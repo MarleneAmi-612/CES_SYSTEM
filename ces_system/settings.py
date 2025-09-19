@@ -93,6 +93,14 @@ DATABASES = {
         'OPTIONS': {
             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
         }
+    },
+    'ces': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': os.environ.get('SIM_DB_NAME', 'ces_simulacion'),
+        'USER': os.environ.get('SIM_DB_USER', 'root'),
+        'PASSWORD': os.environ.get('SIM_DB_PASSWORD', ''),
+        'HOST': os.environ.get('SIM_DB_HOST', 'localhost'),
+        'PORT': os.environ.get('SIM_DB_PORT', '3306'),
     }
 }
 
