@@ -1,3 +1,6 @@
 from django.contrib import admin
+from .models import Graduate, CertificateType, Template
 
-# Register your models here.
+admin.site.register(Graduate)
+admin.site.register(CertificateType)
+admin.site.register(Template)
