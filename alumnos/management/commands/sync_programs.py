@@ -8,7 +8,7 @@ class Command(BaseCommand):
     help = "Sincroniza diplomados desde la base CES a Programs y crea tipos de documento si no existen"
 
     def handle(self, *args, **kwargs):
-        # 1️⃣ Crear los 3 tipos de documento si no existen
+        # Crear los 3 tipos de documento si no existen
         diploma, _ = CertificateType.objects.get_or_create(
             name="Diploma",
             defaults={'description': "Documento que acredita la finalización del programa."}
