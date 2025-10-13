@@ -1,0 +1,152 @@
+{% load static %}
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Solicitudes | Administración CES</title>
+
+  <!-- Fuentes + estilos -->
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/admin.css' %}?v={{ now|date:'U' }}">
+  <link rel="stylesheet" href="{% static 'css/solicitudes.css' %}?v={{ now|date:'U' }}">
+  <!-- Contenedor de notificaciones (toasts) -->
+  <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- Tokens para el JS estático -->
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <meta name="requests-update-url" content="{% url 'administracion:request_update_status' %}">
+</head>
+<body class="bg-orbs">
+<div class="shell">
+  <!-- Topbar -->
+  <header class="topbar">
+    <div class="brand"><span class="dot"></span><strong>CES</strong> · Solicitudes</div>
+    <div class="top-actions">
+      <a class="qbtn" href="{% url 'administracion:home' %}">Panel</a>
+    </div>
+  </header>
+
+  <main class="main">
+    <!-- Filtros -->
+    <form class="toolbar" method="get" action="">
+      <div class="pill">
+        <span>Buscar</span>
+        <input class="tool-input" type="search" name="q" value="{{ q }}" placeholder="correo o nombre…">
+      </div>
+
+      <div class="pill">
+        <span>Estado</span>
+        <select name="status" onchange="this.form.submit()">
+          <option value="">Todos</option>
+          {% for value,label in statuses %}
+            <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="pill">
+        <span>Programa</span>
+        <select name="program" onchange="this.form.submit()">
+          <option value="">Todos</option>
+          {% for p in programas %}
+            <option value="{{ p.id }}" {% if program_id|default:'' == p.id|stringformat:'s' %}selected{% endif %}>
+              {{ p.abbreviation|default:p.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <button class="btn btn--secondary" type="submit">Aplicar</button>
+    </form>
+
+    <!-- Secciones por programa -->
+    {% for group in por_programa %}
+      <section class="collapse">
+        <button class="collapse-hd" type="button" aria-expanded="true" aria-controls="pg-{{ forloop.counter }}" onclick="toggleCollapse(this)">
+          <h3 class="collapse-title">
+            {% if group.program %}
+              {{ group.program.name }}{% if group.program.abbreviation %} <span class="muted">· {{ group.program.abbreviation }}</span>{% endif %}
+            {% else %}Sin programa{% endif %}
+          </h3>
+          <span class="badge">{{ group.items|length }} registros</span>
+        </button>
+
+        <div id="pg-{{ forloop.counter }}" class="collapse-bd">
+          <div class="table-wrap" role="region" aria-label="Solicitudes" tabindex="0">
+            <table class="t t--clean">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th class="left">Alumno</th>
+                  <th>Correo</th>
+                  <th>Enviado</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for r in group.items %}
+                  <tr id="row-{{ r.id }}">
+                    <td>{{ r.id }}</td>
+                    <td class="t-col left">{{ r.name }} {{ r.lastname }}</td>
+                    <td class="t-col"><a href="mailto:{{ r.email }}">{{ r.email }}</a></td>
+                    <td class="t-col">{{ r.sent_at|date:"Y-m-d H:i" }}</td>
+                    <td class="t-col">
+                      <span class="status-chip {{ r.status|default:'pending' }}" data-label>
+                        {{ r.status|default:'pending' }}
+                      </span>
+                    </td>
+                    <td class="t-col">
+                      <div class="actions">
+                        <button class="a-btn warn" data-action="to_review"  data-id="{{ r.id }}">Revisión</button>
+                        <button class="a-btn ok"   data-action="approve"    data-id="{{ r.id }}">Aprobar</button>
+                        <button class="a-btn bad"  data-action="reject"     data-id="{{ r.id }}">Rechazar</button>
+                        <button class="a-btn"      data-action="generating" data-id="{{ r.id }}">Generando</button>
+                      </div>
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr><td colspan="6" class="empty">Sin registros.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    {% empty %}
+      <div class="card">No hay solicitudes.</div>
+    {% endfor %}
+  </main>
+
+  <footer class="foot">© {{ now|date:"Y" }} CES</footer>
+</div>
+
+<!-- Modal rechazar -->
+<div class="modal" id="rejectModal" aria-hidden="true" role="dialog" aria-modal="false" aria-labelledby="rejTitle">
+  <div class="modal__backdrop" data-close="#rejectModal"></div>
+  <div class="modal__dialog modal--sm">
+    <div class="modal__bar"></div>
+    <button class="modal__close" data-close="#rejectModal" aria-label="Cerrar">×</button>
+    <div class="modal__icon" aria-hidden="true">⚠️</div>
+    <h3 class="modal__title" id="rejTitle">Motivo del rechazo</h3>
+    <form id="rejectForm">
+      <input type="hidden" name="id" id="rej_id">
+      <div class="field">
+        <label for="rej_reason">Describe el motivo</label>
+        <textarea class="input" id="rej_reason" name="reason" rows="4" required></textarea>
+      </div>
+      <div id="rejMsg" class="form-msg"></div>
+      <div class="modal__actions">
+        <button class="btn btn--primary" type="submit">Rechazar</button>
+        <button class="btn btn--secondary" type="button" data-close="#rejectModal">Cancelar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- JS de la página -->
+<script src="{% static 'js/solicitudes.js' %}?v={{ now|date:'U' }}" defer></script>
+</body>
+</html>

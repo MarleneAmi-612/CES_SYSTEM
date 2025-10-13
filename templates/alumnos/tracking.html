@@ -1,0 +1,136 @@
+{% load static %}
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Seguimiento de solicitud | CES</title>
+
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{% static 'css/tracking.css' %}" />
+</head>
+<body class="bg-orbs">
+  <div class="wrap">
+
+    {% if not_found %}
+      <div class="panel">
+        <strong>No encontramos esa solicitud.</strong>
+        <a class="back-link" href="{% url 'alumnos:status' %}">Volver a buscar</a>
+      </div>
+    {% else %}
+
+      <div class="top">
+        <h1 class="title">Solicitud #{{ req.id }}</h1>
+        <span id="statusTag" class="tag {{ req.status }}">
+          {% if req.status == "pending" %}Pendiente
+          {% elif req.status == "review" %}Revisión
+          {% elif req.status == "accepted" %}Aprobada
+          {% elif req.status == "generating" %}Generando
+          {% elif req.status == "emailed" %}Enviada por correo
+          {% elif req.status == "downloaded" %}Descargada
+          {% elif req.status == "rejected" %}Rechazada
+          {% else %}{{ req.status|title }}{% endif %}
+        </span>
+      </div>
+
+      <div id="trackingRoot"
+           data-id="{{ req.id }}"
+           data-poll-url="{% url 'alumnos:tracking_api' request_id=req.id %}"
+           class="panel">
+
+        <div><strong>{{ req.name }} {{ req.lastname }}</strong>{% if req.program %} — {{ req.program.name }}{% endif %}</div>
+        <div class="meta">Enviada: {{ req.sent_at|date:"d/m/Y H:i" }} · Correo: {{ req.email }}</div>
+
+        {% with curr=req.status %}
+        <div class="stepper" id="stepper" role="list">
+          {% for st in steps %}
+            {% with n=forloop.counter %}
+            <div class="step
+                 {% if st.done %} done{% endif %}
+                 {% if n <= active_max %} current{% endif %}
+                 {% if curr == 'rejected' and n <= 3 %} bad{% endif %}"
+                 role="listitem"
+                 aria-current="{% if n == active_max %}step{% else %}false{% endif %}">
+              <div class="dot">{{ n }}</div>
+              <div class="label"
+                   data-title="{% if n == 4 %}Generando{% elif n == 6 %}Descargado{% else %}{{ st.title }}{% endif %}">
+                {% if n == 4 %}Generando{% elif n == 6 %}Descargado{% else %}{{ st.title }}{% endif %}
+              </div>
+            </div>
+            {% endwith %}
+          {% endfor %}
+
+          <div class="line">
+            <div id="progressLine" class="progress" data-progress="{{ progress_pct }}"></div>
+          </div>
+        </div>
+        {% endwith %}
+
+        <div class="history-feed amazon" id="historyFeed" aria-live="polite"
+             data-current-status="{{ req.status }}" data-events="{{ events_count }}">
+
+          {% for ev in history %}
+            {% ifchanged ev.when|date:"l d \\de F, Y" %}
+              {% if not forloop.first %}</div>{% endif %}
+              <div class="day">
+                <div class="day-title">
+                  {{ ev.when|date:"l d 'de' F, Y" }}
+                </div>
+            {% endifchanged %}
+
+            <div class="item {% if ev.kind %}{{ ev.kind }}{% endif %}{% if forloop.first %} is-current{% endif %}">
+              <div class="it-spine"></div>
+              <div class="it-dot"></div>
+
+              <div class="it-time">
+                {% if forloop.first %}
+                  <span id="liveTime">{{ ev.when|date:"H:i" }}</span>
+                {% else %}
+                  {{ ev.when|date:"H:i" }}
+                {% endif %}
+              </div>
+
+              <div class="it-main">
+                <div class="it-title {% if ev.kind %}{{ ev.kind }}{% endif %}"
+                     {% if forloop.first %}id="liveTitle"{% endif %}>
+                  {{ ev.title }}
+                </div>
+                {% if ev.sub %}
+                  <div class="it-sub"
+                       {% if forloop.first %}id="liveSub"{% endif %}>{{ ev.sub }}</div>
+                {% endif %}
+              </div>
+            </div>
+
+            {% if forloop.last %}</div>{% endif %}
+          {% empty %}
+            <div class="day">
+              <div class="day-title">—</div>
+              <div class="item info is-current">
+                <div class="it-spine"></div>
+                <div class="it-dot"></div>
+                <div class="it-time">—</div>
+                <div class="it-main">
+                  <div class="it-title info" id="liveTitle">Sin actualizaciones todavía</div>
+                  <div class="it-sub" id="liveSub">Cuando haya novedades, aparecerán aquí.</div>
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+
+        <div class="actions-bottom">
+          <a class="back-link" href="{% url 'alumnos:status' %}">← Consultar otra solicitud</a>
+        </div>
+      </div>
+
+    {% endif %}
+  </div>
+
+  {% if not not_found %}
+    <script src="{% static 'js/tracking-poll.js' %}"></script>
+    <script src="{% static 'js/tracking-progress.js' %}"></script>
+  {% endif %}
+</body>
+</html>

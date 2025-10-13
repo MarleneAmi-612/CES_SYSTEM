@@ -38,7 +38,7 @@ class Command(BaseCommand):
                 defaults={
                     'name': d.programa_full,
                     'certificate_type': cert_type,
-                    'updated_at': timezone.now()
+                    'updated_at': timezone.now(),
                 }
             )
 

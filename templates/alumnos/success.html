@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Solicitud enviada | CES</title>
+  {% load static %}
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{% static 'css/success.css' %}" />
+</head>
+<body class="bg-orbs">
+  <div class="container">
+    <div class="card">
+      <div class="icon-success" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+        </svg>
+      </div>
+
+      <h1 class="title">¡Solicitud enviada con éxito!</h1>
+      <p class="subtitle">
+        Tus datos fueron recibidos y están en revisión.  
+        Te notificaremos cuando tu constancia/diploma esté disponible.
+      </p>
+
+      <form action="{% url 'alumnos:start' %}" class="btns">
+        <button class="btn" type="submit">Volver al inicio</button>
+      </form>
+
+      <div class="footer">© {% now "Y" %} CES</div>
+    </div>
+  </div>
+</body>
+</html>

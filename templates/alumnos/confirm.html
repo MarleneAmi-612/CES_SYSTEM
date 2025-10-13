@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Confirmar datos | CES</title>
+  {% load static %}
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{% static 'css/verify.css' %}" />
+</head>
+<body class="bg-orbs">
+  <div class="container">
+    <div class="card">
+      <div class="header">
+        <h1 class="title">Confirmar datos</h1>
+        <p class="subtitle">Revisa que la información sea correcta antes de continuar.</p>
+      </div>
+
+      <div class="body">
+        {% if error %}
+          <div class="alert" role="alert" aria-live="polite">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 8v5m0 4h.01M12 3l9 18H3L12 3Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <div>{{ error }}</div>
+          </div>
+        {% endif %}
+
+        <!-- Datos personales -->
+        <div class="section">
+          <h3>Datos personales</h3>
+          <ul class="data-list">
+            <li><strong>Correo:</strong> {{ email }}</li>
+            <li><strong>Nombre:</strong> {{ basic.name }}</li>
+            <li><strong>Apellidos:</strong> {{ basic.lastname }}</li>
+          </ul>
+        </div>
+
+        <!-- Programa -->
+        <div class="section">
+          <h3>Programa</h3>
+          <ul class="data-list">
+            <li><strong>{{ program.name }}</strong>{% if program.abbreviation %} ({{ program.abbreviation }}){% endif %}</li>
+          </ul>
+        </div>
+
+        <!-- Datos adicionales -->
+        {% if has_extras %}
+          <div class="section">
+            <h3>Datos adicionales</h3>
+            <ul class="data-list">
+              {% if extras.curp %}<li><strong>CURP:</strong> {{ extras.curp }}</li>{% endif %}
+              {% if extras.rfc %}<li><strong>RFC:</strong> {{ extras.rfc }}</li>{% endif %}
+              {% if extras.job_title %}<li><strong>Puesto:</strong> {{ extras.job_title }}</li>{% endif %}
+              {% if extras.industry %}<li><strong>Giro:</strong> {{ extras.industry }}</li>{% endif %}
+              {% if extras.business_name %}<li><strong>Razón social:</strong> {{ extras.business_name }}</li>{% endif %}
+            </ul>
+          </div>
+        {% endif %}
+
+        <!-- Botones -->
+        <form method="post" class="btns" style="margin-bottom:14px;">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-confirm">Confirmar y enviar</button>
+        </form>
+
+        <form action="{% url 'alumnos:basic' %}" class="btns">
+          <button type="submit" class="btn btn-back">Regresar a editar</button>
+        </form>
+      </div>
+
+      <div class="footer">© {% now "Y" %} CES</div>
+    </div>
+  </div>
+</body>
+</html>

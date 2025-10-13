@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Consulta de solicitud | CES</title>
+
+    {% load static %}
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'css/status.css' %}">
+  </head>
+
+  <body class="bg-orbs">
+    <div class="container">
+      <div class="panel">
+
+        <!-- Header -->
+        <div class="header">
+          <h1 class="title">Consulta tu solicitud</h1>
+
+          <div class="actions-top">
+            <!-- SIEMPRE visible -->
+            <a class="btn-pill back" href="{% url 'alumnos:start' %}">← Regresar</a>
+
+            <!-- SOLO si hay exactamente 1 resultado: CTA directo a seguimiento -->
+            {% if results and results|length == 1 %}
+              <a class="btn-pill cta" href="{% url 'alumnos:tracking' results.0.id %}">Ver seguimiento ›</a>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Sub -->
+        <p class="sub">
+          Escribe tu correo para revisar el estado de tu diploma. Si tu correo tiene varias solicitudes,
+          podrás elegir cuál consultar.
+        </p>
+
+        <!-- Form -->
+        <form method="post" novalidate>
+          {% csrf_token %}
+          <input
+            class="input"
+            type="email"
+            name="email"
+            placeholder="tu@correo.com"
+            value="{{ email_query }}"
+            required
+            autocomplete="email"
+            inputmode="email"
+          />
+          <button class="btn" type="submit">Buscar</button>
+        </form>
+
+        <!-- Error -->
+        {% if error %}
+          <div class="alert">{{ error }}</div>
+        {% endif %}
+
+        <!-- Results -->
+        {% if results != None %}
+
+          <!-- CERO resultados -->
+          {% if results|length == 0 %}
+            <div class="alert" style="margin-top:12px;">
+              No encontramos solicitudes para ese correo.
+            </div>
+
+          <!-- UN resultado -->
+          {% elif results|length == 1 %}
+            {% with r=results.0 %}
+              <div class="single">
+                <h3>{{ r.name }} {{ r.lastname }}</h3>
+
+                <div class="meta">
+                  Programa: {{ r.program.name }}
+                  {% if r.program.abbreviation %} ({{ r.program.abbreviation }}){% endif %}
+                </div>
+
+                <div class="meta">
+                  Enviada: {{ r.sent_at|date:"d/m/Y H:i" }}
+                </div>
+
+                <div class="meta" style="margin-top:6px;">
+                  Estatus:
+                  <span class="badge {{ r.status }}">
+                    {{ r.get_status_display|default:r.status|title }}
+                  </span>
+                </div>
+
+                <div style="margin-top:12px;">
+                  <a class="btn-pill cta" href="{% url 'alumnos:tracking' r.id %}">
+                    Ver seguimiento ›
+                  </a>
+                </div>
+              </div>
+            {% endwith %}
+
+          <!-- MUCHOS resultados -->
+          {% else %}
+            <div class="list">
+              {% for r in results %}
+                <div class="card-row">
+                  <div class="card-left">
+                    <div class="name">
+                      {{ r.name }} {{ r.lastname }}
+                    </div>
+                    <div class="meta">
+                      {{ r.program.name }}
+                      • Enviada: {{ r.sent_at|date:"d/m/Y H:i" }}
+                    </div>
+                  </div>
+
+                  <div class="row-actions">
+                    <span class="badge {{ r.status }}">
+                      {{ r.get_status_display|default:r.status|title }}
+                    </span>
+
+                    <!-- En la lista sí se puede usar r.id con seguridad -->
+                    <a class="link" href="{% url 'alumnos:tracking' r.id %}">
+                      Ver seguimiento ›
+                    </a>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endif %}
+
+        <!-- Footer -->
+        <div class="footer">
+          © {% now "Y" %} CES.
+        </div>
+
+      </div>
+    </div>
+  </body>
+</html>

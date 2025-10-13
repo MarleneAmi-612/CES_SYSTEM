@@ -1,0 +1,107 @@
+/* Usa las mismas variables globales que ya definiste */
+:root {
+  --bg: #0f1216;
+  --bg2:#1b1f24;
+  --card: rgba(255,255,255,.06);
+  --border: rgba(255,255,255,.12);
+  --text:#e8edf3;
+  --muted:#a9b2bd;
+  --accent:#f4771e;
+  --accent-2:#2f67c6;
+  --good:#39d98a;
+  --bad:#ff6b6b;
+  --radius:18px;
+  --shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.05);
+}
+
+/* Fondo igual que verify.css */
+html,body {
+  height:100%; margin:0;
+  font-family: Inter, system-ui, Segoe UI, Roboto, Arial, sans-serif;
+  color: var(--text);
+  background: radial-gradient(1200px 900px at 10% 10%, #12151a 0%, var(--bg) 55%, #0c0f13 100%);
+}
+.bg-orbs::before,.bg-orbs::after{
+  content:""; position:fixed; width:650px; height:650px; border-radius:50%;
+  filter:blur(90px); opacity:.22; z-index:0; pointer-events:none; animation:floaty 18s ease-in-out infinite;
+}
+.bg-orbs::before{ background:linear-gradient(135deg,var(--accent),#ffb671); top:-120px; right:-120px;}
+.bg-orbs::after{  background:linear-gradient(135deg,var(--accent-2),#3e76c4); bottom:-140px; left:-140px; animation-delay:-7s;}
+@keyframes floaty{0%,100%{transform:translate3d(0,0,0) scale(1)}50%{transform:translate3d(0,-10px,0) scale(1.02)}}
+
+/* Centrado */
+.container {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  height:100vh;
+  position:relative;
+  z-index:1;
+}
+
+/* Caja */
+.card {
+  background: var(--card);
+  border:1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 28px 34px 22px;
+  max-width: 440px;
+  width:100%;
+  text-align:center;
+  backdrop-filter: blur(10px);
+}
+
+/* Icono check */
+.icon-success {
+  width:78px; height:78px;
+  margin:0 auto 12px;
+  border-radius:50%;
+  display:grid; place-items:center;
+  border:1px solid var(--border);
+  background:rgba(255,255,255,.04);
+  box-shadow: inset 0 0 12px rgba(0,0,0,.25);
+}
+.icon-success svg {
+  width:42px; height:42px;
+  stroke: var(--good);
+  color: var(--good);
+}
+
+/* Texto */
+.title {
+  font-size:1.4rem;
+  font-weight:700;
+  margin:6px 0;
+}
+.subtitle {
+  font-size:.95rem;
+  color: var(--muted);
+  margin:0 0 18px;
+  line-height:1.4;
+}
+
+/* Botón */
+.btns { margin-top:12px; }
+.btn {
+  background: var(--accent);
+  border:none;
+  padding:9px 16px;
+  border-radius:10px;
+  font-size:.95rem;
+  font-weight:600;
+  cursor:pointer;
+  color:#fff;
+  transition: background .2s ease-in-out, transform .15s ease;
+}
+.btn:hover {
+  background:#ff8b40;
+  transform:translateY(-1px);
+}
+
+/* Footer */
+.footer {
+  margin-top:14px;
+  font-size:.8rem;
+  color: var(--muted);
+}

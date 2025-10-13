@@ -1,0 +1,124 @@
+/* ===== Estilos específicos del tablero de Solicitudes ===== */
+
+.toolbar{
+  display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+  margin:10px 0 16px;
+}
+
+.pill{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:8px 12px; border-radius:999px;
+  background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.14);
+  color:#e8edf3; font-weight:600;
+}
+.pill select, .pill input{
+  background:transparent; border:none; color:inherit; outline:none;
+}
+
+/* Input corto en la toolbar */
+.tool-input{
+  min-width:220px; padding:10px 12px; border-radius:12px;
+  border:1px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.06); color:var(--text);
+}
+
+/* Collapse por programa */
+.collapse{
+  background:var(--card); border:1px solid var(--border);
+  border-radius:16px; padding:12px; margin-bottom:12px;
+  box-shadow:var(--shadow); backdrop-filter:blur(8px);
+}
+.collapse-hd{
+  width:100%; display:flex; align-items:center; justify-content:space-between; gap:10px;
+  cursor:pointer; background:transparent; border:none; color:inherit; text-align:left;
+  padding:6px 2px;
+}
+.collapse-title{ margin:0; font-size:16px; font-weight:700; letter-spacing:.2px; }
+.collapse-bd{ margin-top:10px; }
+.collapse-bd.hide{ display:none; }
+
+/* Tabla */
+.t .t-col.left{ text-align:left; }
+
+/* Acciones */
+.actions{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+.a-btn{
+  padding:6px 10px; border-radius:10px; font-weight:700; font-size:12px; cursor:pointer;
+  border:1px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.06);
+  transition: transform .12s ease, border-color .2s ease, background .2s ease;
+}
+.a-btn:hover{ transform: translateY(-1px); border-color: rgba(255,255,255,.22); background: rgba(255,255,255,.10); }
+.a-btn.ok{
+  color:#39d98a; border-color:rgba(57,217,138,.28); background:rgba(57,217,138,.08);
+}
+.a-btn.warn{
+  color:#ffd18f; border-color:rgba(255,209,143,.28); background:rgba(255,209,143,.08);
+}
+.a-btn.bad{
+  color:#ff6b6b; border-color:rgba(255,107,107,.28); background:rgba(255,107,107,.08);
+}
+
+/* Chips de estado */
+.status-chip{
+  display:inline-block; padding:6px 10px; border-radius:999px; font-size:12px;
+  border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.06);
+}
+.status-chip.pending{   color:#ffd18f; }   /* Pendiente */
+.status-chip.review{    color:#ffd18f; }
+.status-chip.accepted{  color:#39d98a; }
+.status-chip.rejected{  color:#ff6b6b; }
+.status-chip.generating{color:#b7c2ff; }
+
+/* Responsivo */
+@media (max-width: 720px){
+  .tool-input{ min-width: 160px; }
+  .actions{ justify-content:flex-start; }
+}
+/* === Toasts (notificaciones) === */
+.toast-root{
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.toast{
+  min-width: 260px;
+  max-width: 420px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(20,22,26,.82);
+  color: #e9eef4;
+  border: 1px solid rgba(255,255,255,.06);
+  box-shadow: 0 8px 24px rgba(0,0,0,.35);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  pointer-events: auto;
+  animation: toast-in .18s ease-out both;
+}
+
+.toast .t-ic{ font-size: 18px; line-height: 18px; margin-top: 1px; }
+.toast .t-msg{ font-weight: 500; }
+.toast .t-close{
+  margin-left: auto;
+  font-weight: 700;
+  opacity: .75;
+  cursor: pointer;
+}
+.toast .t-close:hover{ opacity: 1; }
+
+.toast.success{ border-color: rgba(16,185,129,.55); }
+.toast.warn   { border-color: rgba(245,158,11,.55); }
+.toast.error  { border-color: rgba(239,68,68,.55); }
+.toast.info   { border-color: rgba(59,130,246,.5); }
+
+@keyframes toast-in { from{ transform: translateY(-6px); opacity: 0; } to{ transform: none; opacity: 1; } }
+@keyframes toast-out{ to  { transform: translateY(-6px); opacity: 0; } }

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Datos básicos | CES</title>
+
+    {% load static %}
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{% static 'css/verify.css' %}" />
+  </head>
+
+  <body class="bg-orbs">
+    <div class="wrap">
+      <div class="panel">
+        <h1 class="title">Tus datos básicos</h1>
+        <p class="sub">Completa tu nombre y selecciona el programa cursado.</p>
+
+        <form method="post" novalidate>
+          {% csrf_token %}
+
+          <div class="field">
+            <label for="id_name">Nombre(s)</label>
+            {{ form.name }}
+          </div>
+
+          <div class="field">
+            <label for="id_lastname">Apellidos</label>
+            {{ form.lastname }}
+          </div>
+
+          <div class="field">
+            <label for="id_program">Programa cursado</label>
+            <!-- El select real se realzará con el dropdown custom -->
+            {{ form.program }}
+          </div>
+
+          <div class="actions">
+            <a class="btn-pill back" href="{% url 'alumnos:start' %}"
+              >← Regresar</a
+            >
+            <button class="btn" type="submit">Siguiente</button>
+          </div>
+        </form>
+
+        {% if missing_fields %}
+        <div class="alert" style="margin-top: 12px">
+          <ul>
+            {% for e in missing_fields %}
+            <li>{{ e }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+
+        <div class="footer">© {% now "Y" %} CES.</div>
+      </div>
+    </div>
+
+  <script src="{% static 'js/nice-select.js' %}"></script>
+<script nonce="{{ csp_nonce }}">
+  window.addEventListener("DOMContentLoaded", () => {
+    if (window.CESNiceSelect) {
+      CESNiceSelect.enhance('#id_program');      // <- fuerza por ID
+      // opcional, si luego quieres usar data-attr en más selects:
+      CESNiceSelect.enhance('[data-nice-select]');
+    } else {
+      console.warn('CESNiceSelect no está disponible');
+    }
+  });
+</script>
+  </body>
+</html>

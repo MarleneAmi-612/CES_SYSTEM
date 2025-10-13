@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es" data-theme="light">
+<head>
+  {% load static %}
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>{{ page_title|default:"Acceso | Administración CES" }}</title>
+
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="{% static 'css/admin_auth.css' %}">
+  <script src="{% static 'js/admin_auth.js' %}" defer></script>
+</head>
+<body>
+  <div class="box">
+    <div class="head">
+      <div>
+        <div class="brand"><span class="dot"></span> CES — Administración</div>
+        <h1 class="title">Inicia sesión</h1>
+      </div>
+
+      <button type="button" class="theme-toggle" id="themeToggle" aria-label="Cambiar tema" aria-pressed="false">
+        <span class="theme-toggle__label" id="themeLabel">Claro</span>
+        <span class="theme-toggle__track" aria-hidden="true">
+          <span class="theme-toggle__thumb">
+            <svg class="theme-toggle__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <circle cx="12" cy="12" r="4"></circle>
+              <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path>
+            </svg>
+          </span>
+        </span>
+      </button>
+    </div>
+
+    {% if form.non_field_errors %}
+      <div class="alert">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      <!-- Renderiza los campos del form (ya traen name="username" y "password") -->
+      {{ form.username }}
+      {{ form.password }}
+
+      <div class="row">
+        <label>
+          <input type="checkbox" name="remember_me" {% if request.POST.remember_me %}checked{% endif %}>
+          Mantener la sesión
+        </label>
+        <a class="link" href="{% url 'administracion:password_reset' %}">¿Olvidaste tu contraseña?</a>
+      </div>
+
+      <button class="btn" type="submit">Acceder</button>
+    </form>
+
+    <div class="footer">© {% now "Y" %} CES</div>
+  </div>
+</body>
+</html>

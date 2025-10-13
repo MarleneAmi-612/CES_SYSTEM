@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Datos extra (CPROEM) | CES</title>
+{% load static %}
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{% static 'css/verify.css' %}" />
+</head>
+<body class="bg-orbs">
+  <div class="container">
+    <div class="card">
+      <div class="progress"></div>
+
+      <div class="header">
+        <p class="kicker">Paso 2 · CPROEM</p>
+        <h1 class="title">Datos extra</h1>
+        <p class="subtitle">Para constancia CPROEM es necesario tu CURP.</p>
+      </div>
+
+      <div class="body">
+        <form method="post" novalidate>
+          {% csrf_token %}
+
+          <div class="grid">
+            <div>
+              <label class="label" for="id_curp">CURP</label>
+              {{ form.curp }}
+              {% if form.curp.errors %}
+                <div class="field-error">{{ form.curp.errors.0 }}</div>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="actions">
+            <a class="btn-ghost" href="{% url 'alumnos:basic' %}">Volver</a>
+            <button class="btn" type="submit">Continuar</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="footer">© {% now "Y" %} CES</div>
+    </div>
+  </div>
+</body>
+</html>
