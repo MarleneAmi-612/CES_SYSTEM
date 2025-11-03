@@ -1,0 +1,77 @@
+{% load static %}
+<link rel="icon" href="{% static 'favicon/favicon.ico' %}">
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Nueva plantilla</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="{% static 'css/plantillas.css' %}">
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <h1 class="h1">Nueva plantilla</h1>
+      <a class="btn" href="{% url 'administracion:plantillas_admin' %}">← Volver</a>
+    </div>
+
+    <form method="post" class="form-card">
+      {% csrf_token %}
+      <div class="form-row">
+        <div class="form-col">
+          <label>Título</label>
+          <input name="title" placeholder="Diploma / Constancia / Portada…" required>
+        </div>
+        <div class="form-col--sm">
+          <label>Tipo</label>
+          <select name="kind">
+            <option value="design">Design (lienzo)</option>
+            <option value="doc">Doc (texto)</option>
+            <option value="slide">Slide (diapositivas)</option>
+          </select>
+        </div>
+      </div>
+
+      <label>JSON inicial</label>
+      <div class="tools">
+        <button class="btn btn--ghost" type="button" onclick="pretty()">Formatear</button>
+        <button class="btn btn--ghost" type="button" onclick="sample('diploma')">Ejemplo Diploma</button>
+        <button class="btn btn--ghost" type="button" onclick="sample('constancia')">Ejemplo Constancia</button>
+      </div>
+      <textarea id="json" name="json">{ "pages":[{"width":1920,"height":1080,"background":"#ffffff","layers":[]}] }</textarea>
+
+      <div class="form-row" style="margin-top:14px">
+        <button class="btn btn--dark">Crear plantilla</button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    function pretty(){
+      const t = document.getElementById('json');
+      try{ t.value = JSON.stringify(JSON.parse(t.value), null, 2); }
+      catch(e){ alert('JSON inválido: '+e.message); }
+    }
+    function sample(kind){
+      const base = { pages:[{ width:1920, height:1080, background:"#FFFFFF", layers:[] }] };
+      if(kind==='diploma'){
+        base.pages[0].layers = [
+          {id:"t1",type:"text",x:720,y:180,text:"Diploma",fontSize:72,fill:"#111"},
+          {id:"t2",type:"text",x:520,y:320,text:"{{nombre}}",fontSize:48,fill:"#0f172a"},
+          {id:"t3",type:"text",x:520,y:390,text:"{{programa}}",fontSize:32,fill:"#334155"},
+          {id:"qr",type:"image",x:1600,y:820,w:220,h:220,url:"/static/img/qr_placeholder.png"}
+        ];
+      } else {
+        base.pages[0].layers = [
+          {id:"head",type:"rect",x:0,y:0,w:1920,h:180,fill:"#f1f5f9"},
+          {id:"title",type:"text",x:680,y:60,text:"Constancia DC3",fontSize:52,fill:"#111"},
+          {id:"nombre",type:"text",x:260,y:350,text:"Trabajador: {{nombre}}",fontSize:30,fill:"#111"},
+          {id:"curp",type:"text",x:260,y:410,text:"CURP: {{curp}}  RFC: {{rfc}}",fontSize:26,fill:"#111"},
+          {id:"puesto",type:"text",x:260,y:470,text:"Puesto: {{puesto}}  Giro: {{giro}}",fontSize:26,fill:"#111"}
+        ];
+      }
+      document.getElementById('json').value = JSON.stringify(base, null, 2);
+    }
+  </script>
+</body>
+</html>

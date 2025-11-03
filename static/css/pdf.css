@@ -1,0 +1,76 @@
+:root {
+  --fg:#111;
+  --muted:#555;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  color: var(--fg);
+  font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
+  background: #fff;
+}
+
+.page {
+  padding: 48px;
+}
+
+.h1 {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+
+.folio {
+  text-align: right;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.box {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 16px;
+}
+
+.row {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.col {
+  flex: 1;
+}
+
+.k {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.v {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.qr {
+  margin-top: 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.qr img {
+  width: 120px;
+  height: 120px;
+  image-rendering: pixelated; /* ayuda al QR con módulos grandes */
+}
+
+.small {
+  color: var(--muted);
+  font-size: 12px;
+}

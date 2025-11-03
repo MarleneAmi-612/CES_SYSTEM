@@ -1,0 +1,93 @@
+{% load static %}
+<link rel="icon" href="{% static 'favicon/favicon.ico' %}">
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>{% if mode == 'edit' %}Editar{% else %}Nueva{% endif %} plantilla · CES</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="{% static 'css/plantillas.css' %}">
+</head>
+<body class="bg-orbs">
+  <div class="app">
+
+    <!-- App Bar -->
+    <header class="appbar">
+      <div class="appbar__left">
+        <div class="brand">
+          <span class="dot"></span><strong>Plantillas</strong>
+        </div>
+      </div>
+      <nav class="appbar__right">
+        <a class="btn" href="{% url 'administracion:plantillas_admin' %}">← Volver</a>
+      </nav>
+    </header>
+
+    <main class="content content--narrow">
+      <h1 class="h1">{% if mode == 'edit' %}Editar{% else %}Nueva{% endif %} plantilla</h1>
+      <p class="sub">Crea la plantilla con un título, tipo y (opcional) un JSON inicial.</p>
+
+      {% if form_error %}
+        <div class="alert alert--error">
+          <strong>Ocurrió un error al validar el JSON:</strong>
+          <div class="mt-6">{{ form_error }}</div>
+        </div>
+      {% endif %}
+
+      <section class="form-card mt-16">
+        <form method="post" id="tplForm" novalidate>
+          {% csrf_token %}
+
+          <div class="field">
+            <label for="title">Título</label>
+            <input
+              class="input"
+              id="title"
+              name="title"
+              type="text"
+              placeholder="Ej. Diploma base"
+              value="{{ prefill.title|default:item.title|default:'' }}"
+              required
+            />
+          </div>
+
+          <div class="row gap-12">
+            <div class="field" style="flex:1">
+              <label for="kind">Tipo</label>
+              <select class="input" id="kind" name="kind">
+                {% with k=prefill.kind|default:item.kind %}
+                  <option value="design" {% if k == 'design' or not k %}selected{% endif %}>Design</option>
+                  <option value="slide"  {% if k == 'slide' %}selected{% endif %}>Slide</option>
+                  <option value="doc"    {% if k == 'doc' %}selected{% endif %}>Doc</option>
+                {% endwith %}
+              </select>
+            </div>
+          </div>
+
+          <div class="field mt-12">
+            <label for="json">JSON inicial (opcional)</label>
+            <textarea
+              class="input"
+              id="json"
+              name="json"
+              rows="16"
+              spellcheck="false"
+              placeholder='{"pages":[{"width":1920,"height":1080,"background":"#ffffff","layers":[]}]}'
+            >{{ prefill.json|default:item.json|default:'' }}</textarea>
+            <div class="hint mt-6">
+              Si lo dejas vacío, se creará una página en blanco (1920×1080) con fondo blanco.
+            </div>
+          </div>
+
+          <div class="row gap-10 mt-16" style="justify-content:flex-end">
+            <a class="btn" href="{% url 'administracion:plantillas_admin' %}">Cancelar</a>
+            <button class="btn btn--primary" type="submit">Guardar</button>
+          </div>
+        </form>
+      </section>
+
+      <footer class="foot">© {{ now|date:"Y" }} CES</footer>
+    </main>
+  </div>
+</body>
+</html>

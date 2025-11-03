@@ -1,0 +1,63 @@
+{% load static %}
+<link rel="icon" href="{% static 'favicon/favicon.ico' %}">
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Logos y Fondos</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="{% static 'css/plantillas.css' %}">
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <h1 class="h1">Logos y Fondos</h1>
+      <form class="row" method="get">
+        <input type="search" name="q" value="{{ q }}" placeholder="Buscar..." />
+        <a class="btn btn--ghost" href="{% url 'administracion:plantillas_admin' %}">← Volver a Plantillas</a>
+      </form>
+    </header>
+
+    <!-- Subida de archivos -->
+    <section class="card assets-upload">
+      <div class="card__body">
+        <form action="{% url 'administracion:asset_upload' %}" method="post" enctype="multipart/form-data" class="row wrap">
+          {% csrf_token %}
+          <input type="file" name="file" accept="image/*" />
+          <input type="text" name="label" placeholder="Etiqueta (opcional)" />
+          <button class="btn" type="submit">Subir</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- Librería -->
+    <section class="assets">
+      {% if items %}
+        <ul class="assets__grid">
+          {% for a in items %}
+            <li class="asset">
+              <div class="asset__thumb">
+                <img src="{{ a.file.url }}" alt="{{ a.label|default:'Asset' }}" class="asset__img">
+              </div>
+              <div class="asset__meta">
+                <div class="title">{{ a.label|default:"(sin etiqueta)" }}</div>
+                <div class="meta">{{ a.kind|title }} • {{ a.created_at|date:"d/m/Y H:i" }}</div>
+              </div>
+              <div class="asset__actions">
+                <a class="btn btn--ghost" href="{{ a.file.url }}" download>Descargar</a>
+
+                <form action="{% url 'administracion:asset_delete' a.id %}" method="post" class="inline">
+                  {% csrf_token %}
+                  <button class="btn btn--ghost" type="submit">Eliminar</button>
+                </form>
+              </div>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p>No hay archivos cargados.</p>
+      {% endif %}
+    </section>
+  </div>
+</body>
+</html>

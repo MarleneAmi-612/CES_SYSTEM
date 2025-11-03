@@ -1,10 +1,14 @@
+{% load static %}
 <!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Confirmar datos | CES</title>
-  {% load static %}
+
+  <!-- Favicons -->
+  <link rel="icon" href="{% static 'favicon/favicon.ico' %}">
+
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="{% static 'css/verify.css' %}" />
@@ -27,7 +31,6 @@
           </div>
         {% endif %}
 
-        <!-- Datos personales -->
         <div class="section">
           <h3>Datos personales</h3>
           <ul class="data-list">
@@ -37,7 +40,6 @@
           </ul>
         </div>
 
-        <!-- Programa -->
         <div class="section">
           <h3>Programa</h3>
           <ul class="data-list">
@@ -45,7 +47,6 @@
           </ul>
         </div>
 
-        <!-- Datos adicionales -->
         {% if has_extras %}
           <div class="section">
             <h3>Datos adicionales</h3>
@@ -59,7 +60,6 @@
           </div>
         {% endif %}
 
-        <!-- Botones -->
         <form method="post" class="btns" style="margin-bottom:14px;">
           {% csrf_token %}
           <button type="submit" class="btn btn-confirm">Confirmar y enviar</button>

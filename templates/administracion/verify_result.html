@@ -1,0 +1,10 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Verificación</title></head>
+<link rel="icon" href="{% static 'favicon/favicon.ico' %}">
+<body>
+  <h1>Documento verificado</h1>
+  <p><strong>Token:</strong> {{ token }}</p>
+  <p><strong>Tipo:</strong> {{ tipo|upper }}</p>
+  <p><strong>Alumno:</strong> {{ alumno }}</p>
+  <p><strong>Programa:</strong> {{ programa }}</p>
+  <p><strong>Inicio:</strong> {{ inicio|date:"d/m/Y" }} — <strong>Fin:</strong> {{ fin|date:"d/m/Y" }}</p>
+</body></html>

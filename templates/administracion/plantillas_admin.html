@@ -1,0 +1,155 @@
+{% load static %}
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Plantillas · Administración</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Favicons -->
+  <link rel="icon" href="{% static 'favicon/favicon.ico' %}?v=1">
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="{% static 'css/plantillas.css' %}">
+
+  <!-- JS -->
+  <script src="{% static 'js/plantillas_admin.js' %}" defer></script>
+</head>
+<body class="bg-orbs">
+  <div class="app">
+
+    <!-- App Bar -->
+    <header class="appbar">
+      <div class="appbar__left">
+        <div class="brand" aria-label="Plantillas CES">
+          <span class="dot" aria-hidden="true"></span><strong>Plantillas</strong>
+        </div>
+
+        <form method="get" class="searchbar" onsubmit="return false">
+          <input id="tpl-search" class="searchbar__input" type="search" name="q"
+                 value="{{ q }}" placeholder="Buscar por título o tipo…">
+        </form>
+      </div>
+
+      <nav class="appbar__right">
+        <!-- Abrir/Importar… (no se muestra JSON al usuario) -->
+        <form id="importForm" action="{% url 'administracion:plantilla_import' %}"
+              method="post" enctype="multipart/form-data">
+          {% csrf_token %}
+          <input id="importFile" name="file" type="file" hidden
+                 accept=".pdf,.doc,.docx,.ppt,.pptx,.odt,.odp,.png,.jpg,.jpeg,.webp,.svg">
+          <button type="button" id="btnImport" class="btn btn--primary btn--sm">
+            Abrir/Importar…
+          </button>
+        </form>
+
+        <a class="btn btn--sm" href="{% url 'administracion:plantillas_catalogo' %}">Catálogo</a>
+        <a class="btn btn--sm" href="{% url 'administracion:plantilla_create' %}">+ Nueva</a>
+        <a class="btn btn--sm" href="{% url 'administracion:home' %}">Inicio</a>
+      </nav>
+    </header>
+
+    <main class="content content--wide">
+      <h1 class="h1">Administración de plantillas</h1>
+      <p class="sub">Importa documentos (PDF/DOCX/PPTX/Imágenes) o edita las plantillas existentes.</p>
+
+      <!-- Flash messages -->
+      {% if messages %}
+        <div class="alerts">
+          {% for message in messages %}
+            <div class="alert 
+                 {% if 'success' in message.tags %}alert--success{% endif %}
+                 {% if 'error' in message.tags or 'danger' in message.tags %}alert--danger{% endif %}
+                 {% if 'warning' in message.tags %}alert--warning{% endif %}
+                 {% if 'info' in message.tags %}alert--info{% endif %}">
+              <span class="alert__dot" aria-hidden="true"></span>
+              <span class="alert__text">{{ message }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <!-- Filtros -->
+      <div class="filterbar">
+        <span class="filterbar__label">Vistas:</span>
+        <div class="chips" id="kind-filter">
+          <button class="chip {% if not kind %}is-active{% endif %}" data-kind="">Todo</button>
+          <button class="chip {% if kind == 'design' %}is-active{% endif %}" data-kind="design">Diplomas</button>
+          <button class="chip {% if kind == 'cproem' %}is-active{% endif %}" data-kind="cproem">CPROEM</button>
+          <button class="chip {% if kind == 'dc3' %}is-active{% endif %}" data-kind="dc3">DC3</button>
+        </div>
+      </div>
+
+      <!-- Grid -->
+      <section class="cards cards--word" id="tpl-grid">
+        {% for t in items %}
+          <article class="card card--tpl"
+                   data-json='{{ t.json_active|default:"{}"|escapejs }}'
+                   data-title="{{ t.title|default_if_none:'' }}"
+                   data-kind="{{ t.kind|default_if_none:'' }}">
+
+            <div class="thumb">
+              {% if t.thumb %}
+                <img class="thumb__img" src="{{ t.thumb.url }}" alt="Vista previa de {{ t.title }}">
+              {% else %}
+                <canvas class="tpl" aria-label="Miniatura de {{ t.title }}"></canvas>
+              {% endif %}
+            </div>
+
+            <div class="card__meta">
+              <h3 class="card__title" title="{{ t.title }}">{{ t.title }}</h3>
+              <div class="card__sub">
+                <span class="pill" title="Tipo">{{ t.kind }}</span>
+                <span class="muted" title="Última actualización">• {{ t.updated_at|date:"d/m/Y H:i" }}</span>
+              </div>
+            </div>
+
+            <div class="card__actions">
+              <a class="btn btn--primary btn--sm"
+                 href="{% url 'administracion:plantilla_edit' t.id %}" title="Editar (E)">Editar</a>
+
+              <!-- Versionar SIN textarea: manda el json actual oculto -->
+              <form method="post" action="{% url 'administracion:plantilla_new_version' t.id %}">
+                {% csrf_token %}
+                <input type="hidden" name="json" value='{{ t.json_active|escapejs }}'>
+                <input type="hidden" name="note" value="Nueva versión desde el listado">
+                <button class="btn btn--sm" type="submit" title="Versionar (V)">Versionar</button>
+              </form>
+
+              <form method="post" action="{% url 'administracion:plantilla_duplicate' t.id %}">
+                {% csrf_token %}
+                <button class="btn btn--sm" type="submit" title="Duplicar (D)">Duplicar</button>
+              </form>
+
+              <form method="post"
+                    action="{% url 'administracion:plantilla_delete' t.id %}"
+                    class="js-confirm"
+                    data-confirm="¿Seguro que deseas eliminar la plantilla «{{ t.title }}»? Esta acción no se puede deshacer.">
+                {% csrf_token %}
+                <button class="btn btn--danger btn--sm" type="submit" title="Eliminar">Eliminar</button>
+              </form>
+            </div>
+          </article>
+        {% empty %}
+          <p class="muted">No hay plantillas registradas.</p>
+        {% endfor %}
+      </section>
+
+      <footer class="foot">© {{ now|date:"Y" }} CES</footer>
+    </main>
+  </div>
+
+  <!-- Modal confirm (reutilizado por .js-confirm) -->
+  <div id="confirmModal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <div class="modal__overlay" data-close></div>
+    <div class="modal__dialog" role="document">
+      <h2 id="confirmTitle" class="modal__title">Confirmar eliminación</h2>
+      <p id="confirmMsg" class="modal__text">¿Seguro que deseas continuar?</p>
+      <div class="modal__actions">
+        <button id="confirmCancel" type="button" class="btn">Cancelar</button>
+        <button id="confirmOk" type="button" class="btn btn--danger">Eliminar</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

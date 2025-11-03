@@ -1,0 +1,91 @@
+{% load static %}
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>{% if mode == 'edit' %}Editar{% else %}Nuevo{% endif %} programa</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="{% static 'favicon/favicon.ico' %}">
+  <link rel="stylesheet" href="{% static 'css/programs.css' %}">
+</head>
+<body class="bg-orbs">
+  <div class="wrap">
+    <header class="page-head">
+      <div class="page-head__row">
+        <h1 class="title">{% if mode == 'edit' %}Editar{% else %}Nuevo{% endif %} programa</h1>
+        <span class="muted ml-auto">Define código, nombre y tipo de constancia.</span>
+      </div>
+      <div class="toolbar">
+        <a class="btn" href="{% url 'administracion:program_list' %}">← Volver</a>
+        <button form="programForm" class="btn btn-primary">Guardar</button>
+      </div>
+    </header>
+
+    <form id="programForm" class="card main" method="post" action="">
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+      <div class="alert">
+        {% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="grid2 grid2--compact">
+        <div class="field">
+          <label class="label" for="code">Código</label>
+          <input id="code" name="code" class="input" type="text" placeholder="Ej. DETN-01"
+                 value="{{ form.code.value|default_if_none:''|default:'' }}">
+          {% if form.code.errors %}<div class="fielderror">{% for e in form.code.errors %}{{ e }}{% endfor %}</div>{% endif %}
+        </div>
+
+        <div class="field">
+          <label class="label" for="name">Nombre</label>
+          <input id="name" name="name" class="input" type="text" placeholder="Nombre del programa"
+                 value="{{ form.name.value|default_if_none:''|default:'' }}">
+          {% if form.name.errors %}<div class="fielderror">{% for e in form.name.errors %}{{ e }}{% endfor %}</div>{% endif %}
+        </div>
+
+        <div class="field">
+          <label class="label" for="constancia_type">Tipo de constancia</label>
+          <select id="constancia_type" name="constancia_type" class="input">
+            <option value="cproem"
+              {% if form.constancia_type.value|default_if_none:'cproem'|lower == 'cproem' %}selected{% endif %}>
+              CPROEM
+            </option>
+            <option value="dc3"
+              {% if form.constancia_type.value|default_if_none:'cproem'|lower == 'dc3' %}selected{% endif %}>
+              DC3
+            </option>
+          </select>
+          <div class="hint">Determina si las constancias del programa serán CPROEM o DC3.</div>
+          {% if form.constancia_type.errors %}<div class="fielderror">{% for e in form.constancia_type.errors %}{{ e }}{% endfor %}</div>{% endif %}
+        </div>
+
+        <div class="field">
+          <label class="label" for="plantilla_diploma">Plantilla de diploma</label>
+          <input id="plantilla_diploma" name="plantilla_diploma" class="input" type="text"
+                 placeholder="Ej. diploma_base"
+                 value="{{ form.plantilla_diploma.value|default_if_none:'diploma_base'|default:'diploma_base' }}">
+          <div class="hint">Por defecto <strong>diploma_base</strong>.</div>
+          {% if form.plantilla_diploma.errors %}<div class="fielderror">{% for e in form.plantilla_diploma.errors %}{{ e }}{% endfor %}</div>{% endif %}
+        </div>
+
+        <div class="field">
+          <label class="label" for="plantilla_constancia">Plantilla de constancia</label>
+          <input id="plantilla_constancia" name="plantilla_constancia" class="input" type="text"
+                 placeholder="Ej. constancia_cproem / constancia_dc3"
+                 value="{{ form.plantilla_constancia.value|default_if_none:''|default:'' }}">
+          {% if form.plantilla_constancia.errors %}<div class="fielderror">{% for e in form.plantilla_constancia.errors %}{{ e }}{% endfor %}</div>{% endif %}
+        </div>
+      </div>
+
+      <div class="edit-actions">
+        <a class="btn btn--ghost" href="{% url 'administracion:program_list' %}">Cancelar</a>
+        <button class="btn btn-primary" type="submit">Guardar</button>
+      </div>
+    </form>
+  </div>
+
+  <script nonce="{{ csp_nonce }}" src="{% static 'js/program.js' %}"></script>
+</body>
+</html>

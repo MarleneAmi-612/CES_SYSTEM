@@ -1,0 +1,222 @@
+{% load static %}
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Editor de Plantilla — {{ tpl.title }} | CES</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- CSRF para fetch -->
+  <meta name="csrf-token" content="{{ csrf_token }}">
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="{% static 'css/editor_moderno.css' %}?v=6.1">
+  <link rel="stylesheet" href="{% static 'css/plantillas.css' %}?v=6.1">
+
+  <!-- FabricJS -->
+  <script src="{% static 'vendor/fabric/fabric.min.js' %}"></script>
+  <script src="{% static 'js/fabric_patch.js' %}" defer></script>
+
+  <!-- PDF.js (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+  <script nonce="{{ NONCE }}">
+    window.pdfjsLib = window['pdfjs-dist/build/pdf'];
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+  </script>
+
+  <!-- URL backend para convertir DOCX/PPTX… -->
+  <script nonce="{{ NONCE }}">
+    window.IMPORT_CONVERT_URL = "{% url 'administracion:plantilla_import_convert' %}";
+  </script>
+
+  <!-- Estado inicial JSON (único) -->
+  <script id="state" type="application/json">{{ tpl.json_active|default:"{}"|safe }}</script>
+</head>
+<body class="bg-orbs">
+  <div class="editor-shell">
+    <!-- Topbar -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="dot"></span>
+        <strong>{{ tpl.title }}</strong>
+      </div>
+      <div class="top-actions">
+        <span id="status" class="status"></span>
+        <a class="btn" href="{% url 'administracion:plantillas_admin' %}">← Salir</a>
+        <button id="btnSave" class="btn btn--dark">💾 Guardar</button>
+      </div>
+    </header>
+
+    <!-- Ribbon -->
+    <nav class="ribbon">
+      <div class="tabs">
+        <button class="tab active" data-tab="inicio">Inicio</button>
+        <button class="tab" data-tab="insertar">Insertar</button>
+        <button class="tab" data-tab="disenio">Diseño</button>
+        <button class="tab" data-tab="formato">Formato</button>
+        <button class="tab" data-tab="vista">Vista</button>
+      </div>
+
+      <div class="ribbon-pages">
+        <!-- INICIO -->
+        <section class="ribbon-page active" data-tab="inicio">
+          <div class="group">
+            <div class="group-title">Edición</div>
+            <div class="group-content">
+              <button id="undo" class="rbtn">↶</button>
+              <button id="redo" class="rbtn">↷</button>
+              <button id="duplicate" class="rbtn">Duplicar</button>
+              <button id="delete" class="rbtn">Eliminar</button>
+              <button id="save" class="rbtn rbtn--primary">Guardar</button>
+            </div>
+          </div>
+          <div class="group">
+            <div class="group-title">Fuente</div>
+            <div class="group-content row">
+              <select id="fontFamily" class="rinput w-180">
+                <option value="system-ui, Segoe UI, Roboto, sans-serif">Sistema</option>
+                <option value="Montserrat, system-ui, -apple-system, Segoe UI, Roboto, sans-serif">Montserrat</option>
+                <option value="Georgia, serif">Georgia</option>
+                <option value="Times New Roman, Times, serif">Times</option>
+              </select>
+              <input id="fontSize" class="rinput w-72" type="number" min="8" max="300" step="1" value="28">
+              <button id="bold" class="rbtn">B</button>
+              <button id="italic" class="rbtn">I</button>
+              <button id="underline" class="rbtn">U</button>
+            </div>
+          </div>
+          <div class="group">
+            <div class="group-title">Color</div>
+            <div class="group-content row">
+              <input id="fillColor" class="rinput w-72 no-pad" type="color" value="#111111">
+            </div>
+          </div>
+        </section>
+
+        <!-- INSERTAR -->
+        <section class="ribbon-page" data-tab="insertar">
+          <div class="group">
+            <div class="group-title">Formas</div>
+            <div class="group-content">
+              <button id="addText" class="rbtn">Texto</button>
+              <button id="addRect" class="rbtn">Rect</button>
+              <button id="addCircle" class="rbtn">Círculo</button>
+              <button id="addLine" class="rbtn">Línea</button>
+            </div>
+          </div>
+
+          <div class="group">
+            <div class="group-title">Importar</div>
+            <div class="group-content">
+              <button id="btnOpenDoc" class="rbtn">Abrir/Importar…</button>
+              <input id="openDocFile"
+                     type="file"
+                     accept=".pdf,.png,.jpg,.jpeg,.webp,.svg,.doc,.docx,.ppt,.pptx,.odt,.odp"
+                     hidden>
+            </div>
+          </div>
+        </section>
+
+        <!-- DISEÑO -->
+        <section class="ribbon-page" data-tab="disenio">
+          <div class="group">
+            <div class="group-title">Página</div>
+            <div class="group-content row">
+              <span class="muted">Fondo</span>
+              <input id="bgColor" class="rinput w-72 no-pad" type="color" value="#ffffff">
+
+              <!-- Controles permanentes en plantilla (evitan duplicados) -->
+              <label class="switch ml-12">
+                <input id="snapMain" data-role="snap" type="checkbox" checked>
+                <span>Snap</span>
+              </label>
+
+              <label class="ml-8">
+                <span class="muted">Cada</span>
+                <input data-role="snapSize" type="number" class="rinput w-72 ml-2"
+                       min="1" max="200" step="1" value="10">
+                <span class="ml-2 muted">px</span>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <!-- FORMATO -->
+        <section class="ribbon-page" data-tab="formato">
+          <div class="group">
+            <div class="group-title">Alinear</div>
+            <div class="group-content">
+              <button id="alignLeft" class="rbtn">Izq</button>
+              <button id="alignCenter" class="rbtn">Centro</button>
+              <button id="alignRight" class="rbtn">Der</button>
+              <button id="bringFront" class="rbtn">Al frente</button>
+              <button id="sendBack" class="rbtn">Al fondo</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- VISTA -->
+        <section class="ribbon-page" data-tab="vista">
+          <div class="group">
+            <div class="group-title">Zoom</div>
+            <div class="group-content">
+              <button id="zoomOut" class="rbtn">–</button>
+              <span id="zoomLabel" class="rlabel">100%</span>
+              <button id="zoomIn" class="rbtn">+</button>
+              <button id="zoom100" class="rbtn">100%</button>
+              <button id="zoomFit" class="rbtn">Ajustar</button>
+            </div>
+          </div>
+          <div class="group">
+            <div class="group-title">Avanzado</div>
+            <div class="group-content">
+              <button id="btnJsonToggle" class="rbtn">Ver JSON (avanzado)</button>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </nav>
+
+    <!-- Workspace -->
+    <main class="workspace">
+      <div id="canvasArea">
+        <div id="canvasWrap" class="canvas-wrap">
+          <canvas id="stage"></canvas>
+        </div>
+      </div>
+    </main>
+
+    <!-- Drawer inferior (JSON y Capas) -->
+    <aside id="drawer" class="drawer">
+      <div class="drawer-bar">
+        <strong>Panel avanzado</strong>
+        <div class="spacer"></div>
+        <button id="drawerClose" class="rbtn">Ocultar</button>
+      </div>
+
+      <div class="drawer-content">
+        <div class="drawer-col">
+          <div class="panel">
+            <div class="panel__title">JSON (solo lectura)</div>
+            <textarea id="json" class="input code" rows="14" readonly spellcheck="false"></textarea>
+          </div>
+        </div>
+        <div class="drawer-col">
+          <div class="panel">
+            <div class="panel__title">Capas</div>
+            <ul id="layers" class="layers"></ul>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <footer class="foot">© {{ now|date:"Y" }} CES</footer>
+  </div>
+
+  <!-- JS del editor (únicos) -->
+  <script src="{% static 'js/plantilla_editor.js' %}" defer></script>
+  <script src="{% static 'js/editor_ui.js' %}" defer></script>
+</body>
+</html>

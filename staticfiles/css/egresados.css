@@ -1,0 +1,467 @@
+/* ===== Paleta base (navy + negro + naranja) ===== */
+:root{
+  --bg:#0c0f13; --bg2:#0f1216; --card:rgba(255,255,255,.06);
+  --border:rgba(255,255,255,.12); --text:#e8edf3; --muted:#a9b2bd;
+  --accent:#f4771e; --good:#39d98a; --bad:#ff6b6b; --radius:16px;
+  --shadow:0 10px 28px rgba(0,0,0,.33), inset 0 1px 0 rgba(255,255,255,.05);
+
+  /* Controles */
+  --control-bg: rgba(255,255,255,.06);
+  --control-bg-2: rgba(255,255,255,.08);
+  --control-border: rgba(255,255,255,.14);
+  --control-focus: #3b82f6;
+
+  /* Colores UI secundarios */
+  --navy:#0b1220;
+  --navy-2:#101827;
+  --orange:#f4771e;
+  --orange-2:#ffb671;
+}
+
+html,body{height:100%;}
+body{
+  margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif; color:var(--text);
+  background: radial-gradient(1100px 820px at 12% 8%, #12151a 0%, var(--bg) 55%, #0a0d11 100%);
+}
+.bg-orbs::before,.bg-orbs::after{
+  content:"";position:fixed;width:600px;height:600px;border-radius:50%;
+  filter:blur(90px);opacity:.20;z-index:0;pointer-events:none;animation:floaty 18s ease-in-out infinite;
+}
+.bg-orbs::before{background:linear-gradient(135deg,var(--accent),#ffb671);top:-110px;right:-110px;}
+.bg-orbs::after{background:linear-gradient(135deg,#2f67c6,#3e76c4);bottom:-130px;left:-130px;animation-delay:-7s;}
+@keyframes floaty{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(0,-8px,0)}}
+
+/* ===== Layout ===== */
+.wrap{position:relative;z-index:1;max-width:1080px;margin:32px auto;padding:0 20px;}
+.page-head{margin-bottom:10px;}
+.page-head__row{display:flex;align-items:flex-end;gap:10px;}
+.title{margin:0;font-size:clamp(24px,2.8vw,30px);font-weight:800;letter-spacing:.2px;}
+.muted{color:var(--muted);font-size:14px;}
+
+.grid{display:grid;grid-template-columns:290px 1fr;gap:14px;align-items:start}
+
+/* ===== Helpers ===== */
+.ml-auto{ margin-left:auto; }
+
+/* ===== Sidebar ===== */
+.side{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow);backdrop-filter:blur(10px);padding:12px;}
+.side__head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.side__title{margin:0;font-size:15px;font-weight:700}
+.badge{background:rgba(255,255,255,.1);border:1px solid var(--border);border-radius:999px;padding:2px 8px;font-size:12px;color:var(--muted)}
+.list{list-style:none;margin:8px 0 0;padding:0;max-height:62vh;overflow:auto}
+.card{border-radius:14px;border:1px solid var(--border);background:rgba(255,255,255,.04);margin-bottom:8px}
+.card.is-active{outline:2px solid rgba(244,119,30,.35)}
+.row{display:flex;align-items:center;gap:10px;padding:10px 10px;text-decoration:none;color:inherit}
+.row__name{font-weight:700;font-size:14px}
+.row__sub{font-size:12px;color:var(--muted)}
+.dot{width:9px;height:9px;border-radius:999px;background:#8ab4ff;box-shadow:0 0 0 6px rgba(138,180,255,.12)}
+.dot--warn{background:var(--accent);box-shadow:0 0 0 6px rgba(244,119,30,.14)}
+.empty{color:var(--muted);padding:10px}
+
+/* Dots pagination */
+.dots{display:flex;gap:6px;justify-content:center;margin-top:6px}
+.dots button{width:8px;height:8px;border-radius:999px;border:0;background:rgba(255,255,255,.25);cursor:pointer}
+.dots button.is-active{background:#fff}
+
+/* ===== Main ===== */
+.main{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow);backdrop-filter:blur(10px);padding:12px 12px 16px;min-height:480px}
+.main__head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.main__title{font-weight:800;font-size:18px}
+
+/* ===== segmented ===== */
+.segmented{display:inline-flex;border:1px solid var(--border);border-radius:12px;background:rgba(255,255,255,.05);overflow:hidden}
+.segmented__btn{appearance:none;background:transparent;color:#cbd5e1;border:0;padding:7px 10px;font-weight:700;cursor:pointer;font-size:13px}
+.segmented__btn.is-active{background:#1f2430;color:#fff;box-shadow:inset 0 0 0 2px rgba(255,255,255,.06)}
+
+/* ===== Mini dropdown Editar ===== */
+.mini-dd{position:relative}
+.mini-dd__btn{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:8px 12px;border-radius:12px;border:1px solid var(--border);
+  background: linear-gradient(180deg, var(--navy), #0c1526);
+  color:#e7ebf3;font-weight:700;cursor:pointer;font-size:13px;
+}
+.mini-dd__btn:hover{background: linear-gradient(180deg, #0d1830, #0b1322);}
+.mini-dd__icon{color: var(--orange);}
+.mini-dd__caret{color:#cbd5e1;}
+
+.mini-dd__menu{
+  position:absolute;right:0;top:calc(100% + 10px);
+  width:min(760px, 92vw);
+  background:
+    radial-gradient(900px 500px at 90% 0%, rgba(244,119,30,.10), transparent 40%),
+    linear-gradient(180deg, rgba(14,23,40,.96), rgba(10,16,28,.94));
+  border:1px solid var(--border);
+  border-radius:16px;
+  backdrop-filter: blur(10px);
+  box-shadow:0 20px 60px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06);
+  color:var(--text);
+  padding:16px; z-index:50;
+  display:none;
+}
+.mini-dd.is-open .mini-dd__menu{ display:block; }
+
+/* ===== Formulario (Editar datos) ===== */
+.edit-form{width:100%}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid2--compact{grid-template-columns:repeat(2, minmax(0, 1fr));}
+.field{
+  display:flex;flex-direction:column;gap:6px;
+  background:rgba(255,255,255,.03);
+  border:1px solid var(--border);
+  border-radius:12px;padding:9px;
+}
+.label{font-size:12px;color:var(--muted)}
+.input{
+  appearance:none;border:1px solid var(--control-border);
+  background:var(--control-bg);color:var(--text);
+  border-radius:10px;padding:8px 10px;font:600 13px/1 Inter,system-ui,sans-serif;
+}
+.input:focus{outline:2px solid var(--orange);outline-offset:2px;border-color:transparent}
+.edit-actions{display:flex;gap:10px;margin-top:8px;justify-content:flex-end}
+.egbtn{
+  --padx:18px; --pady:10px;
+  padding:var(--pady) var(--padx); border-radius:12px; font-weight:800; letter-spacing:.2px; font-size:13px;
+  border:1px solid var(--control-border); background:var(--control-bg-2); color:var(--text); cursor:pointer;
+}
+.egbtn:hover{transform:translateY(-1px); border-color:rgba(255,255,255,.24)}
+.egbtn--ghost{background:transparent}
+.egbtn--primary{
+  background: linear-gradient(180deg, #2d6df6 0%, #1e429f 40%, var(--orange) 140%);
+  border-color: rgba(37,99,235,.6);
+  color:#fff; box-shadow:0 6px 22px rgba(37,99,235,.24), inset 0 1px 0 rgba(255,255,255,.14);
+}
+
+/* ===== Panel documento ===== */
+.panel{border-radius:14px;border:1px solid var(--border);background:rgba(255,255,255,.04);padding:10px;margin-top:10px}
+.doc__head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.doc__title{margin:0;font-size:15px;font-weight:800}
+.doc__folio{font-size:12px;color:var(--muted)}
+.doc__grid{display:grid;grid-template-columns:repeat(2,1fr) 200px;gap:8px}
+.pair{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:12px;padding:9px}
+.pair .k{font-size:12px;color:var(--muted)}
+.pair .v{font-weight:700;font-size:13px}
+.pair--qr .v{display:grid;place-items:center}
+.qr-ph{width:120px;height:120px;border:1px dashed var(--border);border-radius:12px;display:grid;place-items:center;color:var(--muted);font-size:13px}
+
+.doc__actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.btn{
+  background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:12px;color:#e7ebf3;
+  padding:9px 12px;font-weight:700;cursor:pointer;font-size:13px
+}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.btn-primary{background:#2d6df6;border-color:#2d6df6}
+
+/* Tabs logic */
+.doc-tab{display:none}
+.doc-tab.is-active{display:block}
+
+/* ===== Modal Descargas ===== */
+.modal[hidden]{display:none!important;}
+.modal{
+  position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+  background:rgba(7,11,18,.55); z-index:1000;
+}
+.modal__card{ width:min(640px,92vw); background:#0f172a; color:#e2e8f0;
+  border:1px solid rgba(255,255,255,.07); border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,.35); overflow:hidden;}
+.modal__title{ margin:0; padding:14px 16px; font:700 17px/1.2 Inter,system-ui,sans-serif;
+  background:linear-gradient(135deg,#0ea5e9,#22d3ee); -webkit-background-clip:text; background-clip:text; color:transparent;}
+.modal__body{ padding:12px 16px 6px; }
+.modal__footer{ display:flex; gap:8px; justify-content:flex-end; padding:10px 16px 14px; border-top:1px solid rgba(255,255,255,.08); }
+
+.modal .segmented{
+  display:grid; gap:8px; grid-template-columns:1fr; margin:6px 0 12px;
+  background: rgba(255,255,255,.03); border:1px solid var(--border); border-radius:12px; padding:8px;
+}
+.modal .segmented input[type="radio"]{ position:absolute; opacity:0; pointer-events:none; }
+.modal .segmented label{
+  display:flex; align-items:center; gap:10px; padding:9px 11px; border-radius:10px;
+  cursor:pointer; color:#aab3bf; transition:transform .06s ease, border-color .06s ease, background .06s ease;
+  border:1px solid rgba(255,255,255,.1); background:rgba(255,255,255,.03);
+  font-size:13px;
+}
+.modal .segmented label:hover{ transform:translateY(-1px); }
+.modal .segmented input[type="radio"]:checked + label{
+  border-color:#22d3ee; background:rgba(34,211,238,.07); color:#eef2f6;
+}
+.modal .segmented .dot{ width:9px; height:9px; border-radius:50%; background:#22d3ee; box-shadow:0 0 0 2px rgba(34,211,238,.25); }
+
+.btn.btn--ghost{ background:transparent; border:1px solid rgba(255,255,255,.25); color:#e2e8f0; }
+.btn.btn--primary{ background:linear-gradient(90deg,#0ea5e9,#22d3ee); color:#0b1220; border:0; }
+.btn.btn--primary:hover{ filter:brightness(1.07); }
+
+/* ===== Alerta (guardar) ===== */
+.eg-alert[hidden]{ display:none !important; }
+.eg-alert{
+  position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+  background:rgba(4,6,12,.65); backdrop-filter: blur(6px); z-index:1050;
+}
+.eg-alert__card{
+  width:min(520px, 92vw);
+  background: linear-gradient(180deg, #0d1422, #0a111c);
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:18px;
+  color:#e7ecf6;
+  box-shadow: 0 20px 80px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.06);
+  padding:20px 20px 14px;
+}
+.eg-alert__icon{
+  width:38px;height:38px;border-radius:12px;display:grid;place-items:center;
+  background: linear-gradient(180deg, rgba(244,119,30,.25), rgba(244,119,30,.12));
+  color:var(--orange); font-size:20px; margin-bottom:8px;
+}
+.eg-alert__title{ margin:0 0 6px; font:800 18px/1.2 Inter,system-ui,sans-serif; }
+.eg-alert__pre{
+  margin:0; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.10);
+  border-radius:12px; padding:10px; font:600 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color:#cfe2ff;
+  max-height:200px; overflow:auto; white-space:pre-wrap;
+}
+.eg-alert__actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:10px; }
+.egbtn--primary{ background: linear-gradient(180deg, #2d6df6 0%, #1e3a8a 40%, var(--orange) 140%); color:#fff; }
+
+/* ===== Responsivo ===== */
+@media (max-width: 980px){
+  .grid{grid-template-columns:1fr}
+  .doc__grid{grid-template-columns:1fr 1fr}
+}
+@media (max-width: 620px){
+  .grid2{grid-template-columns:1fr}
+}
+/* ====== Overrides de color para "Editar datos" (match UI exterior) ====== */
+:root{
+  /* paleta base */
+  --brand-navy-900:#0b1220;
+  --brand-navy-800:#101827;
+  --brand-navy-700:#0f172a;
+  --brand-blue:#2d6df6;
+  --brand-blue-2:#3b82f6;
+  --brand-orange:#f4771e;
+  --brand-orange-2:#ff9b45;
+
+  --panel-glass: rgba(255,255,255,.06);
+  --panel-border: rgba(255,255,255,.14);
+  --panel-border-strong: rgba(255,255,255,.20);
+  --text-strong:#eef2f6;
+  --text-muted:#a9b2bd;
+}
+
+/* === Botón "Editar datos" (trigger) === */
+.mini-dd__btn{
+  background:
+    linear-gradient(180deg, var(--brand-navy-900), #0d1526);
+  border:1px solid var(--panel-border);
+  color:var(--text-strong);
+  box-shadow:
+    0 8px 24px rgba(0,0,0,.35),
+    inset 0 1px 0 rgba(255,255,255,.06);
+}
+.mini-dd__btn:hover{
+  background:linear-gradient(180deg, #0d1830, #0c1424);
+  border-color: var(--panel-border-strong);
+}
+.mini-dd__btn .caret{ opacity:.85; color:#cbd5e1; }
+.mini-dd__btn::before{
+  /* pequeño glow azul como en el resto de la UI */
+  content:"";
+  position:absolute; inset:-1px; border-radius:12px; pointer-events:none;
+  box-shadow: 0 0 0 1px rgba(59,130,246,.28), 0 6px 24px rgba(37,99,235,.22);
+  opacity:.0; transition:opacity .18s ease;
+}
+.mini-dd.is-open .mini-dd__btn::before{ opacity:.8; }
+
+/* === Panel desplegable (contenedor) === */
+#editPanel.mini-dd__menu{
+  background:
+    radial-gradient(900px 500px at 90% 0%, rgba(244,119,30,.08), transparent 45%),
+    linear-gradient(180deg, rgba(16,24,39,.96), rgba(10,16,28,.94));
+  border:1px solid var(--panel-border);
+  box-shadow:
+    0 20px 60px rgba(0,0,0,.55),
+    inset 0 1px 0 rgba(255,255,255,.05);
+  color:var(--text-strong);
+}
+
+/* === Tarjetas de campo dentro del panel === */
+#editPanel .f{
+  background: rgba(255,255,255,.04);
+  border:1px solid var(--panel-border);
+  border-radius:14px;
+  padding:12px;
+}
+#editPanel .f label{ color:var(--text-muted); font-weight:600; }
+
+/* === Inputs del panel (tono navy + borde suave) === */
+#editPanel .inp{
+  width:100%;
+  appearance:none;
+  background: rgba(10,16,28,.72);
+  border:1px solid rgba(255,255,255,.12);
+  color:var(--text-strong);
+  border-radius:12px;
+  padding:12px 14px;
+  font-weight:700;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+}
+#editPanel .inp::placeholder{ color:#8b93a4; font-weight:600; }
+
+/* focus consistente con UI (anillo azul con leve acento naranja) */
+#editPanel .inp:focus{
+  outline:none;
+  border-color: rgba(59,130,246,.55);
+  box-shadow:
+    0 0 0 3px rgba(59,130,246,.18),
+    0 0 0 1px rgba(244,119,30,.24) inset;
+}
+
+/* === Botones dentro del panel === */
+#editPanel .edit-actions .btn{
+  padding:12px 18px;
+  border-radius:14px;
+  font-weight:800;
+}
+
+/* Primario: gradiente azul con toque naranja (mismo estilo exterior) */
+#editPanel .edit-actions .btn.btn--primary{
+  color:#0b1220;
+  border:0;
+  background:
+    linear-gradient(135deg, #1f3b73 0%, var(--brand-blue) 45%, var(--brand-orange-2) 130%);
+  box-shadow:
+    0 8px 26px rgba(45,109,246,.28),
+    inset 0 1px 0 rgba(255,255,255,.15);
+}
+#editPanel .edit-actions .btn.btn--primary:hover{
+  filter: brightness(1.05) saturate(1.03);
+}
+
+/* Secundario/ghost negro translúcido como el resto */
+#editPanel .edit-actions .btn.btn--ghost{
+  color:var(--text-strong);
+  background:transparent;
+  border:1px solid var(--panel-border);
+}
+#editPanel .edit-actions .btn.btn--ghost:hover{
+  background:var(--panel-glass);
+  border-color:var(--panel-border-strong);
+}
+
+/* Fecha (icono del date input) más visible en fondo oscuro */
+#editPanel input[type="date"]::-webkit-calendar-picker-indicator{
+  filter: invert(1) opacity(.85);
+}
+/* ===== Botón "Editar datos" transparente ===== */
+.mini-dd__btn{
+  background: transparent !important;
+  border: 1px solid rgba(255,255,255,.16) !important;
+  color: #eef2f6 !important;
+  box-shadow: none !important;
+}
+.mini-dd__btn:hover{
+  background: rgba(255,255,255,.06) !important;
+  border-color: rgba(255,255,255,.22) !important;
+}
+.mini-dd__btn:focus{
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59,130,246,.22) !important; /* anillo azul */
+}
+
+/* Glow cuando el menú está abierto (sutil, pero transparente) */
+.mini-dd.is-open .mini-dd__btn{
+  border-color: rgba(59,130,246,.35) !important;
+  box-shadow: 0 0 0 2px rgba(59,130,246,.18) inset !important;
+}
+
+/* ===== Botón "Guardar cambios" transparente dentro del panel ===== */
+#editPanel .edit-actions .btn.btn--primary{
+  background: transparent !important;
+  color: #e8edf3 !important;
+  border: 1px solid rgba(255,255,255,.18) !important;
+  box-shadow: none !important;
+}
+#editPanel .edit-actions .btn.btn--primary:hover{
+  background: rgba(255,255,255,.06) !important;
+  border-color: rgba(255,255,255,.26) !important;
+}
+#editPanel .edit-actions .btn.btn--primary:focus{
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59,130,246,.22) !important;
+}
+
+/* Mantén "Cerrar" como ghost (ya transparente), solo afino hover */
+#editPanel .edit-actions .btn.btn--ghost{
+  background: transparent !important;
+  border: 1px solid rgba(255,255,255,.16) !important;
+  color:#e8edf3 !important;
+}
+#editPanel .edit-actions .btn.btn--ghost:hover{
+  background: rgba(255,255,255,.06) !important;
+  border-color: rgba(255,255,255,.22) !important;
+}
+
+/* Inputs siguen con foco visible sobre fondo azul marino */
+#editPanel .inp:focus{
+  outline: none !important;
+  border-color: rgba(59,130,246,.55) !important;
+  box-shadow: 0 0 0 3px rgba(59,130,246,.18) !important;
+}
+/* ===== Forzar botones del panel Editar (dentro de #editPanel) a transparentes ===== */
+.mini-dd #editPanel .edit-actions .btn.btn--primary,
+#editPanel .edit-actions .btn.btn--primary,
+.mini-dd .edit-actions #editSaveBtn {
+  background: transparent !important;
+  background-image: none !important;
+  color: #e8edf3 !important;
+  border: 1px solid rgba(255,255,255,.18) !important;
+  box-shadow: none !important;
+}
+
+.mini-dd #editPanel .edit-actions .btn.btn--primary:hover,
+#editPanel .edit-actions .btn.btn--primary:hover,
+.mini-dd .edit-actions #editSaveBtn:hover {
+  background: rgba(255,255,255,.06) !important;
+  border-color: rgba(255,255,255,.26) !important;
+}
+
+.mini-dd #editPanel .edit-actions .btn.btn--primary:focus,
+#editPanel .edit-actions .btn.btn--primary:focus,
+.mini-dd .edit-actions #editSaveBtn:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(59,130,246,.22) !important; /* anillo azul accesible */
+}
+
+/* "Cerrar" (ghost) también transparente y coherente */
+.mini-dd #editPanel .edit-actions .btn.btn--ghost,
+#editPanel .edit-actions .btn.btn--ghost,
+.mini-dd .edit-actions #editCloseBtn {
+  background: transparent !important;
+  border: 1px solid rgba(255,255,255,.16) !important;
+  color:#e8edf3 !important;
+  box-shadow: none !important;
+}
+.mini-dd #editPanel .edit-actions .btn.btn--ghost:hover,
+#editPanel .edit-actions .btn.btn--ghost:hover,
+.mini-dd .edit-actions #editCloseBtn:hover {
+  background: rgba(255,255,255,.06) !important;
+  border-color: rgba(255,255,255,.22) !important;
+}
+/* utilidades CSP-friendly */
+.is-hidden { display: none !important; }
+.no-scroll { overflow: hidden !important; }
+
+/* mini dropdown: visible solo cuando .is-open */
+.mini-dd .mini-dd__menu { display: none; }
+.mini-dd.is-open .mini-dd__menu { display: block; }
+
+/* modal ya usa [hidden], forzamos display:none */
+.modal[hidden] { display: none !important; }
+
+/* evita solapamiento: tabs por encima del header mini-dd (ver #3) */
+.page-head { position: relative; z-index: 0; }
+.segmented { position: relative; z-index: 2; }
+.mini-dd { position: relative; z-index: 1; }
+
+.page-head { position: relative; z-index: 0; }
+.segmented  { position: relative; z-index: 2; } /* tabs por encima */
+.mini-dd    { position: relative; z-index: 1; } /* dropdown debajo de tabs */

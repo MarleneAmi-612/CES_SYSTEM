@@ -1,0 +1,87 @@
+@import url('verify.css');
+
+.help-container {
+  position: relative;
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  z-index: 1;
+}
+
+.help-card {
+  width: min(720px, 92vw);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
+  padding: 28px 32px;
+  animation: rise .6s cubic-bezier(.2,.7,.2,1) forwards;
+}
+
+.help-card h1 {
+  font-size: clamp(22px, 3.2vw, 32px);
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.help-card p.subtitle {
+  font-size: 15px;
+  color: var(--muted);
+  margin-bottom: 18px;
+}
+
+.help-tips {
+  list-style: disc;
+  padding-left: 24px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text);
+}
+.help-tips li {
+  margin-bottom: 10px;
+}
+.help-tips strong {
+  color: #fff;
+}
+
+.actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.actions .btn,
+.actions .btn-ghost {
+  flex: 1;
+}
+
+.footer {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+/* Centrar el contenedor del botón */
+.actions{
+  display:flex;
+  justify-content:center;
+}
+
+/* Evitar que el botón crezca a lo ancho y centrar su texto */
+.actions .btn-ghost{
+  flex:0 0 auto;
+  text-align:center;
+  justify-content:center;
+}
+
+/* Botón más pequeño y con ancho contenido */
+.btn-ghost--narrow{
+  width: fit-content;
+  min-width: 160px;        /* ajusta si lo quieres aún más chico */
+  max-width: 260px;
+  padding: 10px 18px;      /* un poco más compacto */
+  margin: 0 auto;
+}

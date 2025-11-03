@@ -1,0 +1,800 @@
+/* ===== Tokens & fondo (mismo que admin.css) ===== */
+:root{
+  --bg:#0f1216;
+  --card:rgba(255,255,255,.06);
+  --border:rgba(255,255,255,.12);
+  --text:#e8edf3;
+  --muted:#a9b2bd;
+  --accent:#f4771e;
+  --accent-2:#2f67c6;
+  --good:#39d98a; --bad:#ff6b6b; --warn:#ffd18f;
+  --radius:18px;
+  --shadow:0 10px 30px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.05);
+}
+
+html,body{height:100%}
+body{
+  margin:0; color:var(--text);
+  font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;
+  background: radial-gradient(1200px 900px at 8% 10%, #12151a 0%, var(--bg) 55%, #0c0f13 100%);
+}
+
+/* Orbes */
+.bg-orbs::before,.bg-orbs::after{
+  content:""; position:fixed; width:650px; height:650px; border-radius:50%;
+  filter:blur(90px); opacity:.22; z-index:0; pointer-events:none; animation:floaty 18s ease-in-out infinite;
+}
+.bg-orbs::before{ background:linear-gradient(135deg,var(--accent),#ffb671); top:-120px; right:-120px;}
+.bg-orbs::after{  background:linear-gradient(135deg,var(--accent-2),#3e76c4); bottom:-140px; left:-140px; animation-delay:-7s;}
+@keyframes floaty{0%,100%{transform:translate3d(0,0,0) scale(1)}50%{transform:translate3d(0,-10px,0) scale(1.02)}}
+
+/* ===== Layout base ===== */
+.shell{position:relative; z-index:1; max-width:1200px; margin:24px auto 40px; padding:0 20px;}
+a, a:link, a:visited, a:active{ color: inherit; text-decoration: none; }
+a:hover{ text-decoration: none; }
+
+/* Topbar compacto (usa el estilo del admin) */
+.topbar{
+  display:flex; align-items:center; justify-content:space-between;
+  background:var(--card); border:1px solid var(--border);
+  border-radius:var(--radius); padding:12px 14px;
+  box-shadow:var(--shadow); backdrop-filter:blur(10px); position:relative; z-index:10;
+}
+.brand{display:flex; align-items:center; gap:10px; font-weight:700}
+.brand .dot{width:10px; height:10px; border-radius:999px; background:linear-gradient(135deg,var(--accent),#ff9b45); box-shadow:0 0 16px rgba(244,119,30,.6)}
+.top-actions{display:flex; align-items:center; gap:10px}
+.search input{
+  width:min(56rem,72vw); padding:12px 14px; border-radius:14px;
+  border:1px solid var(--border); background:rgba(255,255,255,.06); color:var(--text);
+}
+
+/* Utilidades */
+.flex-1{flex:1}
+.mt-12{margin-top:12px} .mt-16{margin-top:16px} .mt-24{margin-top:24px}
+.gap-8{gap:8px} .gap-12{gap:12px} .gap-16{gap:16px}
+.row{display:flex; flex-wrap:wrap; align-items:center}
+.ai-start{align-items:flex-start}
+.h1{margin:0; font-size:20px; letter-spacing:.2px}
+.sub{opacity:.75; font-size:12px}
+
+/* Botones */
+.btn{ display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:12px; font-weight:700; font-size:14px;
+  border:1px solid rgba(255,255,255,.16); background:rgba(255,255,255,.06); color:var(--text);
+  transition: transform .12s ease, border-color .2s ease, background .2s ease;
+}
+.btn:hover{ transform:translateY(-1px); border-color:rgba(255,255,255,.22); background:rgba(255,255,255,.10) }
+.btn--dark{ background:linear-gradient(135deg, var(--accent), #ff9b45); color:#0f1216; border:1px solid transparent; }
+.btn--dark:hover{ transform:translateY(-1px); background:linear-gradient(135deg,#ff8f3a,#ffb066) }
+.btn--ghost{ background:transparent; }
+
+/* Tarjetas / paneles */
+.card, .form-card, .preview{
+  background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow);
+}
+.card{ padding:16px; }
+.card-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px}
+.card-title{margin:0; font-size:18px}
+
+/* Grid responsive */
+.grid{display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); gap:14px}
+.grid--cards{ grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); }
+.col-8{grid-column: span 8} .col-4{grid-column: span 4} .col-12{grid-column: 1 / -1}
+@media (max-width:980px){ .col-8,.col-4{grid-column:1 / -1} }
+
+/* ----- Portada (plantillas.html) ----- */
+.card__actions{display:flex; gap:10px; margin-top:10px}
+
+/* ----- Form (plantilla_form.html) ----- */
+.form-card{ padding:16px }
+.field{ margin-bottom:12px }
+.field label{ display:block; margin:0 0 6px 2px; font-size:13px; color:var(--muted) }
+.input, select, textarea{
+  width:100%; min-height:44px; padding:10px 12px; border-radius:12px; color:var(--text);
+  background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.14); outline:none;
+}
+textarea{ min-height:220px; font-family:ui-monospace,Menlo,Consolas,monospace }
+.hint{ display:block; margin:6px 2px 0; font-size:12px; color:var(--muted); opacity:.9; }
+.pill{display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; font-size:12px; border:1px solid rgba(255,255,255,.16);}
+.pill.ok{background:rgba(57,217,138,.10); color:#39d98a; border-color:rgba(57,217,138,.28)}
+.pill.bad{background:rgba(255,255,255,.06); color:#ff9f9f;}
+
+/* Mini preview */
+.preview-box{border:1px dashed rgba(255,255,255,.16); border-radius:14px; padding:12px; background:rgba(255,255,255,.03)}
+
+/* ----- Editor (plantilla_editor.html) ----- */
+.toolbar{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px}
+.panel{border:1px solid var(--border); border-radius:14px; padding:12px; background:rgba(255,255,255,.03)}
+.panel__title{margin:8px 0; font-size:14px}
+.preview__bar{display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border-bottom:1px solid var(--border)}
+.preview__title{font-weight:700}
+.preview__canvas{padding:12px; overflow:auto}
+.assets{display:grid; grid-template-columns:repeat(3,1fr); gap:8px}
+.assets img{width:100%; display:block; border-radius:10px; border:1px solid rgba(255,255,255,.12); cursor:pointer}
+.icon{width:18px; height:18px; display:inline-block}
+.status{font-size:12px; margin-left:auto; opacity:.85}
+
+/* Utilidad de ancho */
+.w-360{width:360px}
+.w-80{width:80px} .w-48{width:48px} .no-pad{padding:0}
+
+/* Footer */
+.foot{margin:20px 0; text-align:center; color:var(--muted)}
+/* === Layout estilo suite ofimática (Word/Canva/PowerPoint) === */
+.app{min-height:100vh; display:flex; flex-direction:column}
+.appbar{display:flex; align-items:center; justify-content:space-between; gap:16px; padding:10px 16px; background:rgba(255,255,255,.04); border-bottom:1px solid var(--border)}
+.appbar__left{display:flex; align-items:center; gap:14px}
+.appbar .brand{display:flex; align-items:center; gap:10px; font-weight:700}
+.appbar .dot{width:10px; height:10px; background:var(--accent); border-radius:999px; display:inline-block}
+.appbar .searchbar{display:flex; align-items:center}
+.searchbar__input{width:340px; max-width:50vw; padding:10px 12px; border-radius:14px; border:1px solid var(--border); background:transparent; color:var(--text)}
+
+.layout{display:grid; grid-template-columns:260px 1fr; gap:18px; padding:18px}
+.sidebar{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:14px; box-shadow:var(--shadow); position:sticky; top:18px; height:fit-content}
+.sidebar__title{margin:6px 0 10px; font-size:13px; color:var(--muted); letter-spacing:.3px; text-transform:uppercase}
+.navlist{list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:6px}
+.navlist__link{display:block; padding:10px 12px; border-radius:12px; border:1px solid transparent; color:var(--text); text-decoration:none; cursor:pointer}
+.navlist__link:hover{background:rgba(255,255,255,.05); border-color:var(--border)}
+.navlist__link.is-active{background:rgba(255,255,255,.08); border-color:var(--accent)}
+
+.divider{height:1px; background:var(--border); margin:12px 0}
+
+.content .h1{margin:0 0 6px}
+.sub{color:var(--muted); margin-bottom:14px}
+
+.cards{display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:16px}
+.card{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow)}
+.card--tpl{display:flex; flex-direction:column; overflow:hidden}
+.thumb{aspect-ratio:4/3; background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.2)); border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:center}
+.card__meta{padding:12px 14px}
+.card__title{margin:0 0 6px; font-size:16px}
+.card__sub{display:flex; align-items:center; gap:8px}
+.pill{padding:4px 8px; border:1px solid var(--border); border-radius:999px; font-size:12px; color:var(--muted)}
+.muted{color:var(--muted)}
+.card__actions{display:flex; align-items:center; gap:10px; padding:12px 14px; border-top:1px dashed var(--border)}
+.btn{display:inline-flex; align-items:center; gap:8px; padding:10px 12px; border-radius:14px; border:1px solid var(--border); background:transparent; color:var(--text); text-decoration:none; cursor:pointer}
+.btn--primary{border-color:var(--accent); background:linear-gradient(180deg, rgba(244,119,30,.25), rgba(244,119,30,.05));}
+.btn:hover{filter:brightness(1.05)}
+.w-full{width:100%}
+.mt-6{margin-top:6px}.mt-8{margin-top:8px}
+.input{width:100%; padding:10px 12px; border-radius:12px; border:1px solid var(--border); background:transparent; color:var(--text); min-height:42px}
+
+.dropdown{position:relative}
+.dropdown__menu{position:absolute; right:0; top:40px; width:340px; background:var(--card); border:1px solid var(--border); border-radius:16px; padding:12px; box-shadow:var(--shadow); z-index:10}
+.dropdown[open] > summary::marker{display:none}
+.dropdown > summary{list-style:none}
+.dropdown > summary::-webkit-details-marker{display:none}
+.dropdown > summary{cursor:pointer}
+/* === App Bar alineada (botones al nivel de la búsqueda) === */
+.app{min-height:100vh; display:flex; flex-direction:column}
+.appbar{display:flex; align-items:center; justify-content:space-between; gap:16px; padding:10px 16px; background:rgba(255,255,255,.04); border-bottom:1px solid var(--border)}
+.appbar__left{display:flex; align-items:center; gap:14px}
+.appbar .brand{display:flex; align-items:center; gap:10px; font-weight:700}
+.appbar .dot{width:10px; height:10px; background:var(--accent); border-radius:999px; display:inline-block}
+.appbar .searchbar{display:flex; align-items:center}
+.searchbar__input{width:380px; max-width:52vw; padding:10px 12px; border-radius:14px; border:1px solid var(--border); background:transparent; color:var(--text)}
+.appbar__right{display:flex; align-items:center; gap:10px}
+
+/* === Contenido centrado y ancho responsivo === */
+.content{padding:18px}
+.content--wide{max-width:1200px; width:100%; margin:0 auto}
+
+/* === Chips de filtro (compacto, reemplaza sidebar) === */
+.filterbar{display:flex; align-items:center; gap:12px; margin:6px 0 12px}
+.filterbar__label{font-size:13px; color:var(--muted)}
+.chips{display:flex; flex-wrap:wrap; gap:8px}
+.chip{padding:8px 12px; border:1px solid var(--border); background:transparent; color:var(--text); border-radius:999px; cursor:pointer; font-size:13px}
+.chip:hover{background:rgba(255,255,255,.05)}
+.chip.is-active{border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent)}
+
+/* === Grid de plantillas estilo “elegir hoja de Word/Canva” === */
+.cards{display:grid; gap:16px}
+.cards--xl{grid-template-columns:repeat(auto-fill,minmax(380px,1fr))}
+.card{background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow)}
+.card--tpl{display:flex; flex-direction:column; overflow:hidden}
+.thumb{aspect-ratio:4/3; background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(0,0,0,.2)); border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:center}
+.thumb__img{width:100%; height:100%; object-fit:cover; display:block}
+.card__meta{padding:12px 14px}
+.card__title{margin:0 0 6px; font-size:16px}
+.card__sub{display:flex; align-items:center; gap:8px}
+.pill{padding:4px 8px; border:1px solid var(--border); border-radius:999px; font-size:12px; color:var(--muted)}
+.muted{color:var(--muted)}
+.card__actions{display:flex; align-items:center; gap:10px; padding:12px 14px; border-top:1px dashed var(--border)}
+.btn{display:inline-flex; align-items:center; gap:8px; padding:10px 12px; border-radius:14px; border:1px solid var(--border); background:transparent; color:var(--text); text-decoration:none; cursor:pointer}
+.btn--primary{border-color:var(--accent); background:linear-gradient(180deg, rgba(244,119,30,.25), rgba(244,119,30,.05))}
+.btn:hover{filter:brightness(1.05)}
+.w-full{width:100%}
+.mt-6{margin-top:6px}.mt-8{margin-top:8px}
+.input{width:100%; padding:10px 12px; border-radius:12px; border:1px solid var(--border); background:transparent; color:var(--text); min-height:42px}
+
+/* Dropdown (versionar) */
+.dropdown{position:relative}
+.dropdown__menu{position:absolute; right:0; top:40px; width:360px; max-width:88vw; background:var(--card); border:1px solid var(--border); border-radius:16px; padding:12px; box-shadow:var(--shadow); z-index:10}
+.dropdown[open] > summary::marker{display:none}
+.dropdown > summary{list-style:none}
+.dropdown > summary::-webkit-details-marker{display:none}
+.dropdown > summary{cursor:pointer}
+
+/* Responsivo */
+@media (max-width: 980px){
+  .searchbar__input{max-width:44vw}
+  .cards--xl{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+}
+/* ==== Ajustes: miniaturas pequeñas tipo selector de Word ==== */
+.cards--sm{grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:14px}
+.card--tpl{border-radius:16px}
+.thumb{
+  aspect-ratio:4/3; /* puedes cambiar a 3/4 si quieres vertical */
+  background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(0,0,0,.12));
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:center;
+}
+.thumb__img{width:100%; height:100%; object-fit:cover; display:block}
+.card__meta{padding:10px 12px}
+.card__title{font-size:14px; margin:0 0 4px}
+.card__sub{gap:6px}
+.pill{font-size:11px; padding:3px 7px; border-radius:999px}
+
+/* ==== “Vistas” como chips blancos, simples ==== */
+.filterbar{display:flex; align-items:center; gap:10px; margin:6px 0 10px}
+.filterbar__label{font-size:13px; color:var(--muted)}
+.chips{display:flex; flex-wrap:wrap; gap:8px}
+.chip{
+  appearance:none;
+  background:#fff; color:#111;
+  border:1px solid #e5e7eb;
+  padding:8px 12px; border-radius:999px;
+  font-size:13px; cursor:pointer;
+  box-shadow:0 1px 1px rgba(0,0,0,.03);
+}
+.chip:hover{filter:brightness(0.98)}
+.chip.is-active{
+  border-color:var(--accent);
+  box-shadow:inset 0 0 0 1px var(--accent);
+}
+
+/* Botonera inferior de cada tarjeta: compacta */
+.card__actions{gap:8px; padding:10px 12px}
+.btn{padding:8px 10px; border-radius:12px; font-size:13px}
+.btn--primary{border-color:var(--accent); background:linear-gradient(180deg, rgba(244,119,30,.2), rgba(244,119,30,.05))}
+/* ====== Vista tipo Word: miniaturas verticales y chips blancos ====== */
+
+/* Grid compacto */
+.cards.cards--word{grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px}
+
+/* Tarjeta y miniatura vertical (3:4 como hoja) */
+.cards.cards--word .card--tpl{border-radius:14px; overflow:hidden}
+.cards.cards--word .thumb{
+  aspect-ratio:3/4 !important;
+  background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(0,0,0,.12));
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:center;
+}
+.cards.cards--word .thumb__img{
+  width:100%; height:100%; display:block;
+  object-fit:cover;        /* si prefieres borde blanco cambia a "contain" */
+  background:#fff;
+}
+
+/* Meta y título más compactos */
+.cards.cards--word .card__meta{padding:10px 12px}
+.cards.cards--word .card__title{font-size:14px; margin:0 0 4px}
+.cards.cards--word .card__sub{gap:6px}
+.cards.cards--word .pill{font-size:11px; padding:3px 7px}
+
+/* Acciones compactas */
+.cards.cards--word .card__actions{padding:10px 12px; gap:8px}
+.cards.cards--word .btn{padding:8px 10px; border-radius:12px; font-size:13px}
+
+/* Chips de "Vistas" en blanco, minimal */
+.filterbar .chip{
+  appearance:none; background:#fff !important; color:#111 !important;
+  border:1px solid #e5e7eb !important;
+  padding:8px 12px; border-radius:999px; font-size:13px; cursor:pointer;
+  box-shadow:0 1px 1px rgba(0,0,0,.03);
+}
+.filterbar .chip:hover{filter:brightness(0.98)}
+.filterbar .chip.is-active{
+  border-color:var(--accent) !important;
+  box-shadow:inset 0 0 0 1px var(--accent) !important;
+}
+/* --- Acciones: 3 columnas iguales y sin cortes --- */
+.cards.cards--word .card__actions{
+  display:grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap:10px;
+  padding:12px;
+  border-top:1px dashed var(--border);
+  overflow:visible; /* evita cortes del summary/dropdown */
+}
+.cards.cards--word .card__actions .btn{
+  width:100%;
+  justify-content:center;
+  white-space:nowrap;
+  padding:10px 12px;
+  border-radius:12px;
+  font-size:13px;
+}
+
+/* Dropdown coherente dentro del grid */
+.cards.cards--word details.dropdown{
+  position:relative;
+}
+.cards.cards--word details.dropdown .dropdown__menu{
+  right:0; top:40px; width:360px; max-width:88vw;
+}
+
+/* Meta: mejor lectura y separación del bloque de acciones */
+.cards.cards--word .card__meta{
+  padding:10px 12px 6px;
+}
+.cards.cards--word .card__title{ margin:0 0 6px; }
+.cards.cards--word .card__sub .muted{ line-height:1.3; }
+
+/* Responsivo: 2 columnas (tableta) y 1 columna (móvil) */
+@media (max-width: 880px){
+  .cards.cards--word .card__actions{ grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 520px){
+  .cards.cards--word .card__actions{ grid-template-columns: 1fr; }
+}
+/* ===== Compactar tarjeta tipo Word: tipografías y botones pequeños ===== */
+.cards.cards--word .card__meta{ padding:8px 10px 4px }
+.cards.cards--word .card__title{
+  font-size:13px;           /* antes 14 */
+  margin:0 0 4px;
+  line-height:1.25;
+}
+.cards.cards--word .pill{
+  font-size:10px;           /* antes 11 */
+  padding:2px 6px;
+}
+.cards.cards--word .card__sub .muted{
+  font-size:12px;           /* fecha/hora más pequeña */
+  line-height:1.2;
+}
+
+/* línea divisoria más corta y sutil */
+.cards.cards--word .card__meta + .card__actions{
+  border-top:1px dashed rgba(255,255,255,.08);
+}
+
+/* Botones más pequeños */
+.cards.cards--word .card__actions{
+  gap:8px;
+  padding:8px 10px;         /* antes 12px */
+}
+.cards.cards--word .card__actions .btn{
+  padding:6px 8px;          /* antes 10x12 */
+  border-radius:10px;
+  font-size:12px;           /* antes 13 */
+  min-height:32px;          /* altura controlada */
+}
+.cards.cards--word .card__actions .btn--primary{
+  /* mantiene el look pero más discreto */
+  background:linear-gradient(180deg, rgba(244,119,30,.16), rgba(244,119,30,.04));
+  border-color:rgba(244,119,30,.65);
+}
+
+/* Miniatura: margen inferior un poco menor para ahorrar espacio */
+.cards.cards--word .thumb{ margin-bottom:6px }
+
+/* Responsivo: conserva compacto en móvil */
+@media (max-width: 520px){
+  .cards.cards--word .card__title{ font-size:13px }
+  .cards.cards--word .card__sub .muted{ font-size:12px }
+  .cards.cards--word .card__actions .btn{ font-size:12px; min-height:30px }
+}
+/* --- Título centrado --- */
+.cards.cards--word .card__title{
+  text-align:center;
+}
+
+/* --- Acciones: 3 columnas iguales y botones idénticos --- */
+.cards.cards--word .card__actions{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:8px;
+  padding:8px 10px;
+}
+
+/* cada celda (incluye <form> y <details>) ocupa todo */
+.cards.cards--word .card__actions > *{
+  width:100%;
+}
+
+/* botón normal y summary (versionar) con el mismo layout */
+.cards.cards--word .card__actions .btn,
+.cards.cards--word .card__actions details > summary.btn{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:100%;
+  height:36px;           /* altura fija igual para los 3 */
+  padding:0 12px;        /* sin variaciones por el texto */
+  font-size:12px;
+  border-radius:10px;
+  white-space:nowrap;
+}
+
+/* quitar cualquier borde raro del details que cree “pastillas” desiguales */
+.cards.cards--word details.dropdown{
+  margin:0;
+  padding:0;
+  border:none;
+}
+.cards.cards--word details.dropdown .dropdown__menu{
+  right:0; top:42px;     /* se ajusta a la nueva altura */
+}
+
+/* (opcional) compactar el bloque de meta para que todo respire */
+.cards.cards--word .card__meta{ padding:8px 10px 4px }
+/* ==== Botones pequeños y centrados en la tarjeta ==== */
+/* Sobrescribe el grid anterior y centra */
+.cards.cards--word .card__actions{
+  display:flex !important;
+  justify-content:center !important;
+  align-items:center !important;
+  gap:8px !important;
+  padding:8px 0 10px !important;
+  border-top:1px dashed var(--border);
+}
+
+/* Evita que <form> o <details> se estiren */
+.cards.cards--word .card__actions > *{
+  width:auto !important;
+  flex:0 0 auto !important;
+  margin:0 !important;
+  padding:0 !important;
+}
+
+/* Mismo tamaño para botón normal y summary (Versionar) */
+.cards.cards--word .card__actions .btn,
+.cards.cards--word .card__actions details > summary.btn{
+  display:inline-flex !important;
+  align-items:center; justify-content:center;
+  height:30px !important;           /* más pequeño */
+  padding:0 12px !important;        /* compacto */
+  font-size:12px !important;        /* tipografía pequeña */
+  line-height:1 !important;
+  border-radius:9px !important;
+  white-space:nowrap;
+}
+
+/* Opcional: estilo uniforme (contorno discreto) */
+.cards.cards--word .card__actions .btn{
+  background:transparent;
+  border:1px solid rgba(255,255,255,.14);
+}
+.cards.cards--word .card__actions .btn--primary{
+  border-color:rgba(244,119,30,.6);
+  background:linear-gradient(180deg, rgba(244,119,30,.14), rgba(244,119,30,.04));
+}
+
+/* Menú de versionar alineado al nuevo tamaño */
+.cards.cards--word details.dropdown .dropdown__menu{
+  right:0; top:36px; /* justo debajo de los botones pequeños */
+}
+/* ===== Compactar tarjeta tipo Word: tipografías y botones pequeños ===== */
+.cards.cards--word .card__meta{ padding:8px 10px 4px }
+.cards.cards--word .card__title{
+  font-size:13px;           /* antes 14 */
+  margin:0 0 4px;
+  line-height:1.25;
+}
+.cards.cards--word .pill{
+  font-size:10px;           /* antes 11 */
+  padding:2px 6px;
+}
+.cards.cards--word .card__sub .muted{
+  font-size:12px;           /* fecha/hora más pequeña */
+  line-height:1.2;
+}
+
+/* línea divisoria más corta y sutil */
+.cards.cards--word .card__meta + .card__actions{
+  border-top:1px dashed rgba(255,255,255,.08);
+}
+
+/* Botones más pequeños */
+.cards.cards--word .card__actions{
+  gap:8px;
+  padding:8px 10px;         /* antes 12px */
+}
+.cards.cards--word .card__actions .btn{
+  padding:6px 8px;          /* antes 10x12 */
+  border-radius:10px;
+  font-size:12px;           /* antes 13 */
+  min-height:32px;          /* altura controlada */
+}
+.cards.cards--word .card__actions .btn--primary{
+  /* mantiene el look pero más discreto */
+  background:linear-gradient(180deg, rgba(244,119,30,.16), rgba(244,119,30,.04));
+  border-color:rgba(244,119,30,.65);
+}
+
+/* Miniatura: margen inferior un poco menor para ahorrar espacio */
+.cards.cards--word .thumb{ margin-bottom:6px }
+
+/* Responsivo: conserva compacto en móvil */
+@media (max-width: 520px){
+  .cards.cards--word .card__title{ font-size:13px }
+  .cards.cards--word .card__sub .muted{ font-size:12px }
+  .cards.cards--word .card__actions .btn{ font-size:12px; min-height:30px }
+}
+/* ===== Botones ultra-mini ===== */
+.cards.cards--word .card__actions{
+  gap:4px !important;
+  padding:4px 0 6px !important;
+}
+
+.cards.cards--word .card__actions .btn,
+.cards.cards--word .card__actions details > summary.btn{
+  height:22px !important;      /* MUY pequeño */
+  padding:0 8px !important;    /* compacto */
+  font-size:10px !important;   /* tipografía reducida */
+  line-height:1 !important;
+  border-radius:7px !important;
+  letter-spacing:.1px;
+}
+
+/* Bordes discretos y consistentes */
+.cards.cards--word .card__actions .btn{
+  background:transparent !important;
+  border:1px solid rgba(255,255,255,.14) !important;
+}
+.cards.cards--word .card__actions .btn--primary{
+  border-color:rgba(244,119,30,.55) !important;
+  background:linear-gradient(180deg, rgba(244,119,30,.12), rgba(244,119,30,.035)) !important;
+}
+
+/* Dropdown alineado a la nueva altura */
+.cards.cards--word details.dropdown .dropdown__menu{
+  top:28px !important; /* 22px de botón + margen */
+  right:0;
+}
+/* Separación extra entre "Versionar" y "Duplicar" */
+.cards.cards--word .card__actions{
+  gap:8px !important;                 /* un poco más de espacio entre todos */
+}
+
+.cards.cards--word .card__actions details.dropdown{
+  margin-right:8px !important;        /* espacio específico después de Versionar */
+}
+
+.cards.cards--word .card__actions details.dropdown .btn,
+.cards.cards--word .card__actions details > summary.btn{
+  /* evita que el borde del summary “se pegue” visualmente */
+  border-radius:7px !important;
+  overflow: hidden;                    /* limpia solapes de radios internos */
+}
+
+/* Por si algún navegador colapsa el margen del siguiente formulario */
+.cards.cards--word .card__actions details.dropdown + form{
+  margin-left:0 !important;
+}
+/* Más separación entre "Versionar" y "Duplicar" */
+.cards.cards--word .card__actions{
+  gap:12px !important;                 /* espacio general mayor */
+}
+
+.cards.cards--word .card__actions details.dropdown{
+  margin-right:12px !important;        /* respiro extra solo después de Versionar */
+}
+
+/* (opcional) si aún se ven pegados por los bordes redondeados */
+.cards.cards--word .card__actions details > summary.btn{
+  margin-right:2px !important;         /* micro separación adicional del summary */
+}
+/* Utilidades */
+.pt-12{padding-top:12px}
+.minw-480{min-width:480px}
+.ml-12{margin-left:12px}
+.w-64{width:64px}
+.w-140{width:140px}
+.badge{padding:6px 10px;border:1px solid var(--border);border-radius:10px;font-size:12px}
+.chk{display:inline-flex; gap:6px; align-items:center; font-size:13px}
+
+/* Toolbar agrupada */
+.toolbar.wrap{display:flex; flex-wrap:wrap; gap:10px; align-items:center}
+.toolbar .group{display:flex; gap:8px; align-items:center}
+
+/* Panel capas */
+.layers{list-style:none; margin:0; padding:0; max-height:220px; overflow:auto; border:1px solid var(--border); border-radius:10px}
+.layer-item{display:flex; justify-content:space-between; align-items:center; padding:6px 10px; border-bottom:1px solid rgba(255,255,255,.06); font-size:13px}
+.layer-item:last-child{border-bottom:0}
+.layer-item:hover{background:rgba(255,255,255,.04)}
+.layer-tools{display:flex; gap:6px}
+.btn-xs{border:1px solid var(--border); background:transparent; padding:2px 6px; border-radius:8px; font-size:11px; cursor:pointer}
+
+/* Propiedades */
+.props label{font-size:12px; color:var(--muted); margin-right:6px}
+#textOnly{display:none}
+
+/* Lienzo */
+.preview__canvas{overflow:auto; border:1px dashed var(--border); border-radius:12px; background:#fff}
+canvas#stage{display:block; background:transparent}
+/* ---- JSON colapsable (debajo del lienzo) ---- */
+.collapsible {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255,255,255,.02);
+}
+.collapsible__summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 10px 14px;
+  font-weight: 600;
+  border-radius: 14px;
+}
+.collapsible__summary::-webkit-details-marker { display: none; }
+.collapsible[open] .collapsible__summary { border-bottom: 1px dashed var(--border); }
+.collapsible__body { padding: 12px; }
+
+.json-readonly {
+  min-height: 240px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  border-radius: 12px;
+}
+
+/* utilidades ya usadas */
+.mt-16 { margin-top: 16px; }
+.mt-6 {  margin-top:  6px; }
+/* ===== Ribbon estilo Word ===== */
+.ribbon{
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+  border: 1px solid var(--border);
+}
+
+.ribbon__tabs{
+  display:flex; gap:14px; padding:8px 10px 0;
+}
+
+.ribbon__tab{
+  background: transparent;
+  border: 0;
+  color: #cfd8e3;
+  padding: 8px 14px;
+  border-radius: 10px 10px 0 0;
+  cursor: pointer;
+  font-weight: 600;
+}
+.ribbon__tab.is-active{
+  color: #fff;
+  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+  border: 1px solid var(--border);
+  border-bottom: 0;
+}
+
+.ribbon__body{
+  border-top: 1px solid var(--border);
+  padding: 10px;
+}
+
+.ribbon__page{ display:none; gap:12px; align-items:stretch; flex-wrap: wrap; }
+.ribbon__page.is-active{ display:flex; }
+
+.ribbon__group{
+  min-width: 240px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 10px 8px;
+  background: rgba(0,0,0,.06);
+  display: flex;
+  flex-direction: column;
+  gap:8px;
+}
+.ribbon__group-grid{ display:grid; grid-template-columns: 96px 1fr; gap:8px; align-items:start; }
+.ribbon__group-title{
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.ribbon__row{ display:flex; gap:8px; align-items:center; flex-wrap: wrap; }
+
+.rbtn{
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+  border-radius: 10px;
+  color: #e6edf6;
+  cursor: pointer;
+  transition: transform .06s ease;
+}
+.rbtn:hover{ transform: translateY(-1px); }
+.rbtn:active{ transform: translateY(0); }
+.rbtn--lg{ width:96px; height:72px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; }
+.rbtn--md{ height:34px; padding: 0 12px; }
+.rbtn--sm{ height:28px; padding: 0 10px; }
+
+.rbtn__icon{ font-size: 22px; line-height: 1; }
+.rbtn__label{ font-size: 12px; }
+
+.badge{ padding:6px 10px; border:1px solid var(--border); border-radius:10px; font-size:12px; background:rgba(0,0,0,.18); }
+
+/* inputs compactos en ribbon */
+.ribbon .input{ height: 30px; font-size: 12px; }
+.ribbon label{ font-size: 12px; color: var(--muted); }
+
+/* utilidades usadas */
+.w-140{ width:140px }
+.w-64{  width:64px  }
+/* ====== Layout Editor: ribbon fijo + workspace alto visible ====== */
+.editor-frame {              /* contenedor general de la página del editor */
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.ribbon {                    /* barra de pestañas estilo Word */
+  position: sticky;          /* se mantiene arriba al hacer scroll */
+  top: 0;
+  z-index: 100;              /* SIEMPRE por encima del lienzo */
+  background: #171c24;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+}
+
+.workspace {                 /* región desplazable bajo el ribbon */
+  position: relative;
+  height: calc(100vh - 56px);  /* 56px ≈ alto del ribbon (ajústalo si tu ribbon mide distinto) */
+  overflow: auto;
+  padding: 12px 16px 16px;
+  background: radial-gradient(1200px 600px at 12% 0%, rgba(255,255,255,.02), transparent) #0f131a;
+}
+
+/* El wrap se centra y solo ocupa lo que mide la “hoja” */
+#canvasWrap {
+  position: relative;
+  width: max-content;
+  height: max-content;
+  margin: 0 auto;            /* centrar la página */
+}
+
+/* Canvas con sombra sutil, que se ve como “hoja” */
+#stage {
+  display: block;
+  box-shadow: 0 20px 40px rgba(0,0,0,.32), 0 0 0 1px rgba(255,255,255,.06) inset;
+  background: #fff;          /* color de fondo de la hoja (se sobreescribe desde JS si cambias) */
+}
+
+/* Reglas y guías por encima del canvas pero debajo del ribbon */
+.ruler { z-index: 5; }
+.fabric-canvas { z-index: 4; }
+/* ==== Banners de mensajes ==== */
+.alerts { margin: 12px 0 18px; display: grid; gap: 10px; }
+.alert {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-radius: 12px;
+  background: #0f172a; /* slate-900 aprox (oscuro) */
+  border: 1px solid rgba(255,255,255,.08);
+  color: #e5e7eb; /* gris claro */
+  box-shadow: 0 6px 18px rgba(0,0,0,.24) inset, 0 2px 8px rgba(0,0,0,.25);
+}
+.alert__dot { width: 10px; height: 10px; border-radius: 999px; background: #94a3b8; }
+.alert--success { background: rgba(16,185,129,.12); border-color: rgba(16,185,129,.35); color: #d1fae5; }
+.alert--success .alert__dot { background: #10b981; }
+.alert--danger  { background: rgba(239,68,68,.12);  border-color: rgba(239,68,68,.38); color: #fee2e2; }
+.alert--danger .alert__dot { background: #ef4444; }
+.alert--warning { background: rgba(245,158,11,.12); border-color: rgba(245,158,11,.38); color: #fef3c7; }
+.alert--warning .alert__dot { background: #f59e0b; }
+.alert--info    { background: rgba(59,130,246,.12); border-color: rgba(59,130,246,.38); color: #dbeafe; }
+.alert--info .alert__dot { background: #3b82f6; }
+
+/* ==== Botones pequeños ==== */
+.btn--sm { padding: 6px 10px; font-size: 12px; line-height: 1; border-radius: 10px; }
+.card__actions .btn { margin-right: 8px; } /* respirito sin crecer */
+
+/* ==== Modal de confirmación ==== */
+.modal { position: fixed; inset: 0; display: none; z-index: 60; }
+.modal.is-open { display: block; }
+.modal__overlay { position: absolute; inset: 0; background: rgba(0,0,0,.55); backdrop-filter: blur(2px); }
+.modal__dialog {
+  position: relative; margin: 8vh auto 0; max-width: 480px;
+  background: #0b1220; color: #e5e7eb; border: 1px solid rgba(255,255,255,.08);
+  border-radius: 16px; padding: 18px; box-shadow: 0 20px 60px rgba(0,0,0,.6);
+}
+.modal__title { margin: 0 0 6px; font-size: 18px; }
+.modal__text  { margin: 0 0 14px; opacity: .9; }
+.modal__actions { display: flex; justify-content: flex-end; gap: 10px; }

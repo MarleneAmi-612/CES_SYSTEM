@@ -1,0 +1,68 @@
+{% load static %}
+<link rel="icon" href="{% static 'favicon/favicon.ico' %}">
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Plantillas | CES</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="{% static 'css/plantillas.css' %}">
+</head>
+<body class="bg-orbs">
+  <div class="shell">
+    <!-- Topbar -->
+    <header class="topbar">
+      <div class="brand" aria-label="Plantillas CES">
+        <span class="dot" aria-hidden="true"></span>
+        <strong>Plantillas</strong>
+      </div>
+      <div class="top-actions">
+        <a class="btn" href="{% url 'administracion:home' %}">← Volver al panel</a>
+      </div>
+    </header>
+
+    <!-- Cards portada -->
+    <main class="mt-16">
+      <section class="grid grid--cards">
+        <!-- Diseñador -->
+        <article class="card">
+          <div class="card-head">
+            <h2 class="card-title">Diseñador de plantillas (Premium)</h2>
+          </div>
+          <p class="sub">Crea, edita, duplica y versiona plantillas. Sube logos/fondos y arrástralos al lienzo.</p>
+          <div class="card__actions">
+            <a class="btn btn--dark" href="{% url 'administracion:plantillas_admin' %}">Abrir diseñador</a>
+            <a class="btn" href="{% url 'administracion:plantilla_create' %}">+ Nueva plantilla</a>
+            <a class="btn" href="{% url 'administracion:assets_library' %}">Logos/Fondos</a>
+          </div>
+        </article>
+
+        <!-- Programas -->
+        <article class="card">
+          <div class="card-head">
+            <h2 class="card-title">Diplomados (Programas)</h2>
+          </div>
+          <p class="sub">Administra los diplomados y vincula la plantilla y tipo de constancia (CEPROEM o DC3).</p>
+          <div class="card__actions">
+            <a class="btn btn--dark" href="{% url 'administracion:program_list' %}">Gestionar diplomados</a>
+            <a class="btn" href="{% url 'administracion:program_create' %}">+ Nuevo diplomado</a>
+          </div>
+        </article>
+
+        <!-- Egresados -->
+        <article class="card">
+          <div class="card-head">
+            <h2 class="card-title">Egresados / Emisión</h2>
+          </div>
+          <p class="sub">Emite diplomas o constancias para solicitudes en estado <em>generating</em>, previsualiza y descarga.</p>
+          <div class="card__actions">
+            <a class="btn btn--dark" href="{% url 'administracion:egresados' %}">Abrir egresados</a>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <footer class="foot">© {{ now|date:"Y" }} CES</footer>
+  </div>
+</body>
+</html>

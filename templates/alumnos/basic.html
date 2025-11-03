@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="es">
   <head>
@@ -5,12 +6,17 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Datos básicos | CES</title>
 
-    {% load static %}
+    <!-- Favicons -->
+    <link rel="icon" href="{% static 'favicon/favicon.ico' %}">
+
+    <!-- Fuentes (permitidas por tu CSP STYLE_SRC) -->
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap"
       rel="stylesheet"
     />
+
+    <!-- CSS local -->
     <link rel="stylesheet" href="{% static 'css/verify.css' %}" />
   </head>
 
@@ -35,14 +41,11 @@
 
           <div class="field">
             <label for="id_program">Programa cursado</label>
-            <!-- El select real se realzará con el dropdown custom -->
             {{ form.program }}
           </div>
 
           <div class="actions">
-            <a class="btn-pill back" href="{% url 'alumnos:start' %}"
-              >← Regresar</a
-            >
+            <a class="btn-pill back" href="{% url 'alumnos:start' %}">← Regresar</a>
             <button class="btn" type="submit">Siguiente</button>
           </div>
         </form>
@@ -61,17 +64,19 @@
       </div>
     </div>
 
-  <script src="{% static 'js/nice-select.js' %}"></script>
-<script nonce="{{ csp_nonce }}">
-  window.addEventListener("DOMContentLoaded", () => {
-    if (window.CESNiceSelect) {
-      CESNiceSelect.enhance('#id_program');      // <- fuerza por ID
-      // opcional, si luego quieres usar data-attr en más selects:
-      CESNiceSelect.enhance('[data-nice-select]');
-    } else {
-      console.warn('CESNiceSelect no está disponible');
-    }
-  });
-</script>
+    <!-- JS local (permitido por 'self' en CSP) -->
+    <script src="{% static 'js/nice-select.js' %}" defer></script>
+
+    <!-- JS inline con NONCE de django-csp v4+ -->
+    <script nonce="{{ CSP_NONCE }}">
+      window.addEventListener("DOMContentLoaded", () => {
+        if (window.CESNiceSelect) {
+          CESNiceSelect.enhance('#id_program');
+          CESNiceSelect.enhance('[data-nice-select]');
+        } else {
+          console.warn('CESNiceSelect no está disponible');
+        }
+      });
+    </script>
   </body>
 </html>

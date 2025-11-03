@@ -1,0 +1,47 @@
+{% load static %}
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: A4; margin: 0; }
+  html, body { margin:0; padding:0; }
+  .page {
+    position: relative; width: 210mm; height: 297mm;
+    font-family: "DejaVu Sans", Arial, sans-serif;
+  }
+  .bg {
+    position: absolute; inset: 0;
+    background: url("{% static 'img/diplomas/diploma_cproem.png' %}") center/cover no-repeat;
+    z-index: 0;
+  }
+  .layer { position: absolute; z-index: 2; color:#111; }
+  .nombre { top: 130mm; left: 25mm; right: 25mm; font-size: 18pt; text-align: center; font-weight: 700; }
+  .programa { top: 145mm; left: 25mm; right: 25mm; font-size: 12pt; text-align: center; }
+  .vigencia { top: 160mm; left: 25mm; right: 25mm; font-size: 11pt; text-align: center; }
+  .folio { top: 18mm; right: 18mm; font-size: 10pt; letter-spacing: 1px; }
+  .qr { bottom: 20mm; left: 20mm; width: 28mm; height: 28mm; }
+  .qr img { width: 100%; height: 100%; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="bg"></div>
+
+  <div class="layer folio">Folio: {{ folio }}</div>
+
+  <div class="layer nombre">{{ nombre }}</div>
+  <div class="layer programa">{{ programa }}</div>
+
+  <div class="layer vigencia">
+    Periodo: {% if inicio %}{{ inicio|date:"d/m/Y" }}{% else %}—{% endif %}
+    &nbsp;al&nbsp;
+    {% if fin %}{{ fin|date:"d/m/Y" }}{% else %}—{% endif %}
+  </div>
+
+  <div class="layer qr">
+    <img src="{{ qr_url }}" alt="QR verificación">
+  </div>
+</div>
+</body>
+</html>

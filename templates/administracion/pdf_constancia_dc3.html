@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: A4; margin: 15mm; }
+  body { font-family: "DejaVu Sans", Arial, sans-serif; font-size: 10pt; color:#111; }
+  h1 { font-size: 14pt; margin: 0 0 10px 0; text-align:center; }
+  .box { border: 1px solid #333; padding: 8px 10px; margin-bottom: 8px; }
+  .row { display: flex; gap: 8px; }
+  .col { flex: 1; }
+  .label { font-weight: 700; font-size: 9pt; margin-bottom: 2px; }
+  .val { border-bottom: 1px solid #444; padding: 3px 2px; min-height: 16px; }
+  .folio { text-align: right; font-size: 9pt; margin-bottom: 6px; }
+  .small { font-size: 8.5pt; color:#333; }
+  .qr { margin-top: 8px; width: 28mm; }
+  .qr img { width: 28mm; height: 28mm; }
+  .signs { margin-top: 14px; }
+  .sign { border-top: 1px solid #444; text-align:center; padding-top: 4px; font-size: 9pt; }
+</style>
+</head>
+<body>
+
+<div class="folio">Folio: {{ folio }}</div>
+<h1>CONSTANCIA DE COMPETENCIAS O DE HABILIDADES LABORALES (DC-3)</h1>
+
+<div class="box">
+  <div class="label">DATOS DEL TRABAJADOR</div>
+  <div class="row">
+    <div class="col">
+      <div class="label">Nombre</div>
+      <div class="val">{{ nombre }}</div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col">
+      <div class="label">CURP</div>
+      <div class="val">{{ curp|default:"—" }}</div>
+    </div>
+    <div class="col">
+      <div class="label">RFC</div>
+      <div class="val">{{ rfc|default:"—" }}</div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col">
+      <div class="label">Puesto</div>
+      <div class="val">{{ puesto|default:"—" }}</div>
+    </div>
+    <div class="col">
+      <div class="label">Giro (Ocupación específica)</div>
+      <div class="val">{{ giro|default:"—" }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="box">
+  <div class="label">DATOS DE LA EMPRESA</div>
+  <div class="row">
+    <div class="col">
+      <div class="label">Nombre o razón social</div>
+      <div class="val">{{ razon_social|default:"—" }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="box">
+  <div class="label">DATOS DEL PROGRAMA DE CAPACITACIÓN</div>
+  <div class="row">
+    <div class="col">
+      <div class="label">Nombre del curso</div>
+      <div class="val">{{ programa|default:"—" }}</div>
+    </div>
+    <div class="col">
+      <div class="label">Duración (horas)</div>
+      <div class="val">{{ horas|default:"—" }}</div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col">
+      <div class="label">Periodo (de)</div>
+      <div class="val">{% if inicio %}{{ inicio|date:"d/m/Y" }}{% else %}—{% endif %}</div>
+    </div>
+    <div class="col">
+      <div class="label">Periodo (a)</div>
+      <div class="val">{% if fin %}{{ fin|date:"d/m/Y" }}{% else %}—{% endif %}</div>
+    </div>
+  </div>
+
+  <div class="row" style="align-items:flex-end; margin-top:6px;">
+    <div class="col small">
+      Los datos asentados se realizan bajo protesta de decir verdad.
+      <div class="signs">
+        <div class="row" style="gap:20mm;">
+          <div class="col sign">Instructor o tutor</div>
+          <div class="col sign">Patrón o representante legal</div>
+          <div class="col sign">Representante de los trabajadores</div>
+        </div>
+      </div>
+    </div>
+    <div class="qr">
+      <img src="{{ qr_url }}" alt="QR verificación">
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

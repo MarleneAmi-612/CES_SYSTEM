@@ -1,7 +1,6 @@
 # administracion/admin.py
 from django.contrib import admin
-from .models import AdminAccessLog, AdminUser, Graduate, CertificateType, Template
-
+from .models import DesignTemplate,TemplateAsset,AdminAccessLog, AdminUser, Graduate, CertificateType, Template, Program,DesignTemplateVersion,Organization
 # --- Helpers para registrar sin duplicar ---
 def safe_register(model, admin_class=None):
     """Registra un modelo en el admin solo si no está ya registrado."""
@@ -43,3 +42,34 @@ safe_register(AdminUser, AdminUserAdmin)
 safe_register(Graduate, GraduateAdmin)
 safe_register(CertificateType, CertificateTypeAdmin)
 safe_register(Template, TemplateAdmin)
+
+#Plantillas
+
+@admin.register(TemplateAsset)
+class TemplateAssetAdmin(admin.ModelAdmin):
+    list_display = ("name", "mime", "org", "created_at")
+    search_fields = ("name",)
+
+class DesignTemplateVersionInline(admin.TabularInline):
+    model = DesignTemplateVersion
+    extra = 0
+    fields = ("version", "note", "created_by", "created_at")
+    readonly_fields = ("created_at",)
+
+@admin.register(DesignTemplate)
+class DesignTemplateAdmin(admin.ModelAdmin):
+    list_display = ("title", "kind", "org", "updated_at", "is_system")
+    search_fields = ("title",)
+    inlines = [DesignTemplateVersionInline]
+
+@admin.register(Program)
+class ProgramAdmin(admin.ModelAdmin):
+    list_display = ("code","name","constancia_type","is_active","updated_at")
+    search_fields = ("code","name")
+    list_filter = ("constancia_type","is_active")
+
+@admin.register(Organization)
+class OrganizationAdmin(admin.ModelAdmin):
+    list_display = ("name", "slug", "is_active", "created_at")
+    search_fields = ("name", "slug")
+    list_filter = ("is_active",)

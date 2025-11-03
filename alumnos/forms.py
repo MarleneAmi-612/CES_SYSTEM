@@ -38,18 +38,12 @@ class BasicDataForm(forms.Form):
     name = forms.CharField(
         label="Nombre(s)",
         max_length=100,
-        widget=forms.TextInput(attrs={
-            "class": "input",
-            "placeholder": "Ej. Juan Carlos"
-        })
+        widget=forms.TextInput(attrs={"class": "input","placeholder": "Ej. Juan Carlos"})
     )
     lastname = forms.CharField(
         label="Apellidos",
         max_length=100,
-        widget=forms.TextInput(attrs={
-            "class": "input",
-            "placeholder": "Ej. Pérez Gómez"
-        })
+        widget=forms.TextInput(attrs={"class": "input","placeholder": "Ej. Pérez Gómez"})
     )
     program = forms.ModelChoiceField(
         label="Programa cursado",
@@ -57,17 +51,23 @@ class BasicDataForm(forms.Form):
         empty_label="Selecciona un programa",
         widget=forms.Select(attrs={
             "class": "select",
-            "id": "id_program",            # <- ID estable
-            "data-nice-select": "1",       # <- gancho para el JS/CSS
+            "id": "id_program",
+            "data-nice-select": "1",
             "autocomplete": "off",
         })
     )
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["program"].label_from_instance = (
+            lambda obj: (obj.name or obj.abbreviation or f"Programa {obj.pk}")
+        )
+        
     def clean_name(self):
-        return _norm_strip(self.cleaned_data["name"])
+        return (self.cleaned_data["name"] or "").strip()
 
     def clean_lastname(self):
-        return _norm_strip(self.cleaned_data["lastname"])
+        return (self.cleaned_data["lastname"] or "").strip()
 
 
 class ExtrasCPROEMForm(forms.Form):

@@ -1,0 +1,78 @@
+{% load static %}
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Diploma</title>
+
+<style>
+  @page { size: A4 landscape; margin: 0; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    /* tu imagen de fondo (PNG/JPG) a tamaño completo */
+    background: url("{% static 'img/diplomas/diploma_base.png' %}") center center no-repeat;
+    background-size: cover;
+    font-family: "DejaVu Sans", Arial, sans-serif;
+    color: #1b1b1b;
+  }
+
+  /* lienzo absoluto para colocar campos con precisión */
+  .page {
+    position: relative;
+    width: 297mm; height: 210mm; /* A4 horizontal */
+  }
+
+  /* Ejemplos de posiciones: ajusta left/top y ancho como necesites */
+  .nombre {
+    position: absolute;
+    left: 45mm; top: 96mm; right: 45mm;
+    text-align: center;
+    font-size: 18pt;
+    font-weight: 700;
+    letter-spacing: .2pt;
+  }
+
+  .programa {
+    position: absolute;
+    left: 45mm; top: 116mm; right: 45mm;
+    text-align: center;
+    font-size: 12.5pt;
+    font-weight: 600;
+  }
+
+  .fechas {
+    position: absolute;
+    left: 45mm; top: 132mm; right: 45mm;
+    text-align: center;
+    font-size: 11pt;
+  }
+
+  .folio {
+    position: absolute;
+    left: 18mm; top: 16mm;
+    font-size: 9pt; opacity: .85;
+  }
+
+  .qr {
+    position: absolute;
+    right: 18mm; bottom: 18mm;
+    width: 28mm; height: 28mm;
+  }
+
+  /* evita selección de texto (no es seguridad dura, pero suma) */
+  * { -webkit-user-select: none; -ms-user-select: none; user-select: none; }
+</style>
+</head>
+<body>
+  <div class="page">
+    <div class="folio">Folio: {{ folio }}</div>
+    <div class="nombre">{{ nombre }}</div>
+    <div class="programa">{{ programa }}</div>
+    <div class="fechas">
+      Inicio: {{ inicio|date:"d/m/Y" }} &nbsp;•&nbsp; Fin: {{ fin|date:"d/m/Y" }}
+    </div>
+    <img class="qr" src="{{ qr_url }}" alt="QR">
+  </div>
+</body>
+</html>

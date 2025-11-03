@@ -1,4 +1,5 @@
 {% load static %}
+<link rel="icon" href="{% static 'favicon/favicon.ico' %}">
 <!doctype html>
 <html lang="es">
 <head>
@@ -11,8 +12,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{% static 'css/admin.css' %}?v={{ now|date:'U' }}">
   <link rel="stylesheet" href="{% static 'css/solicitudes.css' %}?v={{ now|date:'U' }}">
-  <!-- Contenedor de notificaciones (toasts) -->
-  <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="true"></div>
 
   <!-- Tokens para el JS estático -->
   <meta name="csrf-token" content="{{ csrf_token }}">
@@ -20,6 +19,10 @@
 </head>
 <body class="bg-orbs">
 <div class="shell">
+
+  <!-- Contenedor de notificaciones (toasts) -->
+  <div id="toast-root" class="toast-root" aria-live="polite" aria-atomic="true"></div>
+
   <!-- Topbar -->
   <header class="topbar">
     <div class="brand"><span class="dot"></span><strong>CES</strong> · Solicitudes</div>
@@ -29,21 +32,37 @@
   </header>
 
   <main class="main">
-    <!-- Filtros -->
+
+    <!-- Tabs por estado (default: pendientes) -->
+    <nav class="tabs" aria-label="Estado">
+      <a class="tab {% if estado == 'pending' or not estado %}is-active{% endif %}"
+         href="{% url 'administracion:requests_board' %}?estado=pending">
+        Pendientes <span class="badge">{{ counts.pending|default:0 }}</span>
+      </a>
+      <a class="tab {% if estado == 'review' %}is-active{% endif %}"
+         href="{% url 'administracion:requests_board' %}?estado=review">
+        Revisión <span class="badge">{{ counts.review|default:0 }}</span>
+      </a>
+      <a class="tab {% if estado == 'generating' %}is-active{% endif %}"
+         href="{% url 'administracion:requests_board' %}?estado=generating">
+        Generando <span class="badge">{{ counts.generating|default:0 }}</span>
+      </a>
+      <a class="tab {% if estado == 'accepted' %}is-active{% endif %}"
+         href="{% url 'administracion:requests_board' %}?estado=accepted">
+        Aceptadas <span class="badge">{{ counts.accepted|default:0 }}</span>
+      </a>
+      <a class="tab {% if estado == 'rejected' %}is-active{% endif %}"
+         href="{% url 'administracion:requests_board' %}?estado=rejected">
+        Rechazadas <span class="badge">{{ counts.rejected|default:0 }}</span>
+      </a>
+    </nav>
+
+    <!-- Filtros adicionales (buscar y por programa) -->
     <form class="toolbar" method="get" action="">
+      <input type="hidden" name="estado" value="{{ estado|default:'pending' }}">
       <div class="pill">
         <span>Buscar</span>
         <input class="tool-input" type="search" name="q" value="{{ q }}" placeholder="correo o nombre…">
-      </div>
-
-      <div class="pill">
-        <span>Estado</span>
-        <select name="status" onchange="this.form.submit()">
-          <option value="">Todos</option>
-          {% for value,label in statuses %}
-            <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
       </div>
 
       <div class="pill">
@@ -61,85 +80,162 @@
       <button class="btn btn--secondary" type="submit">Aplicar</button>
     </form>
 
-    <!-- Secciones por programa -->
-    {% for group in por_programa %}
-      <section class="collapse">
-        <button class="collapse-hd" type="button" aria-expanded="true" aria-controls="pg-{{ forloop.counter }}" onclick="toggleCollapse(this)">
-          <h3 class="collapse-title">
-            {% if group.program %}
-              {{ group.program.name }}{% if group.program.abbreviation %} <span class="muted">· {{ group.program.abbreviation }}</span>{% endif %}
-            {% else %}Sin programa{% endif %}
-          </h3>
-          <span class="badge">{{ group.items|length }} registros</span>
-        </button>
+    <!-- Tabla de resultados (lista filtrada en 'items') -->
+    <section class="card card--wide">
+      <div class="card-head">
+        <h2 class="card-title">
+          {% if estado == 'accepted' %}
+            Aceptadas
+          {% elif estado == 'rejected' %}
+            Rechazadas
+          {% elif estado == 'generating' %}
+            Generando
+          {% elif estado == 'review' %}
+            Revisión
+          {% else %}
+            Pendientes
+          {% endif %}
+        </h2>
+        <span class="muted">{{ items|length }} registros</span>
+      </div>
 
-        <div id="pg-{{ forloop.counter }}" class="collapse-bd">
-          <div class="table-wrap" role="region" aria-label="Solicitudes" tabindex="0">
-            <table class="t t--clean">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th class="left">Alumno</th>
-                  <th>Correo</th>
-                  <th>Enviado</th>
-                  <th>Estado</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for r in group.items %}
-                  <tr id="row-{{ r.id }}">
-                    <td>{{ r.id }}</td>
-                    <td class="t-col left">{{ r.name }} {{ r.lastname }}</td>
-                    <td class="t-col"><a href="mailto:{{ r.email }}">{{ r.email }}</a></td>
-                    <td class="t-col">{{ r.sent_at|date:"Y-m-d H:i" }}</td>
-                    <td class="t-col">
-                      <span class="status-chip {{ r.status|default:'pending' }}" data-label>
-                        {{ r.status|default:'pending' }}
-                      </span>
-                    </td>
-                    <td class="t-col">
-                      <div class="actions">
-                        <button class="a-btn warn" data-action="to_review"  data-id="{{ r.id }}">Revisión</button>
-                        <button class="a-btn ok"   data-action="approve"    data-id="{{ r.id }}">Aprobar</button>
-                        <button class="a-btn bad"  data-action="reject"     data-id="{{ r.id }}">Rechazar</button>
-                        <button class="a-btn"      data-action="generating" data-id="{{ r.id }}">Generando</button>
-                      </div>
-                    </td>
-                  </tr>
-                {% empty %}
-                  <tr><td colspan="6" class="empty">Sin registros.</td></tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-    {% empty %}
-      <div class="card">No hay solicitudes.</div>
-    {% endfor %}
+      <div class="table-wrap" role="region" aria-label="Solicitudes" tabindex="0">
+        <table class="t t--clean">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th class="left">Alumno</th>
+              <th>Correo</th>
+              <th>Programa</th>
+              <th>Enviado</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in items %}
+              {% with full_name=r.name|add:" "|add:r.lastname program_lbl=r.program_name|default:"Sin programa" %}
+              <tr id="row-{{ r.id }}">
+                <td>{{ r.id }}</td>
+                <td class="t-col left">{{ full_name }}</td>
+                <td class="t-col"><a href="mailto:{{ r.email }}">{{ r.email }}</a></td>
+                <td class="t-col">{{ program_lbl }}</td>
+                <td class="t-col t-date">
+                  {{ r.sent_at|date:"Y-m-d H:i" }}
+                </td>
+                <td class="t-col">
+                  <span class="status-chip {{ r.status|default:'pending' }}" data-label>
+                    {{ r.status|default:'pending' }}
+                  </span>
+                </td>
+                <td class="t-col">
+                  <div class="actions">
+                    <!-- Botón Detalle con datos embebidos -->
+                    <button class="a-btn ghost"
+                            data-view="detail"
+                            data-id="{{ r.id }}"
+                            data-name="{{ r.name }}"
+                            data-lastname="{{ r.lastname }}"
+                            data-email="{{ r.email }}"
+                            data-program="{{ program_lbl }}"
+                            data-start="{{ r.start_date|date:'d/m/Y' }}"
+                            data-end="{{ r.end_date|date:'d/m/Y' }}"
+                            data-curp="{{ r.curp|default:'—' }}"
+                            data-rfc="{{ r.rfc|default:'—' }}"
+                            data-job_title="{{ r.job_title|default:'—' }}"
+                            data-industry="{{ r.industry|default:'—' }}"
+                            data-status="{{ r.status }}"
+                            data-reason="{{ r.status_reason|default:'—' }}"
+                    >Detalle</button>
+
+                    <button class="a-btn warn"  data-action="to_review"  data-id="{{ r.id }}">Revisión</button>
+                    <button class="a-btn ok"    data-action="approve"    data-id="{{ r.id }}">Aprobar</button>
+                    <button class="a-btn bad"   data-action="reject"     data-id="{{ r.id }}">Rechazar</button>
+                    <button class="a-btn"       data-action="generating" data-id="{{ r.id }}">Generando</button>
+                  </div>
+                </td>
+              </tr>
+              {% endwith %}
+            {% empty %}
+              <tr><td colspan="7" class="empty">No hay solicitudes para mostrar.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
   </main>
 
   <footer class="foot">© {{ now|date:"Y" }} CES</footer>
 </div>
 
-<!-- Modal rechazar -->
+<!-- Modal: Detalle bonito -->
+<div class="modal modal--detail" id="detailModal" aria-hidden="true" role="dialog" aria-modal="false" aria-labelledby="detTitle">
+  <div class="modal__backdrop" data-close="#detailModal"></div>
+  <div class="modal__dialog modal--lg">
+    <div class="modal__bar"></div>
+    <button class="modal__close" data-close="#detailModal" aria-label="Cerrar">×</button>
+
+    <h3 class="modal__title" id="detTitle">Detalle de la solicitud</h3>
+
+    <input type="hidden" id="det_id">
+
+    <div class="grid-2 gap">
+      <div class="card flat">
+        <div class="kv"><span class="k">Alumno</span><span class="v" id="det_name">—</span></div>
+        <div class="kv"><span class="k">Correo</span><span class="v" id="det_email">—</span></div>
+        <div class="kv"><span class="k">Programa</span><span class="v" id="det_program">—</span></div>
+        <div class="kv"><span class="k">Periodo</span><span class="v" id="det_period">—</span></div>
+      </div>
+
+      <div class="card flat">
+        <div class="kv"><span class="k">CURP</span><span class="v" id="det_curp">—</span></div>
+        <div class="kv"><span class="k">RFC</span><span class="v" id="det_rfc">—</span></div>
+        <div class="kv"><span class="k">Puesto</span><span class="v" id="det_job">—</span></div>
+        <div class="kv"><span class="k">Giro</span><span class="v" id="det_industry">—</span></div>
+      </div>
+    </div>
+
+    <div class="grid-2 gap">
+      <div class="card flat">
+        <div class="kv"><span class="k">Estado</span><span class="v chip" id="det_status">—</span></div>
+      </div>
+      <div class="card flat">
+        <div class="kv"><span class="k">Motivo de rechazo</span><span class="v" id="det_reason">—</span></div>
+      </div>
+    </div>
+
+    <div class="modal__actions modal__actions--split">
+      <div class="left">
+        <button class="btn" id="det_btn_review">Marcar revisión</button>
+        <button class="btn" id="det_btn_generating">Marcar generando</button>
+      </div>
+      <div class="right">
+        <button class="btn btn--primary" id="det_btn_approve">Aprobar</button>
+        <button class="btn btn--danger"  id="det_btn_reject">Rechazar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Rechazar -->
 <div class="modal" id="rejectModal" aria-hidden="true" role="dialog" aria-modal="false" aria-labelledby="rejTitle">
   <div class="modal__backdrop" data-close="#rejectModal"></div>
   <div class="modal__dialog modal--sm">
     <div class="modal__bar"></div>
     <button class="modal__close" data-close="#rejectModal" aria-label="Cerrar">×</button>
     <div class="modal__icon" aria-hidden="true">⚠️</div>
-    <h3 class="modal__title" id="rejTitle">Motivo del rechazo</h3>
+    <h3 class="modal__title" id="rejTitle">¿Seguro que desea rechazar?</h3>
+    <p class="muted">Escriba el motivo del rechazo:</p>
     <form id="rejectForm">
       <input type="hidden" name="id" id="rej_id">
       <div class="field">
-        <label for="rej_reason">Describe el motivo</label>
+        <label for="rej_reason">Motivo</label>
         <textarea class="input" id="rej_reason" name="reason" rows="4" required></textarea>
       </div>
       <div id="rejMsg" class="form-msg"></div>
       <div class="modal__actions">
-        <button class="btn btn--primary" type="submit">Rechazar</button>
+        <button class="btn btn--danger"    type="submit">Rechazar</button>
         <button class="btn btn--secondary" type="button" data-close="#rejectModal">Cancelar</button>
       </div>
     </form>

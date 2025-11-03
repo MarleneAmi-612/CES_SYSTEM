@@ -1,16 +1,22 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="es">
   <head>
-    {% load csp %}
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Verificación de correo | CES</title>
-    {% load static %}
+
+    <!-- Favicons -->
+    <link rel="icon" href="{% static 'favicon/favicon.ico' %}">
+
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap"
       rel="stylesheet"
     />
+
+    <!-- CSS local -->
     <link rel="stylesheet" href="{% static 'css/verify.css' %}" />
   </head>
   <body class="bg-orbs">
@@ -20,27 +26,17 @@
           <div class="brand"><span class="dot"></span> CES – Verificación</div>
           <h1 class="title">Confirma tu correo electrónico</h1>
           <p class="subtitle">
-            Usa el correo con el que te registraste en CES para continuar.
+            Usa el correo con el que te registraste en el Diplomado para continuar.
           </p>
         </div>
 
         <div class="card-body">
           {% if error %}
           <div class="alert" role="alert" aria-live="polite">
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              aria-hidden="true"
-            >
-              <path
-                d="M12 8v5m0 4h.01M12 3l9 18H3L12 3Z"
-                stroke="currentColor"
-                stroke-width="1.6"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 8v5m0 4h.01M12 3l9 18H3L12 3Z"
+                    stroke="currentColor" stroke-width="1.6"
+                    stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
             <div>{{ error }}</div>
           </div>
@@ -50,77 +46,43 @@
             {% csrf_token %}
             <label class="label" for="id_email">Correo electrónico</label>
             <div class="input-wrap">
-              <svg
-                class="icon"
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                aria-hidden="true"
-              >
-                <path
-                  d="M4 6h16a1 1 0 0 1 1 1v.4l-9 6.3-9-6.3V7a1 1 0 0 1 1-1Z"
-                  stroke="currentColor"
-                  stroke-width="1.4"
-                />
-                <path
-                  d="M20 8.5v8.5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V8.5"
-                  stroke="currentColor"
-                  stroke-width="1.4"
-                />
+              <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M4 6h16a1 1 0 0 1 1 1v.4l-9 6.3-9-6.3V7a1 1 0 0 1 1-1Z"
+                      stroke="currentColor" stroke-width="1.4"/>
+                <path d="M20 8.5v8.5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V8.5"
+                      stroke="currentColor" stroke-width="1.4"/>
               </svg>
               {{ form.email }}
             </div>
             <div class="helper">
-              <span class="kbd">Enter</span> para continuar • Revisa que esté
-              bien escrito
+              <span class="kbd">Enter</span> para continuar • Revisa que esté bien escrito
             </div>
 
             <button class="btn" type="submit">Continuar</button>
           </form>
 
-          <!-- Acciones rápidas elegantes -->
           <div class="cta-grid" aria-label="Acciones rápidas">
-            <a class="cta" href="mailto:soporte@ces.mx">
+            <!-- 🔹 Botón actualizado: redirige a help.html -->
+            <a class="cta" href="{% url 'alumnos:help' %}">
               <span class="icon-pill orange" aria-hidden="true">
-                <!-- sobre / soporte -->
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <path
-                    d="M4 7h16a1 1 0 0 1 1 1v.3l-9 6.2-9-6.2V8a1 1 0 0 1 1-1Z"
-                    stroke="currentColor"
-                    stroke-width="1.7"
-                  />
-                  <path
-                    d="M20 9v8a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9"
-                    stroke="currentColor"
-                    stroke-width="1.7"
-                  />
+                  <path d="M9 9a3 3 0 1 1 6 0c0 1.657-1.343 3-3 3v2m0 3h.01"
+                        stroke="currentColor" stroke-width="1.7"
+                        stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
               </span>
               <span>
                 <div class="label">¿Problemas con tu correo?</div>
-                <div class="sub">Escríbenos a soporte y te ayudamos</div>
+                <div class="sub">Haz clic aquí para ver algunos consejos</div>
               </span>
             </a>
 
             <a class="cta" href="{% url 'alumnos:status' %}">
               <span class="icon-pill" aria-hidden="true">
-                <!-- reloj / estatus -->
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <circle
-                    cx="12"
-                    cy="12"
-                    r="8"
-                    stroke="currentColor"
-                    stroke-width="1.7"
-                  />
-                  <path
-                    d="M12 7v5l3 2"
-                    stroke="currentColor"
-                    stroke-width="1.7"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
+                  <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.7"/>
+                  <path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.7"
+                        stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
               </span>
               <span>

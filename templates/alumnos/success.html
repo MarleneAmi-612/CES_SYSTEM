@@ -1,10 +1,16 @@
+{% load static %}
 <!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Solicitud enviada | CES</title>
-  {% load static %}
+
+  <!-- Favicons -->
+  <link rel="icon" href="{% static 'favicon/favicon.ico' %}">
+  <link rel="icon" type="image/png" sizes="32x32" href="{% static 'favicon/favicon-32.png' %}">
+  <link rel="icon" type="image/png" sizes="16x16" href="{% static 'favicon/favicon-16.png' %}">
+
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="{% static 'css/success.css' %}" />
@@ -20,7 +26,7 @@
 
       <h1 class="title">¡Solicitud enviada con éxito!</h1>
       <p class="subtitle">
-        Tus datos fueron recibidos y están en revisión.  
+        Tus datos fueron recibidos y están en revisión.
         Te notificaremos cuando tu constancia/diploma esté disponible.
       </p>
 

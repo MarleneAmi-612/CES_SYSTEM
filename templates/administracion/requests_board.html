@@ -1,0 +1,101 @@
+{% load static %}
+<link rel="icon" href="{% static 'favicon/favicon.ico' %}">
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Solicitudes | CES</title>
+
+  <meta name="csrf-token" content="{{ csrf_token }}"/>
+
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/admin.css' %}">          {# tu tema base #}
+  <link rel="stylesheet" href="{% static 'css/solicitudes.css' %}">    {# hoja específica #}
+</head>
+<body class="bg-orbs">
+  <div class="shell">
+    <!-- Topbar simple -->
+    <div class="topbar">
+      <div class="brand"><span class="dot"></span> <span>Solicitudes</span></div>
+      <div class="top-actions">
+        <nav class="tabs" aria-label="Estado">
+          {# pestañas: muestran recuento y controlan el querystring #}
+          <a class="tab {% if estado == 'pending' %}is-active{% endif %}" href="{% url 'administracion:requests_board' %}?estado=pending">
+            Pendientes <span class="badge">{{ count_pending }}</span>
+          </a>
+          <a class="tab {% if estado == 'generating' %}is-active{% endif %}" href="{% url 'administracion:requests_board' %}?estado=generating">Generando</a>
+          <a class="tab {% if estado == 'accepted' %}is-active{% endif %}" href="{% url 'administracion:requests_board' %}?estado=accepted">Aceptadas</a>
+          <a class="tab {% if estado == 'rejected' %}is-active{% endif %}" href="{% url 'administracion:requests_board' %}?estado=rejected">Rechazadas</a>
+        </nav>
+      </div>
+    </div>
+
+    <div class="main grid">
+      <!-- Lista izquierda -->
+      <aside class="list-pane" aria-label="Solicitudes">
+        {% if items %}
+          <ul class="list">
+            {% for r in items %}
+              <li class="list__item rowlink"
+                  tabindex="0"
+                  data-id="{{ r.id }}"
+                  data-name="{{ r.name|default:'' }}"
+                  data-lastname="{{ r.lastname|default:'' }}"
+                  data-email="{{ r.email|default:'' }}"
+                  data-program="{{ r.program.name|default:'—' }}"
+                  data-curp="{{ r.curp|default:'—' }}"
+                  data-rfc="{{ r.rfc|default:'—' }}"
+                  data-job="{{ r.job_title|default:'—' }}"
+                  data-industry="{{ r.industry|default:'—' }}"
+                  data-created="{{ r.created_at|date:'d/m/Y H:i' }}"
+                  >
+                <div class="li-name">{{ r.name }} {{ r.lastname }}</div>
+                <div class="li-sub">{{ r.program.name|default:"Sin programa" }}</div>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <div class="empty">No hay solicitudes para mostrar.</div>
+        {% endif %}
+      </aside>
+
+      <!-- Detalle derecho -->
+      <section class="detail-pane" id="detail" aria-live="polite">
+        <div class="detail-card" id="placeholder">
+          <div class="detail-title">Selecciona una solicitud</div>
+          <p class="muted">Haz clic en un nombre para ver la información completa.</p>
+        </div>
+
+        <article class="detail-card is-hidden" id="card">
+          <header class="detail-header">
+            <h2 class="detail-title" id="d-name"></h2>
+            <div class="muted" id="d-sub"></div>
+          </header>
+
+          <div class="detail-grid">
+            <div><span class="k">Email</span><span class="v" id="d-email"></span></div>
+            <div><span class="k">Diplomado</span><span class="v" id="d-program"></span></div>
+            <div><span class="k">CURP</span><span class="v" id="d-curp"></span></div>
+            <div><span class="k">RFC</span><span class="v" id="d-rfc"></span></div>
+            <div><span class="k">Puesto</span><span class="v" id="d-job"></span></div>
+            <div><span class="k">Giro</span><span class="v" id="d-industry"></span></div>
+          </div>
+
+          <footer class="detail-actions">
+            <button class="btn btn--primary" id="btn-accept">Aceptar</button>
+            <button class="btn btn--danger" id="btn-reject">Rechazar</button>
+          </footer>
+
+          <div class="hint" id="resultMsg" role="status" aria-live="polite"></div>
+        </article>
+      </section>
+    </div>
+
+    <p class="foot">Sugerencia: Acepta o rechaza después de revisar la información completa.</p>
+  </div>
+
+  <script src="{% static 'js/solicitudes.js' %}"></script>
+</body>
+</html>

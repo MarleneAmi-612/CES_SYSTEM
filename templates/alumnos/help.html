@@ -1,0 +1,44 @@
+{% load static %}
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Ayuda con tu correo | CES</title>
+
+  <link rel="icon" href="{% static 'favicon/favicon.ico' %}">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{% static 'css/help.css' %}" />
+</head>
+<body class="bg-orbs">
+  <div class="container">
+    <div class="card">
+      <div class="card-header">
+        <div class="brand"><span class="dot"></span> CES – Ayuda</div>
+        <h1 class="title">¿Problemas con tu correo?</h1>
+        <p class="subtitle">Revisa los siguientes puntos antes de continuar.</p>
+      </div>
+
+      <div class="card-body">
+        <ul class="tips">
+          <li>Verifica que tu correo esté escrito correctamente (sin espacios ni mayúsculas innecesarias).</li>
+          <li>Usa el mismo correo con el que te registraste en el diplomado.</li>
+          <li>Verifica que pusiste tu <strong>nombre completo</strong> correctamente.</li>
+        </ul>
+
+        <p style="margin-top: 32px; text-align: center;">
+          Si el problema persiste, puedes regresar al inicio.
+        </p>
+
+        <div class="actions" style="margin-top: 28px;">
+          <a href="{% url 'alumnos:start' %}" class="btn-ghost btn-ghost--center">Volver al inicio</a>
+        </div>
+      </div>
+
+      <div class="hr"></div>
+      <div class="footer">© {% now "Y" %} CES</div>
+    </div>
+  </div>
+</body>
+</html>

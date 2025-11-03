@@ -1,0 +1,191 @@
+{% load static %}
+{% load humanize %}
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Programas / Diplomados</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <link rel="stylesheet" href="{% static 'css/programs.css' %}">
+  <script src="{% static 'js/program.js' %}" defer></script>
+
+  <style>
+    .programs-page .topbar,
+    .programs-page .brand,
+    .programs-page .programs-table th,
+    .programs-page .programs-table td,
+    .programs-page .alerts,
+    .programs-page .programs-empty,
+    .programs-page .sub { text-align: center; }
+    .programs-page .top-actions { justify-content: center; width: 100%; gap: .75rem; }
+    .programs-page .row.jc-between { justify-content: center; }
+    .programs-page .actions { justify-content: center; }
+    .programs-page .programs-table th,
+    .programs-page .programs-table td { vertical-align: middle; }
+  </style>
+</head>
+
+<body class="bg-orbs programs-page">
+  <div class="shell">
+
+    <!-- Topbar -->
+    <div class="topbar" style="flex-direction: column; gap:.5rem;">
+      <div class="brand" style="justify-content:center;">
+        <span class="dot"></span>
+        <span>Programas / Diplomados</span>
+      </div>
+      <div class="top-actions" style="display:flex;">
+        <a class="btn btn-ghost" href="{% url 'administracion:plantillas' %}">← Volver a Plantillas</a>
+        <a class="btn btn--dark" href="{% url 'administracion:program_create' %}">＋ Nuevo programa</a>
+      </div>
+    </div>
+
+    <!-- Buscador -->
+    <div class="card mt-16">
+      <form class="row gap-12" style="justify-content:center;" method="get" action="">
+        <input
+          type="search"
+          name="q"
+          class="input"
+          style="max-width:560px; width:100%;"
+          placeholder="Buscar por nombre o fuente…"
+          value="{{ q|default_if_none:'' }}"
+          autocomplete="off">
+        {% if q %}
+          <a class="btn btn-ghost" href="?">Limpiar</a>
+        {% endif %}
+        <button class="btn" type="submit">Buscar</button>
+      </form>
+    </div>
+
+    <!-- Mensajes Django -->
+    {% if messages %}
+      <div class="alerts mt-12">
+        {% for message in messages %}
+          <div class="alert {% if 'success' in message.tags %}alert--success{% elif 'error' in message.tags %}alert--danger{% elif 'warning' in message.tags %}alert--warning{% else %}alert--info{% endif %}">
+            <span class="alert__dot"></span>
+            <div>{{ message }}</div>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <!-- Lista -->
+    <div class="card mt-16">
+      {% if items %}
+        <div class="row gap-12 jc-between ai-center mb-10" style="justify-content:center;">
+          <div class="sub">
+            {{ items|length|intcomma }} resultado{{ items|length|pluralize:"s" }}
+            {% if q %} para <strong>"{{ q }}"</strong>{% endif %}
+          </div>
+        </div>
+
+        <div class="programs-table-wrap">
+          <table class="programs-table">
+            <thead>
+              <tr>
+                <th class="col-nombre">Nombre</th>
+                <th class="col-fuente">Fuente</th>
+                <th class="col-actions">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for it in items %}
+                <tr class="programs-row">
+
+                  <td class="col-nombre" data-label="Nombre">
+                    {{ it.nombre|default:"—" }}
+                  </td>
+
+                  <td class="col-fuente" data-label="Fuente">
+                    {% if it.fuente == "simulacion" %}
+                      <span class="badge badge-sim">Simulación</span>
+                    {% elif it.fuente == "alumnos_program" %}
+                      <span class="badge badge-app">App</span>
+                    {% else %}
+                      <span class="badge">{{ it.fuente|default:"—" }}</span>
+                    {% endif %}
+                  </td>
+
+                  <td class="col-actions" data-label="Acciones">
+                    <div class="actions" style="display:flex; gap:.5rem; flex-wrap:wrap; justify-content:center;">
+
+                      {# EDITAR: solo para alumnos_program y con codigo definido #}
+                      {% if it.fuente == "alumnos_program" and it.codigo %}
+                        <a class="btn btn--primary"
+                           href="{% url 'administracion:program_edit' it.codigo %}"
+                           title="Editar">
+                          Editar
+                        </a>
+                      {% endif %}
+
+                      {# BORRAR (con modal) #}
+                      {% if it.fuente == "simulacion" %}
+                        <form id="del-{{ it.fuente }}-{{ it.codigo }}" class="js-del-form inline" method="post" action="{% url 'administracion:program_delete' 'sim' it.codigo %}">
+                          {% csrf_token %}
+                          <button
+                            type="button"
+                            class="btn btn-danger js-del"
+                            data-form-id="del-{{ it.fuente }}-{{ it.codigo }}"
+                            data-program="{{ it.nombre|default:it.codigo }}"
+                            {% if it.enrolled_count|default:0 > 0 %}disabled aria-disabled="true" title="No se puede borrar: hay alumnos cursando ({{ it.enrolled_count }})"{% endif %}
+                          >Borrar</button>
+                        </form>
+                      {% elif it.fuente == "alumnos_program" %}
+                        <form id="del-{{ it.fuente }}-{{ it.codigo }}" class="js-del-form inline" method="post" action="{% url 'administracion:program_delete' 'app' it.codigo %}">
+                          {% csrf_token %}
+                          <button
+                            type="button"
+                            class="btn btn-danger js-del"
+                            data-form-id="del-{{ it.fuente }}-{{ it.codigo }}"
+                            data-program="{{ it.nombre|default:it.codigo }}"
+                            {% if it.enrolled_count|default:0 > 0 %}disabled aria-disabled="true" title="No se puede borrar: hay alumnos cursando ({{ it.enrolled_count }})"{% endif %}
+                          >Borrar</button>
+                        </form>
+                      {% endif %}
+
+                      {% if it.enrolled_count|default:0 > 0 %}
+                        <span class="badge badge-orange">Alumnos: {{ it.enrolled_count }}</span>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+      {% else %}
+        <div class="programs-empty">
+          <h2>No hay programas para mostrar</h2>
+          {% if q %}
+            <p>Intenta con otro término o <a href="?">limpia la búsqueda</a>.</p>
+          {% else %}
+            <p>Cuando existan programas/diplomados aparecerán aquí.</p>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="foot">—</div>
+  </div>
+
+  <!-- Modal de confirmación -->
+  <div id="confirmModal" class="modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <div class="modal__overlay" data-modal-close></div>
+    <div class="modal__dialog">
+      <h3 id="confirmTitle" class="modal__title">Eliminar diplomado</h3>
+      <p id="confirmText" class="modal__text">
+        ¿Seguro que deseas eliminar <strong id="confirmName"></strong>?
+        <br><span class="sub">Esta acción no se puede deshacer.</span>
+      </p>
+      <div class="modal__actions" style="justify-content:center;">
+        <button type="button" id="confirmNo" class="btn">No, cancelar</button>
+        <button type="button" id="confirmYes" class="btn btn--danger">Sí, eliminar</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
