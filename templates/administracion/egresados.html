@@ -29,30 +29,75 @@
     </header>
 
     <div class="grid">
-      <!-- ========== Sidebar: en proceso ========== -->
-      <aside class="side" aria-label="En proceso">
-        <div class="side__head">
-          <h2 class="side__title">En proceso</h2>
-          <span class="badge">{{ generating_reqs|length }}</span>
+      <!-- ========== Sidebar combinado: EN PROCESO / FINALIZADOS ========== -->
+      <aside class="side side--requests" aria-label="Solicitudes">
+        <div class="side__head side__head--tabs">
+          <h2 class="side__title">Solicitudes</h2>
+
+          <div class="segmented side__segmented"
+               role="tablist"
+               aria-label="Estado de solicitud"
+               data-scope="side">
+            <button class="segmented__btn is-active"
+                    role="tab"
+                    aria-selected="true"
+                    data-target="#panelInProcess">
+              En proceso
+              <span class="badge">{{ generating_reqs|length }}</span>
+            </button>
+            <button class="segmented__btn"
+                    role="tab"
+                    aria-selected="false"
+                    data-target="#panelFinished">
+              Finalizados
+              <span class="badge">{{ finished_reqs|length|default:"0" }}</span>
+            </button>
+          </div>
         </div>
 
-        <ul class="list" id="inProcessList" data-page-size="6">
-          {% for r in generating_reqs %}
-            <li class="card {% if active_req and r.id == active_req.id %}is-active{% endif %}">
-              <a class="row" href="{% url 'administracion:egresados_req' r.id %}">
-                <div class="row__main">
-                  <div class="row__name">{{ r.name }} {{ r.lastname }}</div>
-                  <div class="row__sub">#{{ r.id }} · {{ r.program.name|default:"Sin programa" }}</div>
-                </div>
-                <span class="dot dot--warn" aria-hidden="true"></span>
-              </a>
-            </li>
-          {% empty %}
-            <li class="empty">No hay documentos generándose.</li>
-          {% endfor %}
-        </ul>
+        <!-- Panel: EN PROCESO -->
+        <div id="panelInProcess" class="side__panel">
+          <ul class="list" id="inProcessList" data-page-size="6">
+            {% for r in generating_reqs %}
+              <li class="card {% if active_req and r.id == active_req.id %}is-active{% endif %}">
+                <a class="row" href="{% url 'administracion:egresados_req' r.id %}">
+                  <div class="row__main">
+                    <div class="row__name">{{ r.name }} {{ r.lastname }}</div>
+                    <div class="row__sub">#{{ r.id }} · {{ r.program.name|default:"Sin programa" }}</div>
+                  </div>
+                  <span class="dot dot--warn" aria-hidden="true"></span>
+                </a>
+              </li>
+            {% empty %}
+              <li class="empty">No hay documentos generándose.</li>
+            {% endfor %}
+          </ul>
 
-        <div class="dots" id="inProcessDots" aria-label="Paginación"></div>
+          <div class="dots" id="inProcessDots" aria-label="Paginación"></div>
+        </div>
+
+        <!-- Panel: FINALIZADOS -->
+        <div id="panelFinished" class="side__panel is-hidden">
+          <ul class="list" id="finishedList" data-page-size="6">
+            {% for r in finished_reqs %}
+              <li class="card {% if active_req and r.id == active_req.id %}is-active{% endif %}">
+                <a class="row"
+                   href="{% url 'administracion:egresados_req' r.id %}"
+                   data-id="{{ r.id }}">
+                  <div class="row__main">
+                    <div class="row__name">{{ r.name }} {{ r.lastname }}</div>
+                    <div class="row__sub">#{{ r.id }} · {{ r.program.name|default:"Sin programa" }}</div>
+                  </div>
+                  <span class="dot" aria-hidden="true"></span>
+                </a>
+              </li>
+            {% empty %}
+              <li class="empty">No hay documentos finalizados.</li>
+            {% endfor %}
+          </ul>
+
+          <div class="dots" id="finishedDots" aria-label="Paginación"></div>
+        </div>
       </aside>
 
       <!-- ========== Main ========== -->
@@ -175,10 +220,19 @@
           {% endif %}
         </header>
 
-        <!-- Tabs -->
-        <div class="segmented" role="tablist" aria-label="Tipo de documento">
-          <button class="segmented__btn is-active" role="tab" aria-selected="true" data-target="#tabDiploma">Diploma</button>
-          <button class="segmented__btn" role="tab" aria-selected="false" data-target="#tabConstancia">{{ constancia_label|default:"Constancia" }}</button>
+        <!-- Tabs tipo de documento -->
+        <div class="segmented"
+             role="tablist"
+             aria-label="Tipo de documento"
+             data-scope="doc">
+          <button class="segmented__btn is-active"
+                  role="tab"
+                  aria-selected="true"
+                  data-target="#tabDiploma">Diploma</button>
+          <button class="segmented__btn"
+                  role="tab"
+                  aria-selected="false"
+                  data-target="#tabConstancia">{{ constancia_label|default:"Constancia" }}</button>
         </div>
 
         <!-- ===== DIPLOMA ===== -->
@@ -208,21 +262,35 @@
                 </div>
               </div>
 
+              <!-- INICIO (DIPLOMA) -->
               <div class="pair">
                 <div class="k">Inicio</div>
                 <div class="v">
-                  {% if diploma.fecha_inicio %}{{ diploma.fecha_inicio|date:"d/m/Y" }}
-                  {% elif req_start %}{{ req_start|date:"d/m/Y" }}
-                  {% else %}—{% endif %}
+                  {% if active_req and active_req.graduate and active_req.graduate.validity_start %}
+                    {{ active_req.graduate.validity_start|date:"d/m/Y" }}
+                  {% elif diploma.fecha_inicio %}
+                    {{ diploma.fecha_inicio|date:"d/m/Y" }}
+                  {% elif req_start %}
+                    {{ req_start|date:"d/m/Y" }}
+                  {% else %}
+                    —
+                  {% endif %}
                 </div>
               </div>
 
+              <!-- FIN (DIPLOMA) -->
               <div class="pair">
                 <div class="k">Fin</div>
                 <div class="v">
-                  {% if diploma.fecha_fin %}{{ diploma.fecha_fin|date:"d/m/Y" }}
-                  {% elif req_end %}{{ req_end|date:"d/m/Y" }}
-                  {% else %}—{% endif %}
+                  {% if active_req and active_req.graduate and active_req.graduate.validity_end %}
+                    {{ active_req.graduate.validity_end|date:"d/m/Y" }}
+                  {% elif diploma.fecha_fin %}
+                    {{ diploma.fecha_fin|date:"d/m/Y" }}
+                  {% elif req_end %}
+                    {{ req_end|date:"d/m/Y" }}
+                  {% else %}
+                    —
+                  {% endif %}
                 </div>
               </div>
 
@@ -280,21 +348,35 @@
                 </div>
               </div>
 
+              <!-- INICIO (CONSTANCIA) -->
               <div class="pair">
                 <div class="k">Inicio</div>
                 <div class="v">
-                  {% if constancia.fecha_inicio %}{{ constancia.fecha_inicio|date:"d/m/Y" }}
-                  {% elif req_start %}{{ req_start|date:"d/m/Y" }}
-                  {% else %}—{% endif %}
+                  {% if active_req and active_req.graduate and active_req.graduate.validity_start %}
+                    {{ active_req.graduate.validity_start|date:"d/m/Y" }}
+                  {% elif constancia.fecha_inicio %}
+                    {{ constancia.fecha_inicio|date:"d/m/Y" }}
+                  {% elif req_start %}
+                    {{ req_start|date:"d/m/Y" }}
+                  {% else %}
+                    —
+                  {% endif %}
                 </div>
               </div>
 
+              <!-- FIN (CONSTANCIA) -->
               <div class="pair">
                 <div class="k">Fin</div>
                 <div class="v">
-                  {% if constancia.fecha_fin %}{{ constancia.fecha_fin|date:"d/m/Y" }}
-                  {% elif req_end %}{{ req_end|date:"d/m/Y" }}
-                  {% else %}—{% endif %}
+                  {% if active_req and active_req.graduate and active_req.graduate.validity_end %}
+                    {{ active_req.graduate.validity_end|date:"d/m/Y" }}
+                  {% elif constancia.fecha_fin %}
+                    {{ constancia.fecha_fin|date:"d/m/Y" }}
+                  {% elif req_end %}
+                    {{ req_end|date:"d/m/Y" }}
+                  {% else %}
+                    —
+                  {% endif %}
                 </div>
               </div>
 
@@ -396,6 +478,30 @@
             <pre id="egAlertBody" class="eg-alert__pre">—</pre>
             <div class="eg-alert__actions">
               <button type="button" class="egbtn egbtn--primary" id="egAlertOk">Aceptar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== ALERTA Diploma publicado ===== -->
+        <div id="egDiplomaAlert" class="eg-alert" role="dialog"
+             aria-modal="true" aria-labelledby="egDiplomaAlertTitle" hidden>
+          <div class="eg-alert__card">
+            <div class="eg-alert__icon">🎓</div>
+            <h3 id="egDiplomaAlertTitle" class="eg-alert__title">Diploma publicado</h3>
+
+            <p class="eg-alert__msg">
+              El diploma se ha publicado correctamente.
+              Puedes verificarlo con el botón de abajo.
+            </p>
+
+            <div class="eg-alert__actions">
+              <button type="button" class="egbtn" id="egDiplomaAlertClose">
+                Cerrar
+              </button>
+              <a href="#" target="_blank" rel="noopener"
+                 class="btn btn--primary" id="egDiplomaAlertLink">
+                Ir a verificación
+              </a>
             </div>
           </div>
         </div>

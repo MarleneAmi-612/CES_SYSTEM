@@ -359,3 +359,1178 @@ body.bg-orbs{
   #confirmModal .modal__actions{ flex-direction:column-reverse; align-items:stretch; gap:8px; }
   #confirmModal .modal__actions .btn{ width:100%; }
 }
+/* Layout general de la página */
+.programs-page .shell {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Centrado de textos generales */
+.programs-page .topbar,
+.programs-page .brand,
+.programs-page .alerts,
+.programs-page .programs-empty,
+.programs-page .sub {
+  text-align: center;
+}
+
+/* Topbar en columna */
+.topbar--column {
+  flex-direction: column;
+  gap: .5rem;
+}
+
+/* Marca y acciones centradas */
+.brand--center {
+  justify-content: center;
+}
+
+.top-actions--center {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  gap: .75rem;
+}
+
+/* Buscador centrado */
+.search-row-center {
+  justify-content: center;
+}
+
+.search-input {
+  max-width: 560px;
+  width: 100%;
+}
+
+/* Texto de resultados centrado */
+.results-row-center {
+  justify-content: center;
+}
+
+/* Tabla más compacta y centrada */
+.programs-table-wrap {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.programs-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+
+.programs-table th,
+.programs-table td {
+  vertical-align: middle;
+  padding: 0.75rem 1rem;
+}
+
+/* Anchos de columna para evitar huecos gigantes */
+.programs-table .col-nombre {
+  width: 65%;
+  text-align: left;
+}
+
+.programs-table .col-fuente {
+  width: 15%;
+  text-align: center;
+}
+
+.programs-table .col-actions {
+  width: 20%;
+  text-align: center;
+}
+
+/* Botones alineados en el centro */
+.programs-page .actions {
+  display: inline-flex;
+  justify-content: center;
+  gap: .5rem;
+}
+
+/* Botones del modal centrados */
+.modal__actions--center {
+  display: flex;
+  justify-content: center;
+}
+/* === Panel de Programas / Diplomados (estilo similares a Solicitudes) === */
+
+/* Por si acaso, definimos tokens básicos (si ya existen, se reutilizan) */
+:root {
+  --card: var(--card, rgba(20,22,26,.86));
+  --border: var(--border, rgba(255,255,255,.10));
+  --shadow: var(--shadow, 0 18px 40px rgba(0,0,0,.45));
+  --radius: var(--radius, 18px);
+}
+
+/* El “panel” principal que envuelve buscador y tabla */
+.programs-page .card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(8px);
+}
+
+/* Un poco de espacio interior más cómodo */
+.programs-page .card.mt-16 {
+  padding: 14px 16px;
+}
+
+/* Topbar + resultados centrados, pero usando el mismo look */
+.topbar--column {
+  flex-direction: column;
+  gap: .5rem;
+}
+
+.brand--center {
+  justify-content: center;
+}
+
+.top-actions--center {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  gap: .75rem;
+}
+
+/* Buscador centrado tipo toolbar */
+.search-row-center {
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.search-input {
+  max-width: 560px;
+  width: 100%;
+  min-width: 220px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.06);
+  color: var(--text, #e8edf3);
+}
+
+.search-input::placeholder {
+  color: rgba(232,237,243,.5);
+}
+
+/* Texto de resultados centrado */
+.results-row-center {
+  justify-content: center;
+}
+
+/* === Tabla con look “glass” y menos espacio vacío === */
+
+.programs-table-wrap {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* Tabla compacta */
+.programs-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+  background: rgba(255,255,255,.02);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+/* Cabecera similar a tabs de otros paneles */
+.programs-table thead tr {
+  background: rgba(255,255,255,.06);
+}
+
+.programs-table th {
+  padding: 10px 12px;
+  font-weight: 700;
+  letter-spacing: .3px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Celdas */
+.programs-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  vertical-align: middle;
+}
+
+/* Última fila sin borde fuerte */
+.programs-table tbody tr:last-child td {
+  border-bottom-color: transparent;
+}
+
+/* Anchos para evitar huecos enormes */
+.programs-table .col-nombre {
+  width: 65%;
+  text-align: left;
+}
+
+.programs-table .col-fuente {
+  width: 15%;
+  text-align: center;
+}
+
+.programs-table .col-actions {
+  width: 20%;
+  text-align: center;
+}
+
+/* Fila al pasar el mouse, tipo .list__item */
+.programs-table tbody tr:hover {
+  background: rgba(255,255,255,.04);
+}
+
+/* Acciones centradas tipo .actions de Solicitudes */
+.programs-page .actions {
+  display: inline-flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Botones respetando tu estilo global (solo ajuste ligero) */
+.programs-page .btn {
+  min-width: 88px;
+}
+
+/* Badges tipo chips de estado */
+.badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.06);
+}
+
+.badge-sim {
+  color: #b7c2ff;
+  border-color: rgba(183,194,255,.35);
+  background: rgba(183,194,255,.08);
+}
+
+.badge-app {
+  color: #ffd18f;
+  border-color: rgba(255,209,143,.32);
+  background: rgba(255,209,143,.08);
+}
+
+.badge-orange {
+  color: #ffb074;
+  border-color: rgba(255,176,116,.32);
+  background: rgba(255,176,116,.08);
+}
+
+/* Modal: botones centrados como en otros paneles */
+.modal__actions--center {
+  display: flex;
+  justify-content: center;
+}
+
+/* Responsivo básico */
+@media (max-width: 960px) {
+  .programs-table .col-nombre {
+    width: 55%;
+  }
+  .programs-table .col-fuente {
+    width: 18%;
+  }
+  .programs-table .col-actions {
+    width: 27%;
+  }
+}
+
+@media (max-width: 720px) {
+  .search-input {
+    min-width: 160px;
+  }
+  .programs-table {
+    font-size: 14px;
+  }
+}
+/* === Variables básicas (por si no vienen de otro CSS) === */
+:root {
+  --accent: #ff8a3c;
+  --accent-2: #3b82f6;
+  --card: rgba(12, 14, 20, 0.94);
+  --border: rgba(255, 255, 255, 0.12);
+  --radius: 18px;
+  --shadow: 0 22px 50px rgba(0, 0, 0, 0.65);
+  --text: #e9eef5;
+  --muted: #9ba4b4;
+}
+
+/* === Fondo general + orbes === */
+
+body.bg-orbs {
+  margin: 0;
+  min-height: 100vh;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: radial-gradient(circle at top, #111827 0, #020308 55%);
+  color: var(--text);
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* orbes animados */
+.bg-orbs::before,
+.bg-orbs::after {
+  content: "";
+  position: fixed;
+  inset: auto;
+  width: 650px;
+  height: 650px;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.22;
+  z-index: 0;
+  pointer-events: none;
+  animation: floaty 18s ease-in-out infinite;
+}
+
+.bg-orbs::before {
+  background: linear-gradient(135deg, var(--accent), #ffb671);
+  top: -120px;
+  right: -120px;
+}
+
+.bg-orbs::after {
+  background: linear-gradient(135deg, var(--accent-2), #3e76c4);
+  bottom: -140px;
+  left: -140px;
+  animation-delay: -7s;
+}
+
+@keyframes floaty {
+  0%, 100% { transform: translate3d(0,0,0) scale(1); }
+  50%      { transform: translate3d(0,-10px,0) scale(1.02); }
+}
+
+/* Contenedor principal sobre los orbes */
+.programs-page .shell {
+  position: relative;
+  z-index: 1;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 20px 40px;
+}
+
+/* === Tarjetas / layout === */
+
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  padding: 16px 18px;
+  margin-top: 0;
+  backdrop-filter: blur(16px);
+}
+
+.mt-16 { margin-top: 16px; }
+.mt-12 { margin-top: 12px; }
+
+.topbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-weight: 800;
+  font-size: 18px;
+}
+
+.brand .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.top-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+/* buscador */
+
+.search-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.input {
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  padding: 10px 12px;
+}
+
+.search-input {
+  max-width: 560px;
+  width: 100%;
+}
+
+/* botones genéricos */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn-sm {
+  padding: 7px 12px;
+  font-size: 12px;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.btn-ghost {
+  background: transparent;
+}
+
+.btn--dark {
+  background: rgba(15, 17, 23, 0.9);
+}
+
+.btn--primary {
+  color: #0f1216;
+  border: 1px solid transparent;
+  background: linear-gradient(135deg, var(--accent), #ff9b45);
+}
+
+.btn--danger {
+  color: #fff;
+  background: rgba(255, 107, 107, 0.18);
+  border-color: rgba(255, 107, 107, 0.4);
+}
+
+/* mensajes */
+
+.alerts { display: flex; flex-direction: column; gap: 10px; }
+
+.alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(20, 22, 26, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.alert__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #9ba4b4;
+}
+
+.alert--success .alert__dot { background: #22c55e; }
+.alert--danger  .alert__dot { background: #ef4444; }
+.alert--warning .alert__dot { background: #f59e0b; }
+
+/* cabecera resultados */
+
+.results-row {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.sub {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* === Tabla de programas === */
+
+.programs-table-wrap {
+  overflow-x: auto;
+}
+
+.programs-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.programs-table th,
+.programs-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.programs-table thead th {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+/* columnas: nombre ocupa la mayor parte, para que no se vea tanto “hueco” */
+.col-nombre  { width: 65%; }
+.col-fuente  { width: 10%; text-align: center; }
+.col-actions { width: 25%; text-align: center; }
+
+.programs-table td.col-fuente,
+.programs-table td.col-actions {
+  text-align: center;
+}
+
+/* filas */
+
+.programs-row:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* badges */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.badge-sim  { color: #60a5fa; }
+.badge-app  { color: #fbbf24; }
+.badge-orange { color: #fb923c; }
+
+/* acciones dentro de la celda */
+
+.actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* estado vacío */
+
+.programs-empty {
+  text-align: center;
+  padding: 30px 12px;
+}
+
+/* modal */
+
+.modal.is-hidden { display: none; }
+/* (asumo que el resto del CSS de modales ya lo tienes en otro archivo) */
+
+/* responsive */
+
+@media (max-width: 720px) {
+  .topbar { align-items: center; }
+  .top-actions { flex-wrap: wrap; }
+
+  .col-abbr    { width: 25%; }
+  .col-nombre  { width: 55%; }
+  .col-actions { width: 20%; text-align: center; }
+}
+
+.programs-table td.col-actions {
+  text-align: center;
+}
+/* fondo animado */
+.bg-orbs::before,
+.bg-orbs::after {
+  content: "";
+  position: fixed;
+  inset: auto;
+  width: 650px;
+  height: 650px;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: .22;
+  z-index: 0;
+  pointer-events: none;
+  animation: floaty 18s ease-in-out infinite;
+}
+
+.bg-orbs::before {
+  background: linear-gradient(135deg, var(--accent), #ffb671);
+  top: -120px;
+  right: -120px;
+}
+
+.bg-orbs::after {
+  background: linear-gradient(135deg, var(--accent-2), #3e76c4);
+  bottom: -140px;
+  left: -140px;
+  animation-delay: -7s;
+}
+
+@keyframes floaty {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(0, -10px, 0) scale(1.02);
+  }
+}
+/* --- Fix: centrar modal de confirmación de programas --- */
+#confirmModal {
+  position: fixed;
+  inset: 0;                 /* top:0; right:0; bottom:0; left:0 */
+  display: flex;
+  align-items: center;      /* CENTRO vertical */
+  justify-content: center;  /* CENTRO horizontal */
+  z-index: 999;             /* por encima del resto */
+}
+
+/* estados que ya usa program.js */
+#confirmModal.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+#confirmModal.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* opcional: que la cajita no se haga gigante en pantallas grandes */
+.confirm-modal__box {
+  max-width: 460px;
+  width: 100%;
+}
+/* === MODAL ELIMINAR PROGRAMA ================================== */
+
+html.no-scroll,
+body.no-scroll {
+  height: 100%;
+  overflow: hidden;           /* bloquea el scroll cuando el modal está abierto */
+}
+
+/* Overlay de pantalla completa */
+#confirmModal {
+  position: fixed;
+  inset: 0;                   /* top:0; right:0; bottom:0; left:0 */
+  display: flex;
+  align-items: center;        /* centro vertical */
+  justify-content: center;    /* centro horizontal */
+  background: rgba(3, 7, 18, 0.80); /* fondo oscuro translúcido */
+  backdrop-filter: blur(6px);
+  z-index: 2000;
+  transition: opacity 0.18s ease-out, transform 0.18s ease-out;
+}
+
+/* Estado oculto (el JS pone/quita estas clases) */
+#confirmModal.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Estado visible */
+#confirmModal.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Caja del modal (el recuadro) */
+#confirmModal .confirm-modal__box {
+  max-width: 480px;
+  width: calc(100% - 3rem);
+  margin: 0 auto;
+  border-radius: 18px;
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.55);
+  transform: translateY(0);   /* por si antes tenía traslaciones raras */
+}
+/* === TRANSPARENCIA EN CARDS Y TABLAS ========================= */
+
+/* Contenedores principales */
+.card,
+.card--secondary {
+  background: rgba(9, 13, 24, 0.25);      /* casi transparente */
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  backdrop-filter: blur(10px);            /* efecto glass */
+}
+
+/* Cabeceras de card (barra donde va el título/botones) */
+.card__header {
+  background: rgba(9, 13, 24, 0.35);
+}
+
+/* Tabla en sí */
+.table {
+  background: transparent;
+}
+
+/* Encabezado de la tabla */
+.table__head {
+  background: rgba(15, 23, 42, 0.55);
+}
+
+/* Filas del cuerpo */
+.table__body tr {
+  background: transparent;
+}
+
+/* Alternar filas con un ligero velo */
+.table__body tr:nth-child(even) {
+  background: rgba(15, 23, 42, 0.28);
+}
+
+/* Celda “vacía” (mensaje de no hay registros) */
+.table__cell--empty {
+  background: transparent;
+}
+/* Paginador de la tabla de programas */
+.pager {
+  display: none;               /* se muestra solo si hay +10 filas */
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 0 0.25rem;
+}
+
+.pager__dot {
+  width: 18px;
+  height: 8px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(148, 163, 184, 0.35); /* gris translúcido */
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.35);
+  cursor: pointer;
+  opacity: 0.6;
+  transition:
+    width 0.15s ease,
+    opacity 0.15s ease,
+    transform 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.pager__dot.is-active {
+  width: 22px;                 /* el activo un poquito más largo */
+  opacity: 1;
+  background: #f9fafb;         /* casi blanco, como en tu ejemplo */
+}
+
+.pager__dot:hover {
+  transform: translateY(-1px);
+  opacity: 0.9;
+}
+
+.pager__dot:focus-visible {
+  outline: 2px solid rgba(191, 219, 254, 0.95);
+  outline-offset: 2px;
+}
+/* Tabla de programas: ajustar distribución de columnas */
+.table--programs {
+  width: 100%;
+  table-layout: fixed; /* reparte el ancho según las reglas de abajo */
+}
+
+/* ID */
+.table--programs th:nth-child(1),
+.table--programs td:nth-child(1) {
+  width: 6%;
+  text-align: center;
+}
+
+/* Programa */
+.table--programs th:nth-child(2),
+.table--programs td:nth-child(2) {
+  width: 10%;
+  text-align: center;
+}
+
+/* Nombre completo */
+.table--programs th:nth-child(3),
+.table--programs td:nth-child(3) {
+  width: 54%;
+  text-align: left;
+}
+
+/* Constancia */
+.table--programs th:nth-child(4),
+.table--programs td:nth-child(4) {
+  width: 10%;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Acciones */
+.table--programs th:nth-child(5),
+.table--programs td:nth-child(5) {
+  width: 20%;
+  text-align: center;
+}
+/* Tabla de programas: ajustar distribución de columnas */
+.table--programs {
+  width: 100%;
+  table-layout: fixed;
+}
+
+/* Que casi todo vaya centrado por defecto */
+.table--programs th,
+.table--programs td {
+  text-align: center;
+}
+
+/* ID */
+.table--programs th:nth-child(1),
+.table--programs td:nth-child(1) {
+  width: 6%;
+}
+
+/* Programa (corto) */
+.table--programs th:nth-child(2),
+.table--programs td:nth-child(2) {
+  width: 10%;
+}
+
+/* Nombre completo: más corto y centrado */
+.table--programs th:nth-child(3),
+.table--programs td:nth-child(3) {
+  width: 40%;          /* antes 54% */
+  text-align: center;  /* antes estaba left */
+  padding-right: 1rem;
+}
+
+/* Constancia: un poco más de espacio y centrado */
+.table--programs th:nth-child(4),
+.table--programs td:nth-child(4) {
+  width: 14%;          /* antes 10% */
+  white-space: nowrap;
+}
+
+/* Acciones: botones bien juntos al resto */
+.table--programs th:nth-child(5),
+.table--programs td:nth-child(5) {
+  width: 20%;
+}
+/* =======================
+   Alertas de mensajes
+   ======================= */
+.alert-stack {
+  margin: 0 0 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.alert {
+  padding: 0.75rem 1.25rem;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  box-shadow:
+    0 18px 45px rgba(15, 23, 42, 0.65),
+    0 0 0 1px rgba(15, 23, 42, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+/* Por defecto, info neutra */
+.alert--info {
+  background: radial-gradient(circle at top left,
+    rgba(148, 163, 184, 0.65),
+    rgba(15, 23, 42, 0.9)
+  );
+  color: #e5e7eb;
+}
+
+/* Éxito */
+.alert--success {
+  background: radial-gradient(circle at top left,
+    rgba(22, 163, 74, 0.7),
+    rgba(15, 23, 42, 0.95)
+  );
+  color: #ecfdf5;
+}
+
+/* Error */
+.alert--error {
+  background: radial-gradient(circle at top left,
+    rgba(220, 38, 38, 0.75),
+    rgba(15, 23, 42, 0.95)
+  );
+  color: #fef2f2;
+}
+
+.alert__text {
+  font-weight: 500;
+}
+.alert--closing {
+  opacity: 0;
+  transform: translateY(-4px) scale(0.98);
+}
+.alert-stack {
+  margin: 0 0 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.alert {
+  position: relative;  /* para colocar la X y la barra */
+  padding: 0.75rem 2.5rem 1.1rem;  /* más espacio a la derecha y abajo */
+  border-radius: 999px;
+  font-size: 0.95rem;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  box-shadow:
+    0 18px 45px rgba(15, 23, 42, 0.65),
+    0 0 0 1px rgba(15, 23, 42, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
+.alert--closing {
+  opacity: 0;
+  transform: translateY(-4px) scale(0.98);
+}
+
+/* Variantes (las que ya tenías) */
+.alert--info {
+  background: radial-gradient(circle at top left,
+    rgba(148, 163, 184, 0.65),
+    rgba(15, 23, 42, 0.9)
+  );
+  color: #e5e7eb;
+}
+
+.alert--success {
+  background: radial-gradient(circle at top left,
+    rgba(22, 163, 74, 0.7),
+    rgba(15, 23, 42, 0.95)
+  );
+  color: #ecfdf5;
+}
+
+.alert--error {
+  background: radial-gradient(circle at top left,
+    rgba(220, 38, 38, 0.75),
+    rgba(15, 23, 42, 0.95)
+  );
+  color: #fef2f2;
+}
+
+.alert__text {
+  font-weight: 500;
+}
+
+/* Botón X */
+.alert__close {
+  position: absolute;
+  right: 0.9rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.alert__close:hover {
+  opacity: 1;
+  transform: translateY(-50%) scale(1.05);
+}
+
+/* Barra de progreso */
+.alert__progress {
+  position: absolute;
+  left: 1.1rem;
+  right: 1.1rem;
+  bottom: 0.35rem;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.6);
+  overflow: hidden;
+}
+
+.alert__progress-bar {
+  height: 100%;
+  width: 100%;  /* inicia llena */
+  transform-origin: left center;
+  transition: width 0.1s linear;
+  background: rgba(248, 250, 252, 0.9);  /* casi blanco */
+}
+/* Modales: estado oculto realmente no bloquea la página */
+.confirm-modal.is-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;  /* que no capture clics */
+}
+
+.confirm-modal.is-hidden .modal__overlay,
+.confirm-modal.is-hidden .modal__dialog {
+  pointer-events: none;
+}
+/* Centrar el modal de EDITAR programa */
+#programEditModal .modal__dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  width: min(90vw, 640px); /* ancho máximo cómodo */
+}
+
+/* Por si algún estilo anterior lo empuja hacia abajo */
+#programEditModal.confirm-modal {
+  align-items: center;
+  justify-content: center;
+}
+/* Barra superior: buscador + botones */
+.card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;           /* en pantallas chicas se apilan */
+}
+
+/* Contenedor del buscador */
+.card__header-left {
+  flex: 1 1 auto;            /* ocupa todo el espacio disponible */
+  min-width: 260px;          /* para que el input no se haga súper chico */
+}
+
+/* Contenedor de los botones de la derecha */
+.card__header-right {
+  display: flex;
+  gap: 0.75rem;              /* espacio entre “Nuevo” y “Volver” */
+  justify-content: flex-end; /* alineados a la derecha */
+  flex-wrap: wrap;
+}
+/* =======================================================
+   FORMULARIO DE PROGRAMAS
+   (solo aplica cuando el body tiene .page--program-form)
+   ======================================================= */
+
+.page--program-form {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 3rem;
+}
+
+/* Card principal del form */
+.page--program-form .card--secondary {
+  margin-top: 1.25rem;
+}
+
+/* Header del formulario */
+.page--program-form .card__title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.page--program-form .card__subtitle {
+  margin-top: 0.25rem;
+  font-size: 0.9rem;
+  color: #9ca3af;
+}
+
+/* Cuerpo del formulario */
+.page--program-form .card__body {
+  padding: 1.75rem 1.75rem 2rem;
+}
+
+/* Grid para Código + Nombre */
+.page--program-form .form__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .page--program-form .form__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Campos del formulario */
+.page--program-form .field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 1.25rem;
+}
+
+.page--program-form .field__label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #e5e7eb;
+}
+
+.page--program-form .field__input {
+  border-radius: 0.6rem;
+  border: 1px solid #334155;
+  background: #020617;
+  padding: 0.55rem 0.8rem;
+  font-size: 0.95rem;
+  color: #e5e7eb;
+}
+
+.page--program-form .field__input::placeholder {
+  color: #6b7280;
+}
+
+.page--program-form .field__input:focus {
+  outline: none;
+  border-color: #f97316;
+  box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.5);
+}
+
+/* Texto de ayuda bajo cada campo */
+.page--program-form .field__help {
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+/* Botones inferiores */
+.page--program-form .form__actions {
+  margin-top: 1.75rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}

@@ -1,91 +1,235 @@
 {% load static %}
-<!doctype html>
-<html lang="es">
-<head>
-  <meta charset="utf-8" />
-  <title>{% if mode == 'edit' %}Editar{% else %}Nuevo{% endif %} programa</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="icon" href="{% static 'favicon/favicon.ico' %}">
-  <link rel="stylesheet" href="{% static 'css/programs.css' %}">
-</head>
-<body class="bg-orbs">
-  <div class="wrap">
-    <header class="page-head">
-      <div class="page-head__row">
-        <h1 class="title">{% if mode == 'edit' %}Editar{% else %}Nuevo{% endif %} programa</h1>
-        <span class="muted ml-auto">Define código, nombre y tipo de constancia.</span>
-      </div>
-      <div class="toolbar">
-        <a class="btn" href="{% url 'administracion:program_list' %}">← Volver</a>
-        <button form="programForm" class="btn btn-primary">Guardar</button>
-      </div>
-    </header>
+<!DOCTYPE html>
+<html lang="es-mx">
+  <head>
+    <meta charset="utf-8" />
+    <title>
+      {% if mode == "edit" %}
+        Editar programa
+      {% else %}
+        Nuevo programa
+      {% endif %}
+    </title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="{% static 'favicon/favicon.ico' %}">
+    <link rel="stylesheet" href="{% static 'css/programs.css' %}">
+  </head>
 
-    <form id="programForm" class="card main" method="post" action="">
-      {% csrf_token %}
+  <body class="bg-orbs">
+    <div class="page page--program-form">
 
-      {% if form.non_field_errors %}
-      <div class="alert">
-        {% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}
-      </div>
+      <!-- ENCABEZADO SUPERIOR -->
+      <section class="card">
+        <header class="card__header">
+          <div class="card__header-left">
+            <h1 class="card__title">
+              {% if mode == "edit" %}
+                Editar programa
+              {% else %}
+                Nuevo programa
+              {% endif %}
+            </h1>
+            <p class="card__subtitle">
+              Define el código, nombre y tipo de constancia del programa.
+            </p>
+          </div>
+
+          <div class="card__header-right">
+            <a href="{% url 'administracion:program_list' %}" class="btn btn--ghost">
+              ← Volver a la lista
+            </a>
+            <button
+              type="submit"
+              form="programForm"
+              class="btn btn--primary"
+            >
+              Guardar programa
+            </button>
+          </div>
+        </header>
+      </section>
+
+      <!-- ALERTAS (si usas messages de Django) -->
+      {% if messages %}
+        <section class="alert-stack">
+          {% for message in messages %}
+            <div class="alert alert--{{ message.tags|default:'info' }}">
+              <button
+                type="button"
+                class="alert__close"
+                aria-label="Cerrar notificación"
+              >
+                ×
+              </button>
+              <span class="alert__text">{{ message }}</span>
+              <div class="alert__progress">
+                <div class="alert__progress-bar"></div>
+              </div>
+            </div>
+          {% endfor %}
+        </section>
       {% endif %}
 
-      <div class="grid2 grid2--compact">
-        <div class="field">
-          <label class="label" for="code">Código</label>
-          <input id="code" name="code" class="input" type="text" placeholder="Ej. DETN-01"
-                 value="{{ form.code.value|default_if_none:''|default:'' }}">
-          {% if form.code.errors %}<div class="fielderror">{% for e in form.code.errors %}{{ e }}{% endfor %}</div>{% endif %}
+      <!-- FORMULARIO PRINCIPAL -->
+      <section class="card card--secondary">
+        <header class="card__header card__header--small">
+          <h2 class="card__title">
+            Datos del programa
+          </h2>
+        </header>
+
+        <div class="card__body">
+          <form
+            id="programForm"
+            method="post"
+            action=""
+            class="form form--stacked"
+          >
+            {% csrf_token %}
+
+            <!-- Errores generales (si los hubiera) -->
+            {% if form and form.non_field_errors %}
+              <div class="alert alert--error">
+                {% for e in form.non_field_errors %}
+                  <div>{{ e }}</div>
+                {% endfor %}
+              </div>
+            {% endif %}
+
+            <!-- Código + Nombre -->
+            <div class="form__grid">
+              <div class="field">
+                <label for="code" class="field__label">Código</label>
+                <input
+                  id="code"
+                  name="code"
+                  type="text"
+                  class="field__input"
+                  placeholder="Ej. DETN-01"
+                  value="{{ item.code|default_if_none:''|default:'' }}"
+                  required
+                >
+                <p class="field__help">
+                  Identificador corto del programa. Se usa en folios y vínculos.
+                </p>
+              </div>
+
+              <div class="field">
+                <label for="name" class="field__label">Nombre completo</label>
+                <input
+                  id="name"
+                  name="name"
+                  type="text"
+                  class="field__input"
+                  placeholder="Nombre del diplomado o curso"
+                  value="{{ item.name|default_if_none:''|default:'' }}"
+                  required
+                >
+                <p class="field__help">
+                  Nombre tal como aparecerá en diplomas y constancias.
+                </p>
+              </div>
+            </div>
+
+            <!-- Tipo de constancia -->
+            <div class="field">
+              <label for="constancia_type" class="field__label">
+                Tipo de constancia
+              </label>
+
+              {% with current=item.constancia_type|default:ConstanciaType.CEPROEM %}
+                <select
+                  id="constancia_type"
+                  name="constancia_type"
+                  class="field__input"
+                >
+                  {% for value,label in ConstanciaType.choices %}
+                    <option
+                      value="{{ value }}"
+                      {% if value == current %}selected{% endif %}
+                    >
+                      {{ label }}
+                    </option>
+                  {% endfor %}
+                </select>
+              {% endwith %}
+
+              <p class="field__help">
+                Define si las constancias emitidas serán CEPROEM o DC3.
+              </p>
+            </div>
+
+            <!-- Plantilla de diploma -->
+            <div class="field">
+              <label for="plantilla_diploma" class="field__label">
+                Plantilla de diploma
+              </label>
+              <select
+                id="plantilla_diploma"
+                name="plantilla_diploma"
+                class="field__input"
+              >
+                <option value="">
+                  — Sin plantilla asignada —
+                </option>
+                {% for tpl in plantillas %}
+                  <option
+                    value="{{ tpl.id }}"
+                    {% if item.plantilla_diploma_id == tpl.id %}selected{% endif %}
+                  >
+                    {{ tpl.title }}
+                  </option>
+                {% endfor %}
+              </select>
+              <p class="field__help">
+                Plantilla gráfica usada para generar el diploma del programa.
+              </p>
+            </div>
+
+            <!-- Plantilla de constancia -->
+            <div class="field">
+              <label for="plantilla_constancia" class="field__label">
+                Plantilla de constancia
+              </label>
+              <select
+                id="plantilla_constancia"
+                name="plantilla_constancia"
+                class="field__input"
+              >
+                <option value="">
+                  — Sin plantilla asignada —
+                </option>
+                {% for tpl in plantillas %}
+                  <option
+                    value="{{ tpl.id }}"
+                    {% if item.plantilla_constancia_id == tpl.id %}selected{% endif %}
+                  >
+                    {{ tpl.title }}
+                  </option>
+                {% endfor %}
+              </select>
+              <p class="field__help">
+                Plantilla usada para constancias (CPROEM o DC3) de este programa.
+              </p>
+            </div>
+
+            <!-- Acciones inferiores -->
+            <div class="form__actions">
+              <a
+                href="{% url 'administracion:program_list' %}"
+                class="btn btn--ghost"
+              >
+                Cancelar
+              </a>
+              <button type="submit" class="btn btn--primary">
+                Guardar programa
+              </button>
+            </div>
+          </form>
         </div>
+      </section>
+    </div>
 
-        <div class="field">
-          <label class="label" for="name">Nombre</label>
-          <input id="name" name="name" class="input" type="text" placeholder="Nombre del programa"
-                 value="{{ form.name.value|default_if_none:''|default:'' }}">
-          {% if form.name.errors %}<div class="fielderror">{% for e in form.name.errors %}{{ e }}{% endfor %}</div>{% endif %}
-        </div>
-
-        <div class="field">
-          <label class="label" for="constancia_type">Tipo de constancia</label>
-          <select id="constancia_type" name="constancia_type" class="input">
-            <option value="cproem"
-              {% if form.constancia_type.value|default_if_none:'cproem'|lower == 'cproem' %}selected{% endif %}>
-              CPROEM
-            </option>
-            <option value="dc3"
-              {% if form.constancia_type.value|default_if_none:'cproem'|lower == 'dc3' %}selected{% endif %}>
-              DC3
-            </option>
-          </select>
-          <div class="hint">Determina si las constancias del programa serán CPROEM o DC3.</div>
-          {% if form.constancia_type.errors %}<div class="fielderror">{% for e in form.constancia_type.errors %}{{ e }}{% endfor %}</div>{% endif %}
-        </div>
-
-        <div class="field">
-          <label class="label" for="plantilla_diploma">Plantilla de diploma</label>
-          <input id="plantilla_diploma" name="plantilla_diploma" class="input" type="text"
-                 placeholder="Ej. diploma_base"
-                 value="{{ form.plantilla_diploma.value|default_if_none:'diploma_base'|default:'diploma_base' }}">
-          <div class="hint">Por defecto <strong>diploma_base</strong>.</div>
-          {% if form.plantilla_diploma.errors %}<div class="fielderror">{% for e in form.plantilla_diploma.errors %}{{ e }}{% endfor %}</div>{% endif %}
-        </div>
-
-        <div class="field">
-          <label class="label" for="plantilla_constancia">Plantilla de constancia</label>
-          <input id="plantilla_constancia" name="plantilla_constancia" class="input" type="text"
-                 placeholder="Ej. constancia_cproem / constancia_dc3"
-                 value="{{ form.plantilla_constancia.value|default_if_none:''|default:'' }}">
-          {% if form.plantilla_constancia.errors %}<div class="fielderror">{% for e in form.plantilla_constancia.errors %}{{ e }}{% endfor %}</div>{% endif %}
-        </div>
-      </div>
-
-      <div class="edit-actions">
-        <a class="btn btn--ghost" href="{% url 'administracion:program_list' %}">Cancelar</a>
-        <button class="btn btn-primary" type="submit">Guardar</button>
-      </div>
-    </form>
-  </div>
-
-  <script nonce="{{ csp_nonce }}" src="{% static 'js/program.js' %}"></script>
-</body>
+    <script nonce="{{ csp_nonce }}" src="{% static 'js/program.js' %}" defer></script>
+  </body>
 </html>

@@ -748,3 +748,12 @@ strong{font-weight:700;}
 .overlay__icon{ font-size:32px; margin-bottom:8px; }
 .overlay__title{ font-weight:800; font-size:22px; margin:0 0 6px; }
 .overlay__text{ color:var(--text); opacity:.9; }
+/* Acciones del banner de rechazo */
+.reject-banner__actions{
+  margin-top: 10px;
+}
+
+/* Bloque del botón de descarga CPROEM */
+.download-cta{
+  margin: 20px 0;
+}

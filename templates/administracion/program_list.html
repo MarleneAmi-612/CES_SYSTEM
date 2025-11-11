@@ -1,191 +1,257 @@
 {% load static %}
-{% load humanize %}
-
 <!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="utf-8" />
-  <title>Programas / Diplomados</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+<html lang="es-mx">
+  <head>
+    <meta charset="utf-8" />
+    <title>Gestión de programas</title>
 
-  <link rel="stylesheet" href="{% static 'css/programs.css' %}">
-  <script src="{% static 'js/program.js' %}" defer></script>
+    <!-- CSS -->
+    <link rel="stylesheet" href="{% static 'css/programs.css' %}">
 
-  <style>
-    .programs-page .topbar,
-    .programs-page .brand,
-    .programs-page .programs-table th,
-    .programs-page .programs-table td,
-    .programs-page .alerts,
-    .programs-page .programs-empty,
-    .programs-page .sub { text-align: center; }
-    .programs-page .top-actions { justify-content: center; width: 100%; gap: .75rem; }
-    .programs-page .row.jc-between { justify-content: center; }
-    .programs-page .actions { justify-content: center; }
-    .programs-page .programs-table th,
-    .programs-page .programs-table td { vertical-align: middle; }
-  </style>
-</head>
+    <!-- JS -->
+    <script defer src="{% static 'js/program.js' %}"></script>
+    <script defer src="{% static 'js/program_edit.js' %}"></script>
+  </head>
 
-<body class="bg-orbs programs-page">
-  <div class="shell">
+  <body class="bg-orbs">
+    <div class="page">
 
-    <!-- Topbar -->
-    <div class="topbar" style="flex-direction: column; gap:.5rem;">
-      <div class="brand" style="justify-content:center;">
-        <span class="dot"></span>
-        <span>Programas / Diplomados</span>
-      </div>
-      <div class="top-actions" style="display:flex;">
-        <a class="btn btn-ghost" href="{% url 'administracion:plantillas' %}">← Volver a Plantillas</a>
-        <a class="btn btn--dark" href="{% url 'administracion:program_create' %}">＋ Nuevo programa</a>
-      </div>
-    </div>
+      <!-- ENCABEZADO PRINCIPAL -->
+      <header class="page__header">
+        <h1 class="page__title">Gestión de programas</h1>
+      </header>
 
-    <!-- Buscador -->
-    <div class="card mt-16">
-      <form class="row gap-12" style="justify-content:center;" method="get" action="">
-        <input
-          type="search"
-          name="q"
-          class="input"
-          style="max-width:560px; width:100%;"
-          placeholder="Buscar por nombre o fuente…"
-          value="{{ q|default_if_none:'' }}"
-          autocomplete="off">
-        {% if q %}
-          <a class="btn btn-ghost" href="?">Limpiar</a>
-        {% endif %}
-        <button class="btn" type="submit">Buscar</button>
-      </form>
-    </div>
+      <!-- ALERTAS (éxito / error con cierre manual y barra de progreso) -->
+      {% if messages %}
+        <section class="alert-stack">
+          {% for message in messages %}
+            <div class="alert alert--{{ message.tags|default:'info' }}">
+              <!-- Botón de cierre manual -->
+              <button
+                type="button"
+                class="alert__close"
+                aria-label="Cerrar notificación"
+              >
+                ×
+              </button>
 
-    <!-- Mensajes Django -->
-    {% if messages %}
-      <div class="alerts mt-12">
-        {% for message in messages %}
-          <div class="alert {% if 'success' in message.tags %}alert--success{% elif 'error' in message.tags %}alert--danger{% elif 'warning' in message.tags %}alert--warning{% else %}alert--info{% endif %}">
-            <span class="alert__dot"></span>
-            <div>{{ message }}</div>
-          </div>
-        {% endfor %}
-      </div>
-    {% endif %}
+              <!-- Texto del mensaje -->
+              <span class="alert__text">{{ message }}</span>
 
-    <!-- Lista -->
-    <div class="card mt-16">
-      {% if items %}
-        <div class="row gap-12 jc-between ai-center mb-10" style="justify-content:center;">
-          <div class="sub">
-            {{ items|length|intcomma }} resultado{{ items|length|pluralize:"s" }}
-            {% if q %} para <strong>"{{ q }}"</strong>{% endif %}
-          </div>
-        </div>
-
-        <div class="programs-table-wrap">
-          <table class="programs-table">
-            <thead>
-              <tr>
-                <th class="col-nombre">Nombre</th>
-                <th class="col-fuente">Fuente</th>
-                <th class="col-actions">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for it in items %}
-                <tr class="programs-row">
-
-                  <td class="col-nombre" data-label="Nombre">
-                    {{ it.nombre|default:"—" }}
-                  </td>
-
-                  <td class="col-fuente" data-label="Fuente">
-                    {% if it.fuente == "simulacion" %}
-                      <span class="badge badge-sim">Simulación</span>
-                    {% elif it.fuente == "alumnos_program" %}
-                      <span class="badge badge-app">App</span>
-                    {% else %}
-                      <span class="badge">{{ it.fuente|default:"—" }}</span>
-                    {% endif %}
-                  </td>
-
-                  <td class="col-actions" data-label="Acciones">
-                    <div class="actions" style="display:flex; gap:.5rem; flex-wrap:wrap; justify-content:center;">
-
-                      {# EDITAR: solo para alumnos_program y con codigo definido #}
-                      {% if it.fuente == "alumnos_program" and it.codigo %}
-                        <a class="btn btn--primary"
-                           href="{% url 'administracion:program_edit' it.codigo %}"
-                           title="Editar">
-                          Editar
-                        </a>
-                      {% endif %}
-
-                      {# BORRAR (con modal) #}
-                      {% if it.fuente == "simulacion" %}
-                        <form id="del-{{ it.fuente }}-{{ it.codigo }}" class="js-del-form inline" method="post" action="{% url 'administracion:program_delete' 'sim' it.codigo %}">
-                          {% csrf_token %}
-                          <button
-                            type="button"
-                            class="btn btn-danger js-del"
-                            data-form-id="del-{{ it.fuente }}-{{ it.codigo }}"
-                            data-program="{{ it.nombre|default:it.codigo }}"
-                            {% if it.enrolled_count|default:0 > 0 %}disabled aria-disabled="true" title="No se puede borrar: hay alumnos cursando ({{ it.enrolled_count }})"{% endif %}
-                          >Borrar</button>
-                        </form>
-                      {% elif it.fuente == "alumnos_program" %}
-                        <form id="del-{{ it.fuente }}-{{ it.codigo }}" class="js-del-form inline" method="post" action="{% url 'administracion:program_delete' 'app' it.codigo %}">
-                          {% csrf_token %}
-                          <button
-                            type="button"
-                            class="btn btn-danger js-del"
-                            data-form-id="del-{{ it.fuente }}-{{ it.codigo }}"
-                            data-program="{{ it.nombre|default:it.codigo }}"
-                            {% if it.enrolled_count|default:0 > 0 %}disabled aria-disabled="true" title="No se puede borrar: hay alumnos cursando ({{ it.enrolled_count }})"{% endif %}
-                          >Borrar</button>
-                        </form>
-                      {% endif %}
-
-                      {% if it.enrolled_count|default:0 > 0 %}
-                        <span class="badge badge-orange">Alumnos: {{ it.enrolled_count }}</span>
-                      {% endif %}
-                    </div>
-                  </td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-
-      {% else %}
-        <div class="programs-empty">
-          <h2>No hay programas para mostrar</h2>
-          {% if q %}
-            <p>Intenta con otro término o <a href="?">limpia la búsqueda</a>.</p>
-          {% else %}
-            <p>Cuando existan programas/diplomados aparecerán aquí.</p>
-          {% endif %}
-        </div>
+              <!-- Barra de progreso (10s) -->
+              <div class="alert__progress">
+                <div class="alert__progress-bar"></div>
+              </div>
+            </div>
+          {% endfor %}
+        </section>
       {% endif %}
+
+      <!-- BARRA SUPERIOR: BUSCADOR + BOTONES -->
+      <section class="card">
+        <header class="card__header">
+          <div class="card__header-left">
+            <form method="get" action="" class="search-form">
+              <input
+                id="q"
+                type="text"
+                name="q"
+                class="search-form__input"
+                placeholder="Buscar programa..."
+                value="{{ q|default:'' }}"
+              >
+              <button type="submit" class="btn btn--primary btn-sm">
+                Buscar
+              </button>
+            </form>
+          </div>
+
+          <div class="card__header-right">
+            <!-- NUEVO PROGRAMA -->
+            <a href="{% url 'administracion:program_create' %}" class="btn btn--primary">
+              + Nuevo programa
+            </a>
+
+            <!-- VOLVER A PLANTILLAS ADMIN -->
+            <a href="{% url 'administracion:plantillas' %}" class="btn btn--ghost">
+              ← Volver a plantillas admin
+            </a>
+          </div>
+        </header>
+      </section>
+
+      <!-- TABLA: PROGRAMAS DE SIMULACIÓN (ces_simulacion.diplomado) -->
+      <section class="card card--secondary">
+        <header class="card__header card__header--small">
+          <h2 class="card__title">Programas</h2>
+        </header>
+
+        <div class="card__body">
+          <div class="table-wrapper">
+            <table class="table table--programs">
+              <thead class="table__head">
+                <tr>
+                  <th class="table__cell">ID</th>
+                  <th class="table__cell">Programa</th>
+                  <th class="table__cell">Nombre completo</th>
+                  <th class="table__cell">Constancia</th>
+                  <th class="table__cell">Acciones</th>
+                </tr>
+              </thead>
+              <tbody class="table__body">
+                {% for d in sim_programs %}
+                  <tr data-id="{{ d.id }}">
+                    <td class="table__cell js-col-id">{{ d.id }}</td>
+                    <td class="table__cell js-col-code">{{ d.programa }}</td>
+                    <td class="table__cell js-col-name">{{ d.programa_full }}</td>
+                    <td class="table__cell js-col-constancia">{{ d.constancia }}</td>
+                    <td class="table__cell table__cell--actions">
+
+                      <!-- EDITAR (abre modal AJAX) -->
+                      <button
+                        type="button"
+                        class="btn btn--ghost btn-sm js-program-edit"
+                        data-id="{{ d.id }}"
+                        data-code="{{ d.programa }}"
+                        data-name="{{ d.programa_full }}"
+                        data-constancia="{{ d.constancia }}"
+                        data-url="{% url 'administracion:program_edit' d.program_admin_id %}"
+                      >
+                        Editar
+                      </button>
+
+                      <!-- BORRAR: abre modal y luego envía formulario -->
+                      <form id="del-{{ d.id }}"
+                            method="post"
+                            action="{% url 'administracion:program_delete' d.id %}"
+                            class="inline">
+                        {% csrf_token %}
+                        <button
+                          type="button"
+                          class="btn btn--danger btn-sm js-del"
+                          data-form-id="del-{{ d.id }}"
+                          data-program="{{ d.programa }}"
+                          data-code="{{ d.id }}"
+                        >
+                          Borrar
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr>
+                    <td class="table__cell table__cell--empty" colspan="5">
+                      No hay programas en ces_simulacion.
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Paginador (llenado por program.js) -->
+          <div id="programPager" class="pager" aria-label="Páginas de programas"></div>
+        </div>
+      </section>
+
     </div>
 
-    <div class="foot">—</div>
-  </div>
+    <!-- MODAL DE CONFIRMACIÓN (BORRAR) -->
+    <div id="confirmModal" class="confirm-modal is-hidden" aria-hidden="true">
+      <div class="modal__overlay" data-modal-close></div>
 
-  <!-- Modal de confirmación -->
-  <div id="confirmModal" class="modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
-    <div class="modal__overlay" data-modal-close></div>
-    <div class="modal__dialog">
-      <h3 id="confirmTitle" class="modal__title">Eliminar diplomado</h3>
-      <p id="confirmText" class="modal__text">
-        ¿Seguro que deseas eliminar <strong id="confirmName"></strong>?
-        <br><span class="sub">Esta acción no se puede deshacer.</span>
-      </p>
-      <div class="modal__actions" style="justify-content:center;">
-        <button type="button" id="confirmNo" class="btn">No, cancelar</button>
-        <button type="button" id="confirmYes" class="btn btn--danger">Sí, eliminar</button>
+      <div class="modal__dialog confirm-modal__box">
+        <header class="confirm-modal__header">
+          <h3 class="modal__title">Confirmar eliminación</h3>
+        </header>
+
+        <div class="confirm-modal__body">
+          <p class="modal__text">
+            ¿Seguro que deseas eliminar el programa
+            <strong id="confirmName"></strong>?
+          </p>
+          <p class="confirm-modal__code">
+            Código: <span id="confirmCode"></span>
+          </p>
+          <p class="confirm-modal__warning">
+            Esta acción no se puede deshacer.
+          </p>
+        </div>
+
+        <footer class="modal__actions">
+          <button
+            type="button"
+            id="confirmNo"
+            class="btn btn--ghost"
+            data-modal-close
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            id="confirmYes"
+            class="btn btn--danger"
+          >
+            Sí, borrar
+          </button>
+        </footer>
       </div>
     </div>
-  </div>
-</body>
+
+    <!-- MODAL DE EDICIÓN (AJAX) -->
+    <div id="programEditModal" class="confirm-modal is-hidden" aria-hidden="true">
+      <div class="modal__overlay" data-modal-close></div>
+
+      <div class="modal__dialog confirm-modal__box">
+        <header class="confirm-modal__header">
+          <h3 class="modal__title">Editar programa</h3>
+        </header>
+
+        <div class="confirm-modal__body">
+          <form id="programEditForm" class="modal-form">
+            <input type="hidden" id="editId">
+
+            <div class="field">
+              <label for="editCode" class="field__label">Programa (código)</label>
+              <input id="editCode" type="text" class="field__input" required>
+            </div>
+
+            <div class="field">
+              <label for="editName" class="field__label">Nombre completo</label>
+              <input id="editName" type="text" class="field__input" required>
+            </div>
+
+            <div class="field">
+              <span class="field__label">Constancia</span>
+              <div class="field__inline">
+                <label class="radio">
+                  <input type="radio" name="editConstancia" value="dc3"> DC3
+                </label>
+                <label class="radio">
+                  <input type="radio" name="editConstancia" value="cproem"> CPROEM
+                </label>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <footer class="modal__actions">
+          <button
+            type="button"
+            class="btn btn--ghost"
+            data-modal-close
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            id="programEditSave"
+            class="btn btn--primary"
+          >
+            Guardar cambios
+          </button>
+        </footer>
+      </div>
+    </div>
+  </body>
 </html>

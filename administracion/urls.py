@@ -136,7 +136,9 @@ urlpatterns = [
     path("programas/<int:pk>/editar/", views.program_edit, name="program_edit"),
     path("programas/<int:pk>/eliminar/", views.program_delete, name="program_delete"),
     path("programas/bulk-delete/", views.program_bulk_delete, name="program_bulk_delete"),
-    path("programas/", views.program_list, name="program_list"),
     path("programas/<str:source>/<int:pk>/eliminar/", views.program_delete, name="program_delete"),
+    #path("programas/<int:pk>/edit-api/",views.program_edit_api,name="program_edit_api",),
+    path("programas/bulk-delete/", views.program_bulk_delete, name="program_bulk_delete"),
+
 ]
 

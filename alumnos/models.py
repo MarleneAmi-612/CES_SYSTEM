@@ -13,6 +13,7 @@ STATUS_CHOICES = [
     ("generating", "Generando"),
     ("emailed", "Enviado por correo"),
     ("downloaded", "Descargado por el alumno"),
+    ("finalizado", "Finalizado"), 
 ]
 
 

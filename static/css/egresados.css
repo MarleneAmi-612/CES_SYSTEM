@@ -465,3 +465,15 @@ body{
 .page-head { position: relative; z-index: 0; }
 .segmented  { position: relative; z-index: 2; } /* tabs por encima */
 .mini-dd    { position: relative; z-index: 1; } /* dropdown debajo de tabs */
+.eg-alert__msg{
+  margin:0 0 8px;
+  font-size:14px;
+  line-height:1.5;
+  color:#cfe2ff;
+}
+#egDiplomaAlertLink{
+  text-decoration:none;
+}
+#egDiplomaAlertLink:hover{
+  text-decoration:none;
+}

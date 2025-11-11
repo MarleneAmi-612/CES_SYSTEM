@@ -4,75 +4,135 @@
 <head>
 <meta charset="utf-8">
 <title>Diploma</title>
-
 <style>
-  @page { size: A4 landscape; margin: 0; }
-  html, body { height: 100%; }
-  body {
+  @page {
+    size: A4;
     margin: 0;
-    /* tu imagen de fondo (PNG/JPG) a tamaño completo */
-    background: url("{% static 'img/diplomas/diploma_base.png' %}") center center no-repeat;
-    background-size: cover;
-    font-family: "DejaVu Sans", Arial, sans-serif;
-    color: #1b1b1b;
   }
 
-  /* lienzo absoluto para colocar campos con precisión */
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+  }
+
+  body {
+    {% if bg_url %}
+      background: url("{{ bg_url }}") center center no-repeat;
+      background-size: contain;
+    {% endif %}
+    background-color: #ffffff;
+    font-family: "DejaVu Sans", Arial, sans-serif;
+    color: #000;
+  }
+
   .page {
     position: relative;
-    width: 297mm; height: 210mm; /* A4 horizontal */
+    width: 210mm;
+    height: 297mm;
   }
 
-  /* Ejemplos de posiciones: ajusta left/top y ancho como necesites */
+  /* NOMBRE DEL EGRESADO */
   .nombre {
     position: absolute;
-    left: 45mm; top: 96mm; right: 45mm;
+    top: 112mm;
+    left: 20mm;
+    right: 20mm;
+    text-align: center;
+    font-size: 24pt;
+    font-weight: 400;
+    font-family: "Old English Text MT", "Goudy Text MT", "Cloister Black",
+                 "Times New Roman", serif;
+    color: #000;
+  }
+
+  /* (Opcional) texto con el nombre del programa
+     Solo se muestra si show_program_text == True */
+  .programa {
+    position: absolute;
+    top: 150mm;
+    left: 20mm;
+    right: 20mm;
     text-align: center;
     font-size: 18pt;
     font-weight: 700;
-    letter-spacing: .2pt;
   }
 
-  .programa {
+  /* TEXTO DE HORAS + FECHAS */
+  .periodo {
     position: absolute;
-    left: 45mm; top: 116mm; right: 45mm;
-    text-align: center;
-    font-size: 12.5pt;
-    font-weight: 600;
-  }
-
-  .fechas {
-    position: absolute;
-    left: 45mm; top: 132mm; right: 45mm;
+    top: 174mm;
+    left: 25mm;
+    right: 25mm;
     text-align: center;
     font-size: 11pt;
+    color: #000;
+    line-height: 1.4;
   }
 
-  .folio {
-    position: absolute;
-    left: 18mm; top: 16mm;
-    font-size: 9pt; opacity: .85;
+  .periodo .linea-horas {
+    display: block;
+    margin-bottom: 1.5mm;
   }
 
+  .periodo .linea-fechas {
+    display: block;
+  }
+
+  /* QR */
   .qr {
     position: absolute;
-    right: 18mm; bottom: 18mm;
-    width: 28mm; height: 28mm;
+    bottom: 35mm;
+    left: 48.5%;
+    width: 22mm;
+    height: 22mm;
+    transform: translateX(-50%);
   }
 
-  /* evita selección de texto (no es seguridad dura, pero suma) */
-  * { -webkit-user-select: none; -ms-user-select: none; user-select: none; }
+  .qr img {
+    width: 100%;
+    height: 100%;
+  }
 </style>
 </head>
 <body>
   <div class="page">
-    <div class="folio">Folio: {{ folio }}</div>
-    <div class="nombre">{{ nombre }}</div>
-    <div class="programa">{{ programa }}</div>
-    <div class="fechas">
-      Inicio: {{ inicio|date:"d/m/Y" }} &nbsp;•&nbsp; Fin: {{ fin|date:"d/m/Y" }}
+
+    <!-- NOMBRE COMPLETO -->
+    <div class="nombre">
+      {{ nombre }}
     </div>
-    <img class="qr" src="{{ qr_url }}" alt="QR">
+
+    <!-- (Opcional) Nombre del programa si no viene impreso en el PNG -->
+    {% if show_program_text %}
+      <div class="programa">
+        {{ programa }}
+      </div>
+    {% endif %}
+
+    <!-- TEXTO DE HORAS Y FECHAS -->
+    <div class="periodo">
+      <span class="linea-horas">
+        Con una intensidad de 120 horas académicas efectivas
+      </span>
+
+      <span class="linea-fechas">
+        Realizando el programa entre el día
+        {% if inicio %}
+          {{ inicio|date:"j" }} de {{ inicio|date:"F" }} de {{ inicio|date:"Y" }}
+        {% endif %}
+        {% if fin %}
+          &nbsp;al día&nbsp;
+          {{ fin|date:"j" }} de {{ fin|date:"F" }} de {{ fin|date:"Y" }}
+        {% endif %}
+      </span>
+    </div>
+
+    <!-- QR -->
+    <div class="qr">
+      <img src="{{ qr_url }}" alt="QR de verificación">
+    </div>
+
   </div>
 </body>
 </html>

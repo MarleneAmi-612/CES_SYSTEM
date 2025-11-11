@@ -289,24 +289,24 @@ def _status_rank(status: str) -> int:
 def _build_tracking_steps(req: Request):
     grad = getattr(req, "graduate", None)
 
-    sent_at = req.sent_at
-    approved_at = getattr(grad, "completion_date", None) if grad else None
-    generated_at = getattr(grad, "completion_date", None) if (grad and getattr(grad, "diploma_file", None)) else None
-    mailed_at = getattr(grad, "sent_at", None) if grad else None
+    sent_at       = req.sent_at
+    approved_at   = getattr(grad, "completion_date", None) if grad else None
+    generated_at  = getattr(grad, "completion_date", None) if (grad and getattr(grad, "diploma_file", None)) else None
+    mailed_at     = getattr(grad, "sent_at", None) if grad else None
     downloaded_at = getattr(grad, "download_date", None) if grad else None
 
-    rank = _status_rank(req.status)
+    rank = _status_rank(req.status or "")
 
     steps = [
         {"key": "sent",       "title": "Solicitud enviada",            "timestamp": sent_at,       "done": rank >= 1},
         {"key": "review",     "title": "En revisión",                  "timestamp": sent_at,       "done": rank >= 2},
         {"key": "accepted",   "title": "Aprobada",                     "timestamp": approved_at,   "done": rank >= 3},
         {"key": "generated",  "title": "Diploma/Constancia generada",  "timestamp": generated_at,
-         "done": req.status in ("generated", "emailed", "downloaded") or bool(generated_at)},
+         "done": req.status in ("generated", "emailed", "downloaded", "finalizado") or bool(generated_at)},
         {"key": "emailed",    "title": "Enviado por correo",           "timestamp": mailed_at,
-         "done": req.status in ("emailed", "downloaded") or bool(mailed_at)},
+         "done": req.status in ("emailed", "downloaded", "finalizado") or bool(mailed_at)},
         {"key": "downloaded", "title": "Descargado por el alumno",     "timestamp": downloaded_at,
-         "done": req.status == "downloaded" or bool(downloaded_at)},
+         "done": req.status in ("downloaded", "finalizado") or bool(downloaded_at)},
     ]
 
     if req.status == "rejected":
@@ -314,8 +314,15 @@ def _build_tracking_steps(req: Request):
         steps[2]["done"] = True
 
     active_index_map = {
-        "pending": 2, "review": 2, "accepted": 3, "rejected": 3,
-        "generating": 4, "generated": 4, "emailed": 5, "downloaded": 6,
+        "pending": 2,
+        "review": 2,
+        "accepted": 3,
+        "rejected": 3,
+        "generating": 4,
+        "generated": 4,
+        "emailed": 5,
+        "downloaded": 6,
+        "finalizado": 6,  # 👈 círculo 6
     }
     active_index = active_index_map.get(req.status, 1)
 
@@ -374,37 +381,39 @@ def _build_history(req: Request, steps=None):
     items.sort(key=lambda x: x["when"])
     return items
 
+@require_GET
 def tracking(request, request_id):
     req = Request.objects.filter(id=request_id).first()
     if not req:
         return render(request, "alumnos/tracking.html", {"not_found": True})
 
-    # Construye pasos (títulos, timestamps y 'done'); no usamos current_index aquí
+    # Construye pasos
     steps, _current_index, grad = _build_tracking_steps(req)
 
     # === Círculo activo (naranja) ===
     status = (req.status or "").lower()
     status_to_step = {
-        "pending": 1,       # 1: Solicitud enviada
-        "review": 2,        # 2: En revisión
-        "accepted": 3,      # 3: Aprobada
-        "rejected": 3,      # 3: Rechazada (se detiene aquí)
-        "generating": 4,    # 4: Generando
-        "generated": 4,     # 4: Generado (mismo círculo)
-        "emailed": 5,       # 5: Enviado por correo
-        "downloaded": 6,    # 6: Descargado
+        "pending":    1,  # Solicitud enviada
+        "review":     2,  # En revisión
+        "accepted":   3,  # Aprobada
+        "rejected":   3,  # Rechazada
+        "generating": 4,  # Generando
+        "generated":  4,  # Generado
+        "emailed":    5,  # Enviado por correo
+        "downloaded": 6,  # Descargado
+        "finalizado": 6,  # Finalizado (Círculo 6)
     }
-    active_max = status_to_step.get(status, 1)  # qué círculo se resalta en naranja
+    active_max = status_to_step.get(status, 1)
 
     # === Línea de progreso con medios pasos ===
     TOTAL_STEPS = 6
-    total_segments = TOTAL_STEPS - 1  # 5 tramos entre 6 puntos
+    total_segments = TOTAL_STEPS - 1  # 5 tramos
 
-    if status == "downloaded":
+    if status in ("downloaded", "finalizado"):
         # Llega al 100%
         units = total_segments
     elif status == "rejected":
-        # Se queda justo en el 3 (sin 0.5)
+        # Se queda justo en el 3 (sin 0.5 extra)
         units = (active_max - 1)
     else:
         # Avanza medio tramo hacia el siguiente
@@ -420,15 +429,7 @@ def tracking(request, request_id):
     eta_date = _add_business_days(sent_local, 10)
 
     # Motivo de rechazo (si aplica)
-    rejection_reason = req.status_reason
-    if not rejection_reason and req.status == "rejected":
-        rejection_reason = (
-            RequestEvent.objects
-            .filter(request=req, status="rejected")
-            .order_by("created_at")
-            .values_list("note", flat=True)
-            .first()
-        )
+    rejection_reason = getattr(req, "status_reason", "") or ""
 
     # Historial (incluye pasos con timestamp y eventos adicionales)
     history = _build_history(req, steps)
@@ -436,20 +437,35 @@ def tracking(request, request_id):
     # ¿Se puede reenviar?
     can_resubmit = _can_resubmit(req)
 
+    # === Descarga CPROEM para el alumno ===
+    program   = getattr(req, "program", None)
+    cert_type = getattr(program, "certificate_type", None)
+    cert_name = (getattr(cert_type, "name", "") or "").strip().lower()
+    is_cproem = "cproem" in cert_name
+
+    can_download_cproem = is_cproem and status in ("finalizado", "downloaded")
+    cproem_download_url = None
+    if can_download_cproem:
+        cproem_download_url = (
+            reverse("administracion:doc_download", args=[req.id])
+            + "?tipo=constancia&fmt=pdf"
+        )
+
     return render(request, "alumnos/tracking.html", {
         "req": req,
         "steps": steps,
-        "current_index": active_max - 1,  # si tu template lo usa, mantiene compatibilidad
+        "current_index": active_max - 1,
         "grad": grad,
         "progress_pct": progress_pct,
         "events_count": events_count,
-        "active_max": active_max,         # controla el círculo naranja en el template
+        "active_max": active_max,
         "eta_date": eta_date,
         "rejection_reason": rejection_reason,
         "history": history,
         "can_resubmit": can_resubmit,
+        "can_download_cproem": can_download_cproem,
+        "cproem_download_url": cproem_download_url,
     })
-
 
 
 @require_GET
@@ -576,3 +592,4 @@ def tracking_resend(request, request_id:int):
     RequestEvent.objects.create(request=req, status="pending", note="Reenvío de solicitud por el alumno")
 
     return JsonResponse({"ok": True, "new_status": "pending"})
+

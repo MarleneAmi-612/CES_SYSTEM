@@ -1,89 +1,135 @@
-import os
-import uuid
-import fitz  
-import unicodedata
-import logging
-from datetime import timedelta
 import io
-from pathlib import Path
-import secrets
-import requests
-import qrcode
-import zipfile
+import os
 import json
+import uuid
+import qrcode
+import fitz           
 import pikepdf
+import zipfile
+import secrets
+import logging
 import inspect
-import tempfile, subprocess
-from django.core.paginator import Paginator
-from typing import Optional
+import tempfile
+import subprocess
+import unicodedata
+from base64 import b64encode
+from datetime import timedelta,datetime,date
+from pathlib import Path
+from typing import Optional   
+from alumnos.models import Request
+
+# ============================
+# Terceros (third-party)
+# ============================
+import requests               
+from PIL import Image                 
 from weasyprint import HTML
-from django.db import connections, transaction
-from django.core.files.storage import default_storage
-from django.core.files.base import ContentFile
-from .thumbs import save_thumb
-from django.views.decorators.csrf import csrf_exempt
-from django.template.loader import render_to_string
+from csp import constants as csp
+from csp.decorators import csp_update
+from django_otp.decorators import otp_required
+
+# ============================
+# Django
+# ============================
+from django.apps import apps
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import (
-    authenticate, login, logout, get_user_model, update_session_auth_hash
+    authenticate,
+    login,
+    logout,
+    get_user_model,
+    update_session_auth_hash,
 )
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.mixins import UserPassesTestMixin, LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import Group
 from django.contrib.auth.views import (
-    PasswordResetView, PasswordResetDoneView,
-    PasswordResetConfirmView, PasswordResetCompleteView
+    PasswordResetView,
+    PasswordResetDoneView,
+    PasswordResetConfirmView,
+    PasswordResetCompleteView,
 )
-from django.conf import settings
-from django.apps import apps
-from django.forms import modelform_factory
-from django.utils.html import escape
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
+from django.core.paginator import Paginator
+from django.core.mail import send_mail
+from django.core.mail import EmailMessage
+from django.db import connections, transaction,IntegrityError
 from django.db.models import Q, Count, Max
-from django.http import JsonResponse, HttpResponse, FileResponse, Http404, HttpResponseBadRequest, HttpResponseNotAllowed
-from django.shortcuts import redirect, render, get_object_or_404
+from django.forms import modelform_factory
+from django.http import (
+    JsonResponse,
+    Http404,
+    HttpResponse,
+    FileResponse,
+    HttpResponseBadRequest,
+    HttpResponseNotAllowed,
+)
+from django.middleware.csrf import get_token
+from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.decorators import method_decorator
+from django.utils.html import escape
+from django.utils.dateparse import parse_date
 from django.utils.text import slugify
-from django.views.decorators.http import require_POST, require_GET, require_http_methods
-from django.views.generic import TemplateView, FormView
-from django.middleware.csrf import get_token
-from django_otp.decorators import otp_required
-from base64 import b64encode
-
-# Opcionales para rasterización dentro de _pdf_secure
-from PIL import Image  # Pillow
-from csp.decorators import csp_update
-from csp import constants as csp
-
-# Importa Request/Program del módulo de alumnos
-from alumnos.models import Request, Program as ProgramSim, RequestEvent
-from django.views.decorators.csrf import csrf_protect
-
-# Modelos del panel
-from .models import (
-    Graduate, AdminAccessLog, DocToken,
-    DesignTemplate, DesignTemplateVersion, TemplateAsset,
-    Program as ProgramAdmin,
-    ConstanciaType
+from django.views.decorators.csrf import csrf_exempt, csrf_protect
+from django.views.decorators.http import (
+    require_GET,
+    require_POST,
+    require_http_methods,
 )
+from django.views.generic import TemplateView, FormView
+
+# ============================
+# Apps locales
+# ============================
+from alumnos.models import Request  # u otros modelos que sí existan
+from administracion.models import Graduate
+egresados = Graduate.objects.all()
+
+# App "alumnos"
+from alumnos.models import (
+    Request,
+    RequestEvent,
+    Program as ProgramSim,
+)
+
+# App "administracion"
 from .forms import AdminLoginForm
+from .models import (
+    Graduate,
+    AdminAccessLog,
+    DocToken,
+    DesignTemplate,
+    DesignTemplateVersion,
+    TemplateAsset,
+    Program,               # modelo base
+    Program as ProgramAdmin,  # alias usado en vistas
+    ConstanciaType,
+)
 from .security import failed_attempts_count
-from .models import Program
+from .thumbs import save_thumb
+from .models import Program as ProgramAdmin, ConstanciaType
+from django.templatetags.static import static
+from django.contrib.staticfiles import finders
+
+# ============================
+# Config / helpers globales
+# ============================
 User = get_user_model()
-# Si estás en Windows y quieres rasterizar con pdf2image + Poppler,
+
+# Si estás en Windows y quieres rasterizar con Poppler / LibreOffice
 POPPLER_BIN = os.environ.get("POPPLER_BIN")
-SOFFICE_BIN = os.environ.get("SOFFICE_BIN")  
+SOFFICE_BIN = os.environ.get("SOFFICE_BIN")
+
+# Egresado puede no existir en todos los entornos
 try:
-    from .models import Egresado  # ajusta si tu modelo real tiene otro nombre
+    from .models import Egresado
 except Exception:
     Egresado = None
-    
-try:
-    from .models import Program as ProgramAdmin, ConstanciaType
-except ImportError:
-    ProgramAdmin, ConstanciaType = None, None
 
 log = logging.getLogger(__name__)
 
@@ -93,6 +139,30 @@ ALLOWED_EGRESADO_FIELDS = [
     "curp", "rfc", "nss", "telefono", "email",
     "status", "notas",
 ]
+
+# === FONDOS DE DIPLOMAS POR CÓDIGO (abreviado) ===
+# El archivo PNG debe estar en: static/img/diplomas/
+DIPLOMA_BG_BY_CODE = {
+    "DAIE": "DAIEN.png",  # Diplomado en Administración de Instituciones Educativas
+    "DAP":  "DAPN.png",
+    "DCG":  "DCGN.png",
+    "DDE":  "DDE.png",
+    "DEIN": "DEIN.png",
+    "DEM":  "DEMN.png",
+    "DET":  "DETN.png",
+    "DIC":  "DICN.png",
+    "DLI":  "DLIN.png",
+    "DNDI": "DNDI.png",
+    "DNE":  "DNEN.png",
+    "DNP":  "DNPN.png",
+    "DNS":  "DNSN.png",
+    "DOT":  "DOT.png",
+    "DPI":  "DPIE.png",
+    "DTC":  "DTCN.png",
+    "DTS":  "DTSN.png",
+    # aquí puedes seguir agregando códigos nuevos si subes más PNG
+}
+
 # ====================== Endpoint well-known (Chrome DevTools) ======================
 @require_GET
 def wellknown_devtools(request):
@@ -568,65 +638,107 @@ def _constancia_tipo(program) -> str:
     return _program_constancia_kind(program)
 
 @login_required
-@csp_update({
-    'img-src': ("'self'", "data:", "blob:"),
-    'style-src': ("'self'", "https://fonts.googleapis.com", csp.NONCE),
-})
 def egresados(request, req_id=None):
     """
-    Página del panel de egresados. Decide si la constancia del programa activo
-    es DC3 o CPROEM y expone flags/etiquetas al template.
+    Panel de egresados.
+
+    - Muestra a la izquierda las solicitudes en estado "generating".
+    - Agrega también una lista de solicitudes en estado "finalizado".
+    - Para el alumno activo, intenta tomar las fechas desde Graduate
+      (validity_start / validity_end) y, si no existen, desde Request
+      (start_date / end_date).
     """
+
+    # -----------------------
+    #  Solicitudes EN PROCESO
+    # -----------------------
     generating = (
         Request.objects
-        .filter(status='generating')
-        .select_related('program')
-        .order_by('-sent_at')
+        .filter(status="generating")
+        .select_related("program")
+        .order_by("-sent_at")
     )
 
-    active_req = get_object_or_404(
-        Request.objects.select_related('program'),
-        pk=req_id
-    ) if req_id else None
+    # -----------------------
+    #  Solicitudes FINALIZADAS
+    # -----------------------
+    finished = (
+        Request.objects
+        .filter(status="finalizado")
+        .select_related("program")
+        .order_by("-sent_at")
+    )
 
-    # Datos básicos mostrados/ editables
-    program_name   = getattr(getattr(active_req, 'program', None), 'name', None) if active_req else None
-    req_start      = getattr(active_req, 'start_date', None) if active_req else None
-    req_end        = getattr(active_req, 'end_date', None) if active_req else None
-    curp           = getattr(active_req, 'curp', None) if active_req else None
-    rfc            = getattr(active_req, 'rfc', None) if active_req else None
-    job_title      = getattr(active_req, 'job_title', None) if active_req else None
-    industry       = getattr(active_req, 'industry', None) if active_req else None
-    business_name  = getattr(active_req, 'business_name', None) if active_req else None  # Razón social (DC3)
+    # Alumno activo (si viene un id en la URL)
+    active_req = (
+        Request.objects
+        .select_related("program", "graduate")
+        .filter(pk=req_id)
+        .first()
+        if req_id
+        else None
+    )
 
-    # Tipo de constancia según el programa
+    # Datos básicos para el panel derecho
+    program_name = None
+    req_start = None
+    req_end = None
+    curp = rfc = job_title = industry = business_name = None
+
+    if active_req:
+        program = getattr(active_req, "program", None)
+        program_name = getattr(program, "name", None)
+
+        # Preferimos las fechas que estén en Graduate
+        grad = getattr(active_req, "graduate", None)
+        if grad and (getattr(grad, "validity_start", None) or getattr(grad, "validity_end", None)):
+            req_start = getattr(grad, "validity_start", None)
+            req_end = getattr(grad, "validity_end", None)
+        else:
+            # Compatibilidad con la Request original
+            req_start = getattr(active_req, "start_date", None)
+            req_end = getattr(active_req, "end_date", None)
+
+        curp = getattr(active_req, "curp", None)
+        rfc = getattr(active_req, "rfc", None)
+        job_title = getattr(active_req, "job_title", None)
+        industry = getattr(active_req, "industry", None)
+        business_name = getattr(active_req, "business_name", None)
+
+    # Tipo de constancia (dc3 / cproem) para el alumno activo
     const_kind = constancia_kind_for_request(active_req) if active_req else "dc3"
-    is_dc3     = const_kind == "dc3"
-    is_cproem  = const_kind == "cproem"
-    const_label = "Constancia DC3" if is_dc3 else "Constancia CPROEM"
+    is_dc3 = const_kind == "dc3"
+    is_cproem = const_kind == "cproem"
+    const_label = "DC-3" if is_dc3 else "CPROEM"
 
     ctx = {
-        'generating_reqs': generating,
-        'active_req': active_req,
+        # Listas de la columna izquierda
+        "generating_reqs": generating,   # ← nombre que usa la plantilla
+        "finished_reqs": finished,       # ← NUEVO
 
-        # Datos para diplomas/constancias
-        'program_name': program_name,
-        'req_start': req_start,
-        'req_end': req_end,
+        # Alumno seleccionado
+        "active_req": active_req,
+        "program_name": program_name,
+        "req_start": req_start,
+        "req_end": req_end,
+        "curp": curp,
+        "rfc": rfc,
+        "job_title": job_title,
+        "industry": industry,
+        "business_name": business_name,
 
-        'curp': curp,
-        'rfc': rfc,
-        'job_title': job_title,
-        'industry': industry,
-        'business_name': business_name,
+        # Info de tipo de constancia
+        "is_dc3": is_dc3,
+        "is_cproem": is_cproem,
+        "constancia_label": const_label,
+        "const_kind": const_kind,
 
-        # Flags / etiquetas para el template
-        'is_dc3': is_dc3,
-        'is_cproem': is_cproem,
-        'constancia_label': const_label,
-        'const_kind': const_kind,
-        # CSRF para el JS
-        'csrf_token': get_token(request),
+        # Dummies para que el template no truene aunque estén vacíos
+        "diploma": {},
+        "constancia": {},
+
+        # Para el JS
+        "csrf_token": get_token(request),
     }
     return render(request, "administracion/egresados.html", ctx)
 
@@ -685,28 +797,183 @@ def egresados_preview_pdf(request, req_id: int):
         return HttpResponse("WeasyPrint no está instalado. Vista HTML abajo:<hr>" + html)
 
 @login_required
-def egresado_update(request, req_id: int):
-    """Actualiza campos simples de Egresado vía POST (AJAX)."""
+def egresado_update(request, req_id):
+    """
+    Actualiza, vía AJAX, los datos reales del egresado.
+    - La URL recibe el id de alumnos.Request (req_id).
+    - Los datos “fuertes” se guardan en administracion.Graduate.
+    - En lo posible, también se actualiza alumnos.Request si tiene esos campos.
+    """
     if request.method != "POST":
         return HttpResponseNotAllowed(["POST"])
 
-    Egresado = apps.get_model("administracion", "Egresado")
-    if Egresado is None:
-        return HttpResponseBadRequest("Modelo Egresado no encontrado")
+    # 1) Localizar la solicitud original
+    req = get_object_or_404(Request, pk=req_id)
 
-    allowed = {
-        "nombre", "apellido_paterno", "apellido_materno",
-        "curp", "rfc", "nss", "telefono", "email", "status", "notas",
+    # 2) Localizar (o crear) el Graduate vinculado
+    grad, _created = Graduate.objects.get_or_create(
+        request=req,
+        defaults={
+            "name": getattr(req, "name", "") or "",
+            "lastname": getattr(req, "lastname", "") or "",
+            "email": getattr(req, "email", "") or "",
+            "curp": getattr(req, "curp", "") or "",
+        },
+    )
+
+    changed = {}
+    grad_dirty = False
+    req_dirty = False
+
+    # --------- Campos de texto (nombre, curp, etc.) ---------
+    # Cada entrada: nombre_en_POST -> lista de posibles destinos (objeto, campo)
+    text_fields = {
+        "name":         [("grad", "name"),         ("req", "name")],
+        "lastname":     [("grad", "lastname"),     ("req", "lastname")],
+        "curp":         [("grad", "curp"),         ("req", "curp")],
+        "job_title":    [("grad", "job_title"),    ("req", "job_title")],
+        "industry":     [("grad", "industry"),     ("req", "industry")],
+        "business_name":[("grad", "business_name"),("req", "business_name")],
+        # Si tu modelo Request tiene rfc, lo actualizamos ahí:
+        "rfc":          [("req", "rfc")],
     }
-    data = {k: v for k, v in request.POST.items() if k in allowed}
-    if not data:
-        return HttpResponseBadRequest("Sin campos válidos")
 
-    obj = get_object_or_404(Egresado, pk=req_id)
-    for k, v in data.items():
-        setattr(obj, k, v)
-    obj.save()
-    return JsonResponse({"ok": True, "id": obj.pk, "saved": data})
+    for post_name, targets in text_fields.items():
+        raw_val = (request.POST.get(post_name) or "").strip()
+        db_val = raw_val or None  # guardamos None si viene vacío
+
+        for obj_name, field in targets:
+            obj = grad if obj_name == "grad" else req
+            if not hasattr(obj, field):
+                continue
+
+            old_val = getattr(obj, field) or ""
+            if old_val != raw_val:
+                setattr(obj, field, db_val)
+                # solo registramos una vez el cambio por campo
+                if post_name not in changed:
+                    changed[post_name] = f"{old_val or '—'} → {raw_val or '—'}"
+
+                if obj_name == "grad":
+                    grad_dirty = True
+                else:
+                    req_dirty = True
+                # pasamos al siguiente campo POST
+                break
+
+    # --------- Fechas (inicio / fin) ---------
+    # POST: start_date / end_date
+    # Graduate: validity_start / validity_end
+    # Request: (si existen) start_date / end_date
+    date_fields = {
+        "start_date": [("grad", "validity_start"), ("req", "start_date")],
+        "end_date":   [("grad", "validity_end"),   ("req", "end_date")],
+    }
+
+    for post_name, targets in date_fields.items():
+        raw = (request.POST.get(post_name) or "").strip()
+
+        if not raw:
+            new_date = None
+        else:
+            new_date = parse_date(raw)  # espera YYYY-MM-DD
+            if new_date is None:
+                return HttpResponseBadRequest(f"Fecha inválida para {post_name}: {raw}")
+
+        for obj_name, field in targets:
+            obj = grad if obj_name == "grad" else req
+            if not hasattr(obj, field):
+                continue
+
+            old_date = getattr(obj, field)
+            if old_date != new_date:
+                setattr(obj, field, new_date)
+
+                if post_name not in changed:
+                    changed[post_name] = f"{old_date or '—'} → {new_date or '—'}"
+
+                if obj_name == "grad":
+                    grad_dirty = True
+                else:
+                    req_dirty = True
+                break
+
+    # --------- Guardar si hubo cambios ---------
+    if grad_dirty:
+        grad.save()
+    if req_dirty:
+        req.save()
+
+    return JsonResponse({
+        "ok": True,
+        "changed": changed,
+    })
+
+def egresados_req(request, req_id):
+    active_req = get_object_or_404(Request, pk=req_id)
+
+    # 👉 traemos (si existe) el Graduate ligado a la solicitud
+    graduate = Graduate.objects.filter(request=active_req).first()
+
+    # ----------------- DATOS BÁSICOS -----------------
+    # si en Graduate hay dato, se usa; si no, se cae a Request
+    curp = None
+    if graduate and graduate.curp:
+        curp = graduate.curp
+    else:
+        curp = active_req.curp
+
+    job_title = None
+    if graduate and graduate.job_title:
+        job_title = graduate.job_title
+    else:
+        job_title = getattr(active_req, "job_title", None)
+
+    industry = None
+    if graduate and graduate.industry:
+        industry = graduate.industry
+    else:
+        industry = getattr(active_req, "industry", None)
+
+    business_name = None
+    if graduate and graduate.business_name:
+        business_name = graduate.business_name
+    else:
+        business_name = getattr(active_req, "business_name", None)
+
+    # ----------------- FECHAS -----------------
+    # 👈 AQUÍ ES LO IMPORTANTE
+    if graduate and graduate.validity_start:
+        req_start = graduate.validity_start
+    else:
+        req_start = getattr(active_req, "start_date", None)
+
+    if graduate and graduate.validity_end:
+        req_end = graduate.validity_end
+    else:
+        req_end = getattr(active_req, "end_date", None)
+
+    # ... resto de tu lógica: generar diploma_data, constancia_data, etc. ...
+
+    context = {
+        "active_req": active_req,
+        "curp": curp,
+        "job_title": job_title,
+        "industry": industry,
+        "business_name": business_name,
+        "req_start": req_start,
+        "req_end": req_end,
+        # + todo lo demás que ya mandabas:
+        # "diploma": diploma_data,
+        # "constancia": constancia_data,
+        # "is_dc3": is_dc3,
+        # "constancia_label": constancia_label,
+        # "const_kind": const_kind,
+        # "generating_reqs": generating_reqs,
+        # etc...
+    }
+
+    return render(request, "administracion/egresados.html", context)
 
 @login_required
 def egresado_update_inline(request, req_id: int):
@@ -729,13 +996,21 @@ def egresado_update_inline(request, req_id: int):
         "saved": incoming,
         "note": "Egresado model no disponible; stub.",
     })
-
 @require_POST
 def doc_send(request, req_id):
+    """
+    Publica token de verificación para el documento (diploma/constancia),
+    genera el PDF y lo envía por correo al alumno con el link de verificación.
+    Además marca la solicitud como 'emailed' para activar el quinto círculo.
+    """
     import logging
     log = logging.getLogger(__name__)
 
-    req = get_object_or_404(Request.objects.select_related("program"), pk=req_id)
+    # Cargamos la solicitud (y el graduate si existe)
+    req = get_object_or_404(
+        Request.objects.select_related("program", "graduate"),
+        pk=req_id,
+    )
 
     # --- Tipo solicitado (query) y tipo real ---
     tipo_query = _get_tipo_from_request(request, default="diploma")
@@ -744,21 +1019,121 @@ def doc_send(request, req_id):
 
     tipo_real = "diploma" if tipo_query == "diploma" else constancia_kind_for_request(req)
 
-    # --- Logging ---
     log.info("[doc_send] tipo_query=%s → tipo_real=%s (req=%s)", tipo_query, tipo_real, req.id)
 
     # --- Publicar token / URL de verificación ---
     doc = _ensure_published_token(req, tipo_real)
-    verify_url = request.build_absolute_uri(reverse("administracion:verificar_token", args=[doc.token]))
+    verify_url = request.build_absolute_uri(
+        reverse("administracion:verificar_token", args=[doc.token])
+    )
 
-    return JsonResponse({"ok": True, "verify_url": verify_url, "tipo": tipo_real})
+    # --- Generar PDF del diploma/constancia (mismo motor que el preview) ---
+    pdf_bytes = None
+    try:
+        # Igual que egresados_preview_pdf / doc_download
+        tpl, ctx = _render_ctx_and_template(
+            request, req, tipo_real, use_published_if_exists=True
+        )
+
+        html = render_to_string(tpl, ctx, request=request)
+        # HTML → PDF
+        pdf_bytes = HTML(string=html, base_url=request.build_absolute_uri("/")).write_pdf()
+
+        # Endurecer / marca de agua como en doc_download
+        pdf_bytes = _pdf_secure(
+            pdf_bytes,
+            user_pwd="",                         # sin password para abrir
+            watermark_text="CES · Solo lectura", # marca de agua opcional
+        )
+    except Exception as e:
+        pdf_bytes = None
+        log.exception("Error generando PDF para Request %s: %s", req.id, e)
+
+    # --- Enviar correo al alumno ---
+    emailed = False
+    if req.email:
+        try:
+            kind_label = "diploma" if tipo_real == "diploma" else "constancia"
+
+            subject = f"Tu {kind_label} – Centro de Estudios Superiores"
+            body = (
+                f"Hola {getattr(req, 'name', '')} {getattr(req, 'lastname', '')},\n\n"
+                f"Tu {kind_label} ha sido publicado.\n"
+                f"Puedes verlo y verificarlo en el siguiente enlace:\n{verify_url}\n\n"
+                "Centro de Estudios Superiores"
+            )
+
+            # Remitente configurado en settings (ej: yadier472@gmail.com)
+            from_email = getattr(settings, "DEFAULT_FROM_EMAIL", None) or getattr(settings, "EMAIL_HOST_USER", None)
+
+            if not from_email:
+                log.warning("No DEFAULT_FROM_EMAIL/EMAIL_HOST_USER configurado; no se enviará correo.")
+            else:
+                # Creamos el mensaje para poder adjuntar el PDF
+                email = EmailMessage(
+                    subject=subject,
+                    body=body,
+                    from_email=from_email,
+                    to=[req.email],
+                )
+
+                # Si pudimos generar el PDF, lo adjuntamos
+                if pdf_bytes:
+                    filename = f"{tipo_real}-{req.id}.pdf"
+                    email.attach(filename, pdf_bytes, "application/pdf")
+
+                # Enviar
+                email.send(fail_silently=False)
+                emailed = True
+
+        except Exception as exc:
+            log.exception("Error enviando correo para Request %s: %s", req.id, exc)
+
+    # --- Si se envió el correo, actualizar estado / tracking (quinto círculo) ---
+    if emailed:
+        try:
+            # 1) status principal
+            if getattr(req, "status", None) != "emailed":
+                req.status = "emailed"
+                req.save(update_fields=["status"])
+
+            # 2) evento en la bitácora (RequestEvent)
+            if not RequestEvent.objects.filter(request=req, status="emailed").exists():
+                RequestEvent.objects.create(
+                    request=req,
+                    status="emailed",
+                    note="Documento enviado por correo desde administración.",
+                )
+
+            # 3) timestamp en Graduate.sent_at para el timeline
+            grad = getattr(req, "graduate", None)
+            if grad and not getattr(grad, "sent_at", None):
+                grad.sent_at = timezone.now()
+                grad.save(update_fields=["sent_at"])
+        except Exception as exc:
+            log.exception("Error actualizando estado 'emailed' para Request %s: %s", req.id, exc)
+
+    # Respuesta al frontend (tu JS usa verify_url; lo demás es informativo)
+    return JsonResponse(
+        {
+            "ok": True,
+            "verify_url": verify_url,
+            "tipo": tipo_real,
+            "emailed": emailed,
+            "pdf_attached": bool(pdf_bytes),
+        }
+    )
 
 @require_POST
 def doc_confirm(request, req_id):
     import logging
     log = logging.getLogger(__name__)
 
-    req = get_object_or_404(Request.objects.select_related("program"), pk=req_id)
+    # Traemos también el graduate para poder marcar download_date
+    req = get_object_or_404(
+        Request.objects.select_related("program", "graduate"),
+        pk=req_id,
+    )
 
     # --- Tipo solicitado (query) y tipo real ---
     tipo_query = _get_tipo_from_request(request, default="constancia")
@@ -772,9 +1147,39 @@ def doc_confirm(request, req_id):
 
     # --- Publicar token / URL de verificación ---
     doc = _ensure_published_token(req, tipo_real)
-    verify_url = request.build_absolute_uri(reverse("administracion:verificar_token", args=[doc.token]))
+    verify_url = request.build_absolute_uri(
+        reverse("administracion:verificar_token", args=[doc.token])
+    )
 
-    return JsonResponse({"ok": True, "verify_url": verify_url, "tipo": tipo_real})
+    # === Solo para CPROEM: marcar como FINALIZADO (círculo 6) ===
+    is_cproem = (tipo_real == "cproem")
+    if is_cproem:
+        # 1) Cambiar estado a 'finalizado'
+        if req.status != "finalizado":
+            req.status = "finalizado"
+            req.save(update_fields=["status"])
+
+        # 2) Registrar evento 'finalizado' una sola vez
+        if not RequestEvent.objects.filter(request=req, status="finalizado").exists():
+            RequestEvent.objects.create(
+                request=req,
+                status="finalizado",
+                note="Constancia CPROEM confirmada; disponible para descarga.",
+            )
+
+        # 3) Marcar fecha de 'descarga' (usamos esto como finalización)
+        grad = getattr(req, "graduate", None)
+        if grad and not getattr(grad, "download_date", None):
+            grad.download_date = timezone.localdate()
+            grad.save(update_fields=["download_date"])
+
+    return JsonResponse({
+        "ok": True,
+        "verify_url": verify_url,
+        "tipo": tipo_real,
+        "finalizado": is_cproem,
+    })
+
 
 def doc_preview(request, req_id):
     return egresados_preview_pdf(request, req_id)
@@ -949,16 +1354,24 @@ def doc_download(request, req_id: int):
 def verificar_token(request, token: str):
     dt = get_object_or_404(DocToken, token=token, is_active=True)
     req = dt.request
+
+    grad = getattr(req, 'graduate', None)
+    if grad:
+        inicio = getattr(grad, 'validity_start', None)
+        fin = getattr(grad, 'validity_end', None)
+    else:
+        inicio = getattr(req, 'start_date', None)
+        fin = getattr(req, 'end_date', None)
+
     ctx = {
         "token": token,
         "tipo": dt.tipo,
         "alumno": f"{getattr(req,'name','')} {getattr(req,'lastname','')}".strip(),
         "programa": getattr(getattr(req, "program", None), "name", "—"),
-        "inicio": getattr(req, "start_date", None),
-        "fin": getattr(req, "end_date", None),
+        "inicio": inicio,
+        "fin": fin,
     }
     return render(request, "administracion/verify_result.html", ctx)
-
 
 # ====================== Tokens helpers ======================
 
@@ -979,9 +1392,23 @@ def _get_existing_token(req: Request, tipo: str):
 # ====================== Render helpers (ctx/plantilla/PDF/DOCX) ======================
 
 def _render_ctx_and_template(request, req, tipo_real: str, *, use_published_if_exists: bool):
+    # Nombre completo y programa
     nombre = f"{getattr(req,'name','')} {getattr(req,'lastname','')}".strip()
-    programa = getattr(getattr(req, "program", None), "name", "")
 
+    program_obj = getattr(req, "program", None)
+    programa = getattr(program_obj, "name", "") or ""
+    program_name_lower = programa.lower()
+
+    # Fechas del curso: primero Graduate, luego Request
+    grad = getattr(req, 'graduate', None)
+    if grad:
+        inicio = getattr(grad, 'validity_start', None)
+        fin = getattr(grad, 'validity_end', None)
+    else:
+        inicio = getattr(req, 'start_date', None)
+        fin = getattr(req, 'end_date', None)
+
+    # Token de verificación
     if use_published_if_exists:
         published = _get_existing_token(req, tipo_real)
         token = published.token if published else _random_hex_25()
@@ -993,36 +1420,101 @@ def _render_ctx_and_template(request, req, tipo_real: str, *, use_published_if_e
     )
     qr_url = _qr_png_data_url(verify_url, box_size=12)
 
+    # ======================================================
+    #  Diplomas
+    # ======================================================
     if tipo_real == "diploma":
+        # Fondo según programa abreviado
+        bg_static, show_program_text = _diploma_background_for_request(req)
+
+        # Si bg_static es None, simplemente no usamos fondo
+        bg_url = static(bg_static) if bg_static else ""
+
         tpl = "administracion/pdf_diploma.html"
         ctx = {
             "folio": f"DIP-{req.id:06d}",
             "nombre": nombre,
             "programa": programa,
-            "inicio": getattr(req, "start_date", None),
-            "fin": getattr(req, "end_date", None),
+            "inicio": inicio,
+            "fin": fin,
+            "qr_url": qr_url,
+            "bg_url": bg_url,
+            "show_program_text": show_program_text,
+        }
+
+    # ======================================================
+    #  Constancias (DC-3 y CPROEM)
+    # ======================================================
+    else:
+        tpl = (
+            "administracion/pdf_constancia_dc3.html"
+            if tipo_real == "dc3"
+            else "administracion/pdf_constancia_cproem.html"
+        )
+
+        ctx = {
+            "folio": f"CON-{req.id:06d}",
+            "nombre": nombre,
+            "programa": programa,
+            "inicio": inicio,
+            "fin": fin,
+            "curp": getattr(req, "curp", None),
+            "rfc": getattr(req, "rfc", None),
+            "puesto": getattr(req, "job_title", None),
+            "giro": getattr(req, "industry", None),
+            "razon_social": getattr(req, "business_name", None),
+            "horas": getattr(req, "hours", None),
             "qr_url": qr_url,
         }
-    else:
-        tpl = "administracion/pdf_constancia_dc3.html" if tipo_real == "dc3" else "administracion/pdf_constancia_cproem.html"
-        ctx = {
-        "folio": f"CON-{req.id:06d}",
-        "nombre": nombre,
-        "programa": programa,
-        "inicio": getattr(req, "start_date", None),
-        "fin": getattr(req, "end_date", None),
-        "curp": getattr(req, "curp", None),
-        "rfc": getattr(req, "rfc", None),
-        "puesto": getattr(req, "job_title", None),
-        "giro": getattr(req, "industry", None),
 
-        # 🔹 NUEVOS CAMPOS PARA DC-3:
-        "razon_social": getattr(req, "business_name", None),
-        "horas": getattr(req, "hours", None),  # si no existe en tu modelo, puedes quitar esta línea
-
-        "qr_url": qr_url,
-        }
     return tpl, ctx
+
+
+def _diploma_background_for_request(req):
+    """
+    Elige automáticamente el fondo del diploma según el programa abreviado.
+
+    Regla:
+      - Toma el código del programa (abbreviation / programa / code).
+      - Busca en /static/img/diplomas/:
+          1) <CODIGO>.png
+          2) <CODIGO>N.png
+      - Usa el primero que exista.
+      - Si no hay ninguno, no rompe: devuelve el primer candidato,
+        pero en la práctica verás la hoja en blanco (señal de que falta el PNG).
+    """
+    program_obj = getattr(req, "program", None)
+
+    code = ""
+    if program_obj:
+        code = (
+            getattr(program_obj, "abbreviation", None)
+            or getattr(program_obj, "programa", None)
+            or getattr(program_obj, "code", None)
+            or ""
+        )
+
+    code = (code or "").upper().strip()
+
+    # Si no hay código, ni lo intentamos
+    if not code:
+        return None, True
+
+    # Candidatos de nombre de archivo
+    candidates = [
+        f"img/diplomas/{code}.png",
+        f"img/diplomas/{code}N.png",
+    ]
+
+    # ¿Alguno existe en static?
+    for rel_path in candidates:
+        if finders.find(rel_path):
+            # Para fondos específicos normalmente el título ya va impreso
+            return rel_path, False
+
+    # Ninguno encontrado: devolvemos el primero como fallback
+    # (no truena; simplemente el fondo no se verá hasta que subas la imagen)
+    return candidates[0], True
 
 
 # ==================== Seguridad PDF ====================
@@ -1137,7 +1629,11 @@ class RequestsBoardView(LoginRequiredMixin, TemplateView):
 
         # Filtros por querystring (compat: 'estado' o 'status')
         q = (self.request.GET.get("q") or "").strip()
-        estado = (self.request.GET.get("estado") or self.request.GET.get("status") or "pending").strip() or "pending"
+        estado = (
+            self.request.GET.get("estado")
+            or self.request.GET.get("status")
+            or "pending"
+        ).strip() or "pending"
         program_id = (self.request.GET.get("program") or "").strip()
 
         # Base queryset
@@ -1145,10 +1641,10 @@ class RequestsBoardView(LoginRequiredMixin, TemplateView):
 
         if q:
             base = base.filter(
-                Q(email__icontains=q) |
-                Q(name__icontains=q) |
-                Q(lastname__icontains=q) |
-                Q(program__name__icontains=q)
+                Q(email__icontains=q)
+                | Q(name__icontains=q)
+                | Q(lastname__icontains=q)
+                | Q(program__name__icontains=q)
             )
 
         if program_id:
@@ -1157,7 +1653,7 @@ class RequestsBoardView(LoginRequiredMixin, TemplateView):
         # Orden por estado
         if estado == "pending":
             qs = base.filter(status="pending").order_by("sent_at")
-        elif estado in {"accepted", "rejected", "generating", "review"}:
+        elif estado in {"accepted", "rejected", "generating", "review", "finalizado"}:
             qs = base.filter(status=estado).order_by("-sent_at")
         else:
             qs = base.order_by("-sent_at")
@@ -1167,13 +1663,18 @@ class RequestsBoardView(LoginRequiredMixin, TemplateView):
         missing_ids = {
             r.program_id
             for r in qs_list
-            if getattr(r, "program_id", None) and (getattr(r, "program", None) is None
-                                                   or not getattr(getattr(r, "program", None), "name", None))
+            if getattr(r, "program_id", None)
+            and (
+                getattr(r, "program", None) is None
+                or not getattr(getattr(r, "program", None), "name", None)
+            )
         }
 
         sim_map = {}
         if missing_ids:
-            sim_programs = ProgramSim.objects.filter(id__in=missing_ids).only("id", "name")
+            sim_programs = ProgramSim.objects.filter(
+                id__in=missing_ids
+            ).only("id", "name")
             sim_map = {p.id: getattr(p, "name", "") for p in sim_programs}
 
         for r in qs_list:
@@ -1197,30 +1698,37 @@ class RequestsBoardView(LoginRequiredMixin, TemplateView):
             .values("id", "name", "abbreviation")
         )
 
+        # pestañas/estados disponibles (ya incluye FINALIZADO)
         statuses = [
             ("pending", "Pendiente"),
             ("review", "Revisión"),
             ("accepted", "Aprobada"),
             ("rejected", "Rechazada"),
             ("generating", "Generando"),
+            ("finalizado", "Finalizado"),
         ]
 
-        ctx.update({
-            "q": q,
-            "estado": estado,
-            "status": estado,
-            "program_id": program_id,
-            "items": items,
-            "programas": programas,
-            "counts": counts,
-            "count_pending": counts.get("pending", 0),
-            "statuses": statuses,
-            "now": timezone.now(),
-        })
+        ctx.update(
+            {
+                "q": q,
+                "estado": estado,
+                "status": estado,
+                "program_id": program_id,
+                "items": items,
+                "programas": programas,
+                "counts": counts,
+                "count_pending": counts.get("pending", 0),
+                "statuses": statuses,
+                "now": timezone.now(),
+            }
+        )
 
         ctx["csrf_token"] = get_token(self.request)
-        ctx["requests_update_url"] = reverse("administracion:request_update_status")
+        ctx["requests_update_url"] = reverse(
+            "administracion:request_update_status"
+        )
         return ctx
+
 
 
 @require_POST
@@ -1460,11 +1968,141 @@ def asset_delete(request, pk: int):
 
 # ========== PROGRAMAS / DIPLOMADOS ==========
 
+
+@csrf_exempt
 @login_required
-def program_list(request):
-    q = request.GET.get("q", "").strip() or None
-    items = fetch_programs(q)
-    return render(request, "administracion/program_list.html", {"items": items, "q": q or ""})
+@require_http_methods(["GET", "POST"])
+def program_edit(request, pk: int):
+    """
+    Edita SOLO el modelo Program (tabla nueva).
+    No toca ProgramSim ni la BD 'ces' para evitar errores.
+    """
+    p = get_object_or_404(Program, pk=pk)
+
+    # ---------- RAMA AJAX (llamada desde program_edit.js) ----------
+    if request.method == "POST" and request.headers.get("x-requested-with") == "XMLHttpRequest":
+        try:
+            data = json.loads(request.body.decode("utf-8") or "{}")
+        except json.JSONDecodeError:
+            return JsonResponse(
+                {"success": False, "message": "Datos inválidos (JSON)."},
+                status=400,
+            )
+
+        new_code = (data.get("programa") or "").strip()
+        new_name = (data.get("programa_full") or "").strip()
+        new_constancia = (data.get("constancia") or "").strip().lower()
+
+        # ---- Validaciones básicas ----
+        if not new_code or not new_name:
+            return JsonResponse(
+                {
+                    "success": False,
+                    "message": "Los campos «Programa» y «Nombre completo» son obligatorios.",
+                },
+                status=400,
+            )
+
+        if new_constancia not in ("dc3", "cproem"):
+            return JsonResponse(
+                {
+                    "success": False,
+                    "message": "Tipo de constancia inválido. Usa «dc3» o «cproem».",
+                },
+                status=400,
+            )
+
+        # Mapear dc3/cproem -> ConstanciaType
+        constancia_model = (
+            ConstanciaType.DC3 if new_constancia == "dc3" else ConstanciaType.CEPROEM
+        )
+
+        # Validar unicidad (evita IntegrityError)
+        if Program.objects.exclude(pk=p.pk).filter(code=new_code).exists():
+            return JsonResponse(
+                {
+                    "success": False,
+                    "message": f"Ya existe otro programa con el código «{new_code}».",
+                },
+                status=400,
+            )
+
+        if Program.objects.exclude(pk=p.pk).filter(name=new_name).exists():
+            return JsonResponse(
+                {
+                    "success": False,
+                    "message": f"Ya existe otro programa con el nombre «{new_name}».",
+                },
+                status=400,
+            )
+
+        # Guardar SOLO Program
+        try:
+            with transaction.atomic():
+                p.code = new_code
+                p.name = new_name
+                p.constancia_type = constancia_model
+                p.save()
+        except Exception as e:
+            # Error de negocio (ej. constraint) -> 400 con mensaje
+            return JsonResponse(
+                {
+                    "success": False,
+                    "message": f"No se pudo guardar el programa: {type(e).__name__}: {e}",
+                },
+                status=400,
+            )
+
+        # Respuesta OK para el front
+        return JsonResponse(
+            {
+                "success": True,
+                "message": f"El programa «{new_name}» se actualizó correctamente.",
+                "data": {
+                    "programa": new_code,
+                    "programa_full": new_name,
+                    "constancia": new_constancia,  # 'dc3' o 'cproem'
+                },
+            },
+            status=200,
+        )
+
+    # ---------- RAMA NORMAL (formulario clásico por POST / GET) ----------
+    if request.method == "POST":
+        # Formulario HTML clásico (si lo usas)
+        p.name = request.POST.get("name") or p.name
+        p.code = request.POST.get("code") or p.code
+
+        constancia_raw = (request.POST.get("constancia_type") or "").upper()
+        if constancia_raw in (ConstanciaType.DC3, ConstanciaType.CEPROEM):
+            p.constancia_type = constancia_raw
+
+        plantilla_d = request.POST.get("plantilla_diploma") or None
+        plantilla_c = request.POST.get("plantilla_constancia") or None
+
+        p.plantilla_diploma = (
+            DesignTemplate.objects.filter(id=plantilla_d).first() if plantilla_d else None
+        )
+        p.plantilla_constancia = (
+            DesignTemplate.objects.filter(id=plantilla_c).first() if plantilla_c else None
+        )
+
+        p.save()
+        return redirect("administracion:program_list")
+
+    # GET normal: mostrar formulario clásico (si navegas directo a la URL)
+    plantillas = DesignTemplate.objects.all().order_by("title")
+    return render(
+        request,
+        "administracion/program_form.html",
+        {
+            "mode": "edit",
+            "item": p,
+            "plantillas": plantillas,
+            "ConstanciaType": ConstanciaType,
+        },
+    )
+
 
 @login_required
 @require_http_methods(["GET", "POST"])
@@ -1491,52 +2129,237 @@ def program_create(request):
         "administracion/program_form.html",
         {"mode": "create", "plantillas": plantillas, "ConstanciaType": ConstanciaType},
     )
-
+@csrf_exempt
 @login_required
 @require_http_methods(["GET", "POST"])
 def program_edit(request, pk: int):
-    p = get_object_or_404(ProgramAdmin, pk=pk)
+    """
+    Edita el modelo Program (tabla Django) y sincroniza, en la medida de lo posible:
+      - Program (BD principal)
+      - alumnos.Program (ProgramSim)   [best effort]
+      - ces_simulacion.diplomado       [best effort]
+
+    El id que llega en la URL (pk) es el de Program.
+    El id del diplomado (ces_simulacion.diplomado.id) viaja en sim_id (hidden del modal).
+    """
+    # Program de la BD principal
+    p = get_object_or_404(Program, pk=pk)
+
+    # ---------- RAMA AJAX (modal de edición) ----------
+    if request.method == "POST" and request.headers.get("x-requested-with") == "XMLHttpRequest":
+        # Parsear JSON
+        try:
+            data = json.loads(request.body.decode("utf-8") or "{}")
+        except json.JSONDecodeError:
+            return JsonResponse(
+                {"success": False, "message": "Datos inválidos (JSON)."},
+                status=400,
+            )
+
+        old_code = p.code
+
+        new_code       = (data.get("programa") or "").strip()
+        new_name       = (data.get("programa_full") or "").strip()
+        new_constancia = (data.get("constancia") or "").strip().lower()
+
+        # id del diplomado en ces_simulacion.diplomado
+        sim_id_raw = data.get("sim_id")
+        try:
+            sim_id = int(sim_id_raw) if sim_id_raw not in (None, "",) else None
+        except (TypeError, ValueError):
+            sim_id = None
+
+        # ---- Validaciones básicas ----
+        if not new_code or not new_name:
+            return JsonResponse(
+                {
+                    "success": False,
+                    "message": "Los campos «Programa» y «Nombre completo» son obligatorios.",
+                },
+                status=400,
+            )
+
+        if new_constancia not in ("dc3", "cproem"):
+            return JsonResponse(
+                {
+                    "success": False,
+                    "message": "Tipo de constancia inválido. Usa «dc3» o «cproem».",
+                },
+                status=400,
+            )
+
+        # Mapear dc3/cproem -> ConstanciaType y flag numérico (1/0) para ces_simulacion
+        constancia_model = (
+            ConstanciaType.DC3 if new_constancia == "dc3" else ConstanciaType.CEPROEM
+        )
+        constancia_flag = 1 if new_constancia == "dc3" else 0
+
+        # ---- Validar unicidad en Program (para evitar IntegrityError) ----
+        if Program.objects.exclude(pk=p.pk).filter(code=new_code).exists():
+            return JsonResponse(
+                {
+                    "success": False,
+                    "message": f"Ya existe otro programa con el código «{new_code}».",
+                },
+                status=400,
+            )
+
+        if Program.objects.exclude(pk=p.pk).filter(name=new_name).exists():
+            return JsonResponse(
+                {
+                    "success": False,
+                    "message": f"Ya existe otro programa con el nombre «{new_name}».",
+                },
+                status=400,
+            )
+
+        try:
+            # 1) Guardar SIEMPRE el Program principal (crítico)
+            with transaction.atomic():
+                p.code = new_code
+                p.name = new_name
+                p.constancia_type = constancia_model
+                p.save()
+
+            # 2) Sincronizar alumnos.Program (ProgramSim) – best effort
+            try:
+                related_qs = None
+                # No sabemos 100% el esquema real, así que usamos atributos defensivos
+                if hasattr(ProgramSim, "abbreviation"):
+                    related_qs = ProgramSim.objects.filter(abbreviation=old_code)
+                elif hasattr(ProgramSim, "programa"):
+                    related_qs = ProgramSim.objects.filter(programa=old_code)
+                else:
+                    related_qs = ProgramSim.objects.none()
+
+                for pr in related_qs:
+                    if hasattr(pr, "abbreviation"):
+                        pr.abbreviation = new_code
+                    if hasattr(pr, "programa"):
+                        pr.programa = new_code
+                    if hasattr(pr, "name"):
+                        pr.name = new_name
+                    if hasattr(pr, "programa_full"):
+                        pr.programa_full = new_name
+                    if hasattr(pr, "constancia_type"):
+                        pr.constancia_type = constancia_model
+                    pr.save()
+            except Exception:
+                logging.exception(
+                    "No se pudo sincronizar alumnos.Program (ProgramSim); se continúa de todos modos."
+                )
+
+            # 3) Sincronizar ces_simulacion.diplomado – best effort
+            try:
+                with connections["ces"].cursor() as cur:
+                    if sim_id is not None:
+                        # Actualizamos por ID de diplomado (lo más seguro)
+                        cur.execute(
+                            """
+                            UPDATE diplomado
+                            SET programa      = %s,
+                                programa_full = %s,
+                                constancia    = %s,
+                                updated_at    = NOW()
+                            WHERE id = %s
+                            """,
+                            [new_code, new_name, constancia_flag, sim_id],
+                        )
+                    else:
+                        # Fallback por código viejo, por si no vino el id
+                        cur.execute(
+                            """
+                            UPDATE diplomado
+                            SET programa      = %s,
+                                programa_full = %s,
+                                constancia    = %s,
+                                updated_at    = NOW()
+                            WHERE programa = %s
+                            """,
+                            [new_code, new_name, constancia_flag, old_code],
+                        )
+            except Exception:
+                logging.exception(
+                    "No se pudo sincronizar tabla diplomado en BD 'ces'; se continúa de todos modos."
+                )
+
+        except Exception as e:
+            # Si algo falla al guardar Program, devolvemos error claro
+            logging.exception("Error crítico al actualizar Program en program_edit")
+            return JsonResponse(
+                {
+                    "success": False,
+                    "message": f"No se pudo guardar el programa: {type(e).__name__}: {e}",
+                },
+                status=400,
+            )
+
+        # Si llegamos aquí, Program se guardó bien (y se intentó sincronizar todo)
+        return JsonResponse(
+            {
+                "success": True,
+                "message": f"El programa «{new_name}» se actualizó correctamente.",
+                "data": {
+                    "programa": new_code,
+                    "programa_full": new_name,
+                    "constancia": new_constancia,  # 'dc3' o 'cproem'
+                },
+            },
+            status=200,
+        )
+
+    # ---------- RAMA NORMAL (formulario clásico) ----------
     if request.method == "POST":
         p.name = request.POST.get("name") or p.name
         p.code = request.POST.get("code") or p.code
-        p.constancia_type = request.POST.get("constancia_type") or p.constancia_type
+
+        constancia_raw = (request.POST.get("constancia_type") or "").upper()
+        if constancia_raw in (ConstanciaType.DC3, ConstanciaType.CEPROEM):
+            p.constancia_type = constancia_raw
+
         plantilla_d = request.POST.get("plantilla_diploma") or None
         plantilla_c = request.POST.get("plantilla_constancia") or None
-        p.plantilla_diploma = DesignTemplate.objects.filter(id=plantilla_d).first() if plantilla_d else None
-        p.plantilla_constancia = DesignTemplate.objects.filter(id=plantilla_c).first() if plantilla_c else None
+
+        p.plantilla_diploma = (
+            DesignTemplate.objects.filter(id=plantilla_d).first()
+            if plantilla_d
+            else None
+        )
+        p.plantilla_constancia = (
+            DesignTemplate.objects.filter(id=plantilla_c).first()
+            if plantilla_c
+            else None
+        )
+
         p.save()
         return redirect("administracion:program_list")
 
+    # ---------- GET normal: formulario de edición clásico ----------
     plantillas = DesignTemplate.objects.all().order_by("title")
     return render(
         request,
         "administracion/program_form.html",
-        {"mode": "edit", "item": p, "plantillas": plantillas, "ConstanciaType": ConstanciaType},
+        {
+            "mode": "edit",
+            "item": p,
+            "plantillas": plantillas,
+            "ConstanciaType": ConstanciaType,
+        },
     )
 
-@require_http_methods(["POST"])
-def program_delete(request, source: str, pk: int):
+@login_required
+@require_POST
+def program_delete(request, source, code):
     """
-    Elimina por origen:
-      - 'sim' -> DELETE FROM ces_simulacion.diplomado
-      - 'app' -> DELETE FROM ces_db.alumnos_program
-    Muestra mensajes de éxito/error y redirige a la lista.
+    Elimina un diplomado de la tabla Diplomado en la BD 'ces' (ces_simulacion).
+    El parámetro 'source' ya no se usa para nada (siempre vamos a simulación).
     """
-    try:
-        if source == "sim":
-            with transaction.atomic(using="ces"):
-                _query_simulacion("DELETE FROM diplomado WHERE id = %s", [pk])
-            messages.success(request, f"Diplomado (sim) #{pk} eliminado.")
-        elif source == "app":
-            with transaction.atomic(using="default"):
-                _query_default("DELETE FROM alumnos_program WHERE id = %s", [pk])
-            messages.success(request, f"Programa (app) #{pk} eliminado.")
-        else:
-            messages.error(request, "Origen inválido.")
-    except Exception as e:
-        messages.error(request, f"No se pudo eliminar: {escape(str(e))}")
+    with transaction.atomic(using="ces"):
+        with connections["ces"].cursor() as cur:
+            cur.execute("DELETE FROM Diplomado WHERE idDiplomado = %s", [code])
 
-    return redirect(reverse("administracion:program_list"))
+    messages.success(request, "El diplomado se eliminó correctamente.")
+    return redirect("administracion:program_list")
 @login_required
 @require_http_methods(["POST"])
 def plantilla_upload_thumb(request, tpl_id: int):
@@ -1579,9 +2402,14 @@ def plantilla_delete(request, tpl_id: int):
 @require_http_methods(["POST"])
 def plantilla_import(request):
     """
-    Importa un documento (imagen/PDF/Office) **sin convertir**.
-    Guarda el archivo como TemplateAsset y crea una plantilla vacía.
-    Luego, desde el editor podrás 'Convertir a imagen' si lo deseas.
+    Importa un documento subido desde "Plantillas admin".
+
+    Comportamiento:
+    - Si es imagen (PNG/JPG/JPEG/WEBP/SVG) → crea una plantilla con la imagen como fondo.
+    - Si es PDF u Office (DOC/DOCX/PPT/PPTX/ODT/ODP) → intenta generar PNG de la 1ª página
+      usando `_pdf_to_png_bytes` / `_office_to_pdf_bytes`.
+    - Si la conversión falla o no hay dependencias → crea una plantilla en blanco con
+      un texto "Adjunto: <nombre>", pero el archivo original queda guardado como asset.
     """
     f = request.FILES.get("file")
     if not f:
@@ -1589,45 +2417,158 @@ def plantilla_import(request):
         return redirect("administracion:plantillas_admin")
 
     name = Path(f.name).name
-    ext  = Path(f.name).suffix.lower()
+    ext = Path(f.name).suffix.lower()
 
-    # 1) Guardar SIEMPRE el archivo original como asset
-    asset = TemplateAsset.objects.create(name=name, file=f, mime=f.content_type or "")
+    # Guardamos SIEMPRE el archivo original como asset
+    asset_original = TemplateAsset.objects.create(
+        name=name,
+        file=f,
+        mime=f.content_type or "",
+    )
 
-    # 2) Crear una plantilla mínima (página en blanco)
+    image_exts  = {".png", ".jpg", ".jpeg", ".webp", ".svg"}
+    office_exts = {".doc", ".docx", ".ppt", ".pptx", ".odt", ".odp"}
+
+    # 1) Imágenes → plantilla con imagen de fondo
+    if ext in image_exts:
+        data = {
+            "pages": [{
+                "width": 1920,
+                "height": 1080,
+                "background": "#ffffff",
+                "layers": [{
+                    "type": "image",
+                    "url": asset_original.file.url,
+                    "x": 0,
+                    "y": 0,
+                    "w": 1920,
+                    "h": 1080,
+                }],
+            }]
+        }
+        tpl = DesignTemplate.objects.create(
+            title=name,
+            kind=DesignTemplate.DESIGN,
+            json_active=data,
+        )
+        messages.success(
+            request,
+            f"Se importó «{name}» como imagen de fondo. También se guardó el archivo original en la biblioteca de assets."
+        )
+        return redirect("administracion:plantilla_edit", tpl_id=tpl.id)
+
+    # 2) PDF / Office → intentar generar PNG de 1ª página
+    png_bytes = None
+    try:
+        if ext == ".pdf":
+            with asset_original.file.open("rb") as fh:
+                pdf_bytes = fh.read()
+            png_bytes = _pdf_to_png_bytes(pdf_bytes)
+        elif ext in office_exts:
+            # Office → PDF usando helper ya definido más abajo
+            with asset_original.file.open("rb") as fh:
+                content = fh.read()
+
+            class _U:
+                def __init__(self, b): self._b = b
+                def chunks(self, csize=64 * 1024):
+                    mv = memoryview(self._b)
+                    for i in range(0, len(mv), csize):
+                        yield mv[i:i + csize]
+
+            pdf_bytes = _office_to_pdf_bytes(_U(content), name_hint=name)
+            if pdf_bytes:
+                png_bytes = _pdf_to_png_bytes(pdf_bytes)
+    except Exception:
+        png_bytes = None
+
+    # Si pudimos generar PNG → usarlo como fondo
+    if png_bytes:
+        img_name = Path(name).with_suffix(".png").name
+        asset_png = TemplateAsset.objects.create(
+            name=img_name,
+            file=ContentFile(png_bytes, name=img_name),
+            mime="image/png",
+        )
+        data = {
+            "pages": [{
+                "width": 1920,
+                "height": 1080,
+                "background": "#ffffff",
+                "layers": [{
+                    "type": "image",
+                    "url": asset_png.file.url,
+                    "x": 0,
+                    "y": 0,
+                    "w": 1920,
+                    "h": 1080,
+                }],
+            }]
+        }
+        tpl = DesignTemplate.objects.create(
+            title=name,
+            kind=DesignTemplate.DESIGN,
+            json_active=data,
+        )
+        messages.success(
+            request,
+            f"Se importó «{name}» y se generó una vista previa de la primera página."
+        )
+        return redirect("administracion:plantilla_edit", tpl_id=tpl.id)
+
+    # 3) Fallback → plantilla en blanco con texto "Adjunto: <nombre>"
     data = {
         "pages": [{
-            "width": 1920, "height": 1080, "background": "#ffffff",
-            "layers": [
-                # Podríamos colocar una nota de texto como guía:
-                {"type":"text","text":f"Adjunto: {name}", "x":64, "y":64, "fontSize":36, "fill":"#111"}
-            ]
+            "width": 1280,
+            "height": 720,
+            "background": "#ffffff",
+            "layers": [{
+                "type": "text",
+                "text": f"Adjunto: {name}",
+                "x": 64,
+                "y": 64,
+                "fontSize": 32,
+                "fill": "#111",
+            }],
         }]
     }
-    tpl = DesignTemplate.objects.create(title=name, kind=DesignTemplate.DESIGN, json_active=data)
+    tpl = DesignTemplate.objects.create(
+        title=name,
+        kind=DesignTemplate.DESIGN,
+        json_active=data,
+    )
 
-    # 3) Aviso + sugerencia
-    messages.success(
+    messages.warning(
         request,
-        f"Se adjuntó «{name}». El archivo original se conservó sin cambios. "
-        "Desde el editor puedes usar 'Convertir a imagen' si necesitas usarlo como fondo."
+        "Se adjuntó el archivo original pero no se pudo generar la vista previa. "
+        "Verifica que LibreOffice y Poppler estén instalados en el servidor si deseas convertir a imagen."
     )
     return redirect("administracion:plantilla_edit", tpl_id=tpl.id)
 
 
+
 def _pdf_to_png_bytes(pdf_bytes: bytes):
-    """PDF -> PNG (1ª página) usando pdf2image + Poppler."""
+    """
+    PDF -> PNG (1ª página) usando PyMuPDF (fitz).
+
+    Ventajas:
+    - No necesita Poppler ni binarios externos.
+    - Todo se resuelve con la librería Python pymupdf, que ya está en requirements.txt.
+    """
     try:
-        from pdf2image import convert_from_bytes
-        imgs = convert_from_bytes(pdf_bytes, dpi=150, poppler_path=POPPLER_BIN or None)
-        if not imgs:
+        import fitz  # pymupdf
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        if doc.page_count == 0:
             return None
-        img0 = imgs[0]
-        if img0.mode != "RGB":
-            img0 = img0.convert("RGB")
-        buf = io.BytesIO()
-        img0.save(buf, format="PNG")
-        return buf.getvalue()
+
+        page = doc.load_page(0)          # primera página (índice 0)
+        zoom = 2.0                       # 2x para que se vea nítido
+        mat = fitz.Matrix(zoom, zoom)
+        pix = page.get_pixmap(matrix=mat)
+
+        # Devolver bytes PNG directamente
+        png_bytes = pix.tobytes("png")
+        return png_bytes
     except Exception:
         return None
 
@@ -1914,22 +2855,75 @@ def _query_default(sql, params=None):
             return [dict(zip(cols, row)) for row in cur.fetchall()]
         return cur.rowcount
 
-@require_http_methods(["POST"])
-def program_delete(request, source: str, pk: int):
-    try:
-        if source == "sim":
-            with transaction.atomic(using="ces"):
-                _query_simulacion("DELETE FROM diplomado WHERE id = %s", [pk])
-            messages.success(request, f"Diplomado (sim) #{pk} eliminado.")
-        elif source == "app":
-            with transaction.atomic(using="default"):
-                _query_default("DELETE FROM alumnos_program WHERE id = %s", [pk])
-            messages.success(request, f"Programa (app) #{pk} eliminado.")
-        else:
-            messages.error(request, "Origen inválido.")
-    except Exception as e:
-        messages.error(request, f"No se pudo eliminar: {escape(str(e))}")
-    return redirect(reverse("administracion:program_list"))
+@login_required
+@require_POST
+def program_delete(request, pk: int):
+    """
+    Elimina un diplomado de la BD de simulación (tabla `diplomado` en conexión 'ces'),
+    pero SOLO si no hay alumnos con solicitudes activas para ese programa.
+    """
+
+    # 1) Buscar el diplomado en la BD de simulación y obtener sus datos
+    with connections["ces"].cursor() as cur:
+        cur.execute(
+            "SELECT id, programa, programa_full FROM diplomado WHERE id = %s",
+            [pk],
+        )
+        row = cur.fetchone()
+
+    if not row:
+        messages.error(request, "El diplomado que intentas borrar no existe.")
+        return redirect("administracion:program_list")
+
+    dip_id, abbreviation, full_name = row
+
+    # 2) Localizar el/los programas correspondientes en la BD real (alumnos_program)
+    related_programs = ProgramSim.objects.filter(abbreviation=abbreviation)
+
+    # Estados que BLOQUEAN el borrado (inglés/español como comentaste)
+    BLOCKED_STATUSES = [
+        "pending", "pendiente",
+        "review", "revision",
+        "accepted", "aprobada",
+        "rejected", "rechazada",
+        "generating", "generando",
+        "emailed", "enviada",
+        "downloaded", "descargada", "download",
+    ]
+
+    blocked_qs = Request.objects.none()
+    if related_programs.exists():
+        blocked_qs = Request.objects.filter(
+            program__in=related_programs,
+            status__in=BLOCKED_STATUSES,
+        )
+
+    blocked_count = blocked_qs.count()
+
+    # 3) Si hay alumnos con solicitudes en esos estatus → NO se borra
+    if blocked_count > 0:
+        messages.error(
+            request,
+            (
+                f"No se puede eliminar el diplomado «{full_name}» porque hay "
+                f"{blocked_count} alumno(s) con solicitudes en proceso o ya generadas. "
+                "Solo podrás eliminarlo cuando ya no haya alumnos cursando ni con "
+                "solicitudes pendientes; es decir, cuando todas estén en estatus "
+                "«completado»."
+            ),
+        )
+        return redirect("administracion:program_list")
+
+    # 4) Si no hay solicitudes bloqueantes, borrar el diplomado en la simulación
+    with transaction.atomic(using="ces"):
+        with connections["ces"].cursor() as cur:
+            cur.execute("DELETE FROM diplomado WHERE id = %s", [dip_id])
+
+    messages.success(
+        request,
+        f"El diplomado «{full_name}» se eliminó correctamente."
+    )
+    return redirect("administracion:program_list")
 
 # ---------- LÓGICA DE NEGOCIO ----------
 def fetch_programs(search_text=None):
@@ -2099,3 +3093,203 @@ def fetch_programs(search_text: str | None = None) -> list[dict]:
     # Ordena por nombre y luego por código para vista estable
     items.sort(key=lambda x: ((x.get("nombre") or "").lower(), str(x.get("codigo") or "")))
     return items
+
+def _dictfetchall(cursor):
+    """Convierte resultados de cursor en lista de dicts."""
+    cols = [col[0] for col in cursor.description]
+    return [dict(zip(cols, row)) for row in cursor.fetchall()]
+
+@csrf_exempt  # durante desarrollo te quita dolores de cabeza con CSRF
+@login_required
+@require_http_methods(["POST"])
+def program_edit_api(request, pk: int):
+    try:
+        data = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse(
+            {"success": False, "message": "Datos inválidos."},
+            status=400,
+        )
+
+    prog_admin = get_object_or_404(ProgramAdmin, pk=pk)
+    old_code = prog_admin.code
+
+    new_code = (data.get("programa") or "").strip()
+    new_name = (data.get("programa_full") or "").strip()
+    new_constancia = (data.get("constancia") or "").strip().lower()
+
+    if not new_code or not new_name:
+        return JsonResponse(
+            {
+                "success": False,
+                "message": "Los campos «Programa» y «Nombre completo» son obligatorios.",
+            },
+            status=400,
+        )
+
+    if new_constancia not in ("dc3", "cproem"):
+        return JsonResponse(
+            {
+                "success": False,
+                "message": "Tipo de constancia inválido. Usa «dc3» o «cproem».",
+            },
+            status=400,
+        )
+
+    constancia_flag = 1 if new_constancia == "dc3" else 0
+
+    try:
+        with transaction.atomic():
+            # 1) BD admin
+            prog_admin.code = new_code
+            prog_admin.name = new_name
+            prog_admin.constancia_type = new_constancia
+            prog_admin.save()
+
+            # 2) BD alumnos_program (ProgramSim)
+            related = ProgramSim.objects.filter(abbreviation=old_code)
+            for p in related:
+                p.abbreviation = new_code
+                if hasattr(p, "name"):
+                    p.name = new_name
+                if hasattr(p, "constancia_type"):
+                    p.constancia_type = new_constancia
+                p.save()
+
+            # 3) BD ces_simulacion.diplomado
+            with connections["ces"].cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE diplomado
+                    SET programa = %s,
+                        programa_full = %s,
+                        constancia = %s,
+                        update_at = NOW()
+                    WHERE programa = %s
+                    """,
+                    [new_code, new_name, constancia_flag, old_code],
+                )
+    except Exception:
+        return JsonResponse(
+            {
+                "success": False,
+                "message": (
+                    "Ocurrió un error al guardar los cambios. "
+                    "Intenta de nuevo o contacta al administrador."
+                ),
+            },
+            status=500,
+        )
+
+    return JsonResponse(
+        {
+            "success": True,
+            "message": f"El programa «{new_name}» se actualizó correctamente.",
+            "data": {
+                "programa": new_code,
+                "programa_full": new_name,
+                "constancia": new_constancia,
+            },
+        }
+    )
+@login_required
+def program_list(request):
+    """
+    Lista de programas de ces_simulacion (diplomado) y asegura
+    que exista un Program para cada código de programa.
+    Maneja duplicados de name de forma segura.
+    """
+    q = (request.GET.get("q") or "").strip()
+
+    # Program (tabla nueva) para la lista de la derecha (si la usas)
+    programs_qs = Program.objects.all()
+    if q:
+        programs_qs = programs_qs.filter(
+            Q(code__icontains=q) | Q(name__icontains=q)
+        )
+    programs = programs_qs.order_by("id")
+
+    # Programas de ces_simulacion.diplomado
+    with connections["ces"].cursor() as cur:
+        sql = """
+            SELECT d.id, d.programa, d.programa_full, d.constancia
+            FROM diplomado AS d
+        """
+        params = []
+        if q:
+            sql += " WHERE d.programa LIKE %s OR d.programa_full LIKE %s"
+            like = f"%{q}%"
+            params.extend([like, like])
+        sql += " ORDER BY d.id"
+
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+
+    sim_programs = []
+
+    for row in rows:
+        diplomado_id, programa, programa_full, constancia_flag = row
+        if not programa:
+            continue
+
+        constancia_ui = "dc3" if constancia_flag == 1 else "cproem"
+        constancia_model = (
+            ConstanciaType.DC3 if constancia_flag == 1 else ConstanciaType.CEPROEM
+        )
+
+        # --- Asegurar Program para este código, manejando duplicados de name ---
+        prog_obj = None
+
+        # 1) Intentar por code primero (lo normal)
+        prog_obj = Program.objects.filter(code=programa).first()
+
+        if not prog_obj:
+            # 2) No existe por code; intentamos crearlo
+            base_name = programa_full or programa or f"Programa {diplomado_id}"
+
+            try:
+                prog_obj = Program.objects.create(
+                    code=programa,
+                    name=base_name,
+                    constancia_type=constancia_model,
+                )
+            except IntegrityError:
+                # 3) El name ya existe para otro registro -> buscamos uno existente
+                #    o inventamos un nombre alterno único.
+                # 3a) Si existe por name, lo reutilizamos
+                prog_obj = Program.objects.filter(name=base_name).first()
+
+                if not prog_obj:
+                    # 3b) Generar nombre único sin romper unique(name)
+                    safe_name = base_name
+                    suffix = 2
+                    while Program.objects.filter(name=safe_name).exists():
+                        safe_name = f"{base_name} ({suffix})"
+                        suffix += 1
+
+                    prog_obj = Program.objects.create(
+                        code=programa,
+                        name=safe_name,
+                        constancia_type=constancia_model,
+                    )
+
+        # Llenamos la lista para la tabla de la izquierda (ces_simulacion)
+        sim_programs.append(
+            {
+                "id": diplomado_id,
+                "programa": programa,
+                "programa_full": programa_full,
+                "constancia": constancia_ui,
+                "program_admin_id": prog_obj.id if prog_obj else None,
+            }
+        )
+
+    return render(
+        request,
+        "administracion/program_list.html",
+        {
+            "programs": programs,
+            "sim_programs": sim_programs,
+            "q": q,
+        },
+    )

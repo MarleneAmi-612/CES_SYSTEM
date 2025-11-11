@@ -42,64 +42,101 @@
   const confirmUrl  = root.dataset.confirmUrl;
   const editUrl     = root.dataset.editUrl;
 
-  // Útil para depuraciones si algo no cuadra
   try {
     console.log('[Egresados] constKind detectado =', constKind);
   } catch {}
 
-  // ---------- Tabs ----------
-  const tabs = document.querySelectorAll('.segmented__btn');
-  const panels = document.querySelectorAll('.doc-tab');
+  // ---------- Tabs documento (Diploma / Constancia) ----------
+  const docTabs   = document.querySelectorAll('.segmented[data-scope="doc"] .segmented__btn');
+  const docPanels = document.querySelectorAll('.doc-tab');
 
-  function setActiveTab(targetSel) {
-    tabs.forEach(b => b.classList.remove('is-active'));
-    panels.forEach(p => p.classList.remove('is-active'));
-    const btn = Array.from(tabs).find(b => b.dataset.target === targetSel);
+  function setDocTab(targetSel) {
+    docTabs.forEach(b => b.classList.remove('is-active'));
+    docPanels.forEach(p => p.classList.remove('is-active'));
+
+    const btn = Array.from(docTabs).find(b => b.dataset.target === targetSel);
     const panel = document.querySelector(targetSel);
     if (btn) btn.classList.add('is-active');
     if (panel) panel.classList.add('is-active');
   }
 
-  tabs.forEach(btn => {
+  docTabs.forEach(btn => {
     btn.addEventListener('click', () => {
-      setActiveTab(btn.dataset.target);
+      setDocTab(btn.dataset.target);
     });
   });
 
   // Cambio automático a "Constancia" si el programa es CPROEM
-  // (Si no lo quieres, comenta la siguiente línea)
-  if (constKind === 'cproem') setActiveTab('#tabConstancia');
+  if (constKind === 'cproem') setDocTab('#tabConstancia');
 
   // También permite activar por query ?tab=constancia | diploma
   try {
     const params = new URLSearchParams(location.search);
     const tab = (params.get('tab') || '').toLowerCase();
-    if (tab === 'constancia') setActiveTab('#tabConstancia');
-    else if (tab === 'diploma') setActiveTab('#tabDiploma');
+    if (tab === 'constancia') setDocTab('#tabConstancia');
+    else if (tab === 'diploma') setDocTab('#tabDiploma');
   } catch {}
 
-  // ---------- Sidebar pagination ----------
-  const list = document.getElementById('inProcessList');
-  const dots = document.getElementById('inProcessDots');
-  if (list && dots) {
-    const pageSize = parseInt(list.dataset.pageSize || '6', 10);
-    const items = Array.from(list.children);
+  // ---------- Tabs sidebar (En proceso / Finalizados) ----------
+  const sideTabs = document.querySelectorAll('.segmented[data-scope="side"] .segmented__btn');
+  const panelInProcess = document.getElementById('panelInProcess');
+  const panelFinished  = document.getElementById('panelFinished');
+
+  function setSideTab(targetSel) {
+    sideTabs.forEach(b => b.classList.toggle('is-active', b.dataset.target === targetSel));
+    if (panelInProcess) {
+      panelInProcess.classList.toggle('is-hidden', targetSel !== '#panelInProcess');
+    }
+    if (panelFinished) {
+      panelFinished.classList.toggle('is-hidden', targetSel !== '#panelFinished');
+    }
+  }
+
+  sideTabs.forEach(btn => {
+    btn.addEventListener('click', () => {
+      setSideTab(btn.dataset.target);
+    });
+  });
+
+  // estado inicial: En proceso
+  setSideTab('#panelInProcess');
+
+  // ---------- Sidebar pagination (para ambas listas) ----------
+  function setupPager(listEl, dotsEl) {
+    if (!listEl || !dotsEl) return;
+
+    const pageSize = parseInt(listEl.dataset.pageSize || '6', 10);
+    const items = Array.from(listEl.children);
     const pages = Math.max(1, Math.ceil(items.length / pageSize));
+
     function render(page) {
       items.forEach((el, i) => {
         const p = Math.floor(i / pageSize);
-        el.classList.toggle('is-hidden', p !== page);      
+        el.classList.toggle('is-hidden', p !== page);
       });
-      dots.querySelectorAll('button').forEach((b, i) => b.classList.toggle('is-active', i === page));
+      dotsEl.querySelectorAll('button').forEach((b, i) =>
+        b.classList.toggle('is-active', i === page)
+      );
     }
-    dots.innerHTML = '';
+
+    dotsEl.innerHTML = '';
     for (let i = 0; i < pages; i++) {
       const b = document.createElement('button');
+      b.type = 'button';
       b.addEventListener('click', () => render(i));
-      dots.appendChild(b);
+      dotsEl.appendChild(b);
     }
     render(0);
   }
+
+  setupPager(
+    document.getElementById('inProcessList'),
+    document.getElementById('inProcessDots')
+  );
+  setupPager(
+    document.getElementById('finishedList'),
+    document.getElementById('finishedDots')
+  );
 
   // ---------- Preview (abre nueva pestaña) ----------
   const btnPrevDipl = document.getElementById('btnPrevDiploma');
@@ -128,12 +165,21 @@
       if (!sendUrl) return;
       sendDipl.disabled = true;
       try {
-        const fd = new FormData(); fd.append('tipo', 'diploma');
+        const fd = new FormData();
+        fd.append('tipo', 'diploma');
         const data = await postForm(sendUrl, fd);
-        if (data && data.verify_url) alert('Diploma publicado.\nVerificación: ' + data.verify_url);
+
+        if (data && data.verify_url) {
+          openDiplomaAlert(data.verify_url);
+        } else {
+          openDiplomaAlert(null);
+        }
       } catch (e) {
-        console.error(e); alert('No se pudo enviar el diploma.\n' + e.message);
-      } finally { sendDipl.disabled = false; }
+        console.error(e);
+        alert('No se pudo enviar el diploma.\n' + e.message);
+      } finally {
+        sendDipl.disabled = false;
+      }
     });
   }
 
@@ -189,7 +235,6 @@
       if (!downloadUrl) return;
       const fmt = dlForm.querySelector('input[name="fmt"]:checked')?.value || 'pdf';
       const tipo = activeTipo();
-      // El backend fuerza PDF por seguridad, pero conservamos la UI
       const url = downloadUrl
         + (downloadUrl.includes('?') ? '&' : '?')
         + 'tipo=' + encodeURIComponent(tipo)
@@ -209,11 +254,14 @@
 
   function ddOpen(open) {
     if (!mini || !editMenu) return;
-      mini.classList.toggle('is-open', !!open);
-      editMenu.setAttribute('aria-hidden', open? 'false': 'true');
-    }
+    mini.classList.toggle('is-open', !!open);
+    editMenu.setAttribute('aria-hidden', open ? 'false' : 'true');
+  }
 
-  if (editBtn) editBtn.addEventListener('click', (e) => { e.stopPropagation(); ddOpen(!mini.classList.contains('is-open')); });
+  if (editBtn) editBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    ddOpen(!mini.classList.contains('is-open'));
+  });
   if (editClose) editClose.addEventListener('click', () => ddOpen(false));
   document.addEventListener('click', (e) => { if (mini && !mini.contains(e.target)) ddOpen(false); });
 
@@ -259,3 +307,30 @@
     }
   });
 })();
+
+// ---------- Alerta "Diploma publicado" ----------
+const diplAlert      = document.getElementById('egDiplomaAlert');
+const diplAlertLink  = document.getElementById('egDiplomaAlertLink');
+const diplAlertClose = document.getElementById('egDiplomaAlertClose');
+
+function openDiplomaAlert(verifyUrl) {
+  // Fallback: si por algo no existe el modal, al menos abrimos la URL
+  if (!diplAlert) {
+    if (verifyUrl) window.open(verifyUrl, '_blank', 'noopener');
+    return;
+  }
+
+  if (diplAlertLink && verifyUrl) {
+    diplAlertLink.href = verifyUrl;
+  }
+
+  diplAlert.hidden = false;
+  document.body.classList.add('no-scroll');
+}
+
+if (diplAlertClose) {
+  diplAlertClose.addEventListener('click', () => {
+    diplAlert.hidden = true;
+    document.body.classList.remove('no-scroll');
+  });
+}

@@ -35,6 +35,7 @@
           {% elif req.status == "generating" %}Generando
           {% elif req.status == "emailed" %}Enviada por correo
           {% elif req.status == "downloaded" %}Descargada
+          {% elif req.status == "finalizado" %}Finalizado
           {% elif req.status == "rejected" %}Rechazada
           {% else %}{{ req.status|title }}{% endif %}
         </span>
@@ -73,7 +74,7 @@
               {% if rejection_reason %}
                 <div class="reject-banner__reason"><span>Motivo:</span> {{ rejection_reason }}</div>
               {% endif %}
-              <div class="reject-banner__actions" style="margin-top:10px">
+              <div class="reject-banner__actions">
                 <a href="#" id="btnResend" class="back-link" role="button" aria-label="Reenviar solicitud">⟳ Reenviar solicitud</a>
               </div>
             </div>
@@ -90,10 +91,12 @@
                             {% if curr == 'rejected' and n <= 3 %} bad{% endif %}"
                      role="listitem"
                      aria-current="{% if n == active_max %}step{% else %}false{% endif %}">
+
                   <div class="dot">{{ n }}</div>
+
                   <div class="label"
-                       data-title="{% if n == 4 %}Generando{% elif n == 6 %}Descargado{% else %}{{ st.title }}{% endif %}">
-                    {% if n == 4 %}Generando{% elif n == 6 %}Descargado{% else %}{{ st.title }}{% endif %}
+                       data-title="{% if n == 4 %}Generando{% elif n == 6 %}Finalizado{% else %}{{ st.title }}{% endif %}">
+                    {% if n == 4 %}Generando{% elif n == 6 %}Finalizado{% else %}{{ st.title }}{% endif %}
                   </div>
                 </div>
               {% endwith %}
@@ -105,13 +108,22 @@
           </div>
         {% endwith %}
 
+        {% if cproem_download_url %}
+          <div class="download-cta">
+            <a href="{{ cproem_download_url }}"
+               class="btn btn-primary"
+               target="_blank" rel="noopener">
+              Descargar constancia CPROEM (PDF)
+            </a>
+          </div>
+        {% endif %}
+
         <div class="history-feed amazon" id="historyFeed" aria-live="polite"
              data-current-status="{{ req.status }}" data-events="{{ events_count }}">
 
           {% for ev in history %}
             {% ifchanged ev.when|date:"l d \\d\\e F, Y" %}
               {% if not forloop.first %}</div>{% endif %}
-              <!-- Cambio: data-day-key estable para el JS -->
               <div class="day" data-day-key="{{ ev.when|date:'Y-m-d' }}">
                 <div class="day-title">
                   {{ ev.when|date:"l d \\d\\e F, Y"|capfirst }}
@@ -143,7 +155,8 @@
 
             {% if forloop.last %}</div>{% endif %}
           {% empty %}
-            <div class="day" data-day-key="{{ timezone.now|date:'Y-m-d' }}">
+            {% now "Y-m-d" as today_str %}
+            <div class="day" data-day-key="{{ today_str }}">
               <div class="day-title">—</div>
               <div class="item info is-current">
                 <div class="it-spine"></div>

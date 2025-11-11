@@ -15,6 +15,8 @@
     emailed:    { title: "Documento enviado por correo.", sub: "Revisa tu bandeja de entrada.",                 kind: "info", pos: 5 },
     downloaded: { title: "Documento descargado.",        sub: "¡Listo! Guarda tu archivo.",                     kind: "ok",   pos: 6 },
     rejected:   { title: "Solicitud rechazada",          sub: "Se registró un rechazo.",                         kind: "bad",  pos: 3 }, // se corta en el 3
+    downloaded: { title: "Documento descargado.",        sub: "¡Listo! Guarda tu archivo.", kind: "ok",   pos: 6 },
+    finalizado: { title: "Documento finalizado.",        sub: "Tu constancia CPROEM está lista para descargar.", kind: "ok", pos: 6 },
   };
 
   // ====== DOM refs ======
@@ -39,13 +41,14 @@
   function updateStatusTag(status) {
     if (!statusTag) return;
     statusTag.className = "tag " + status;
-    const text =
+        const text =
       status === "pending"    ? "Pendiente" :
       status === "review"     ? "Revisión" :
       status === "accepted"   ? "Aprobada" :
       status === "generating" ? "Generando" :
       status === "emailed"    ? "Enviada por correo" :
       status === "downloaded" ? "Descargada" :
+      status === "finalizado" ? "Finalizado" :
       status === "rejected"   ? "Rechazada" : (status || "");
     statusTag.textContent = text;
   }
