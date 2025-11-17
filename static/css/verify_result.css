@@ -1,0 +1,200 @@
+/* verify_result.css — Página de verificación de documentos */
+
+:root {
+  --vr-bg: #020617;
+  --vr-bg-soft: rgba(15, 23, 42, 0.85);
+  --vr-card-bg: #020617;
+  --vr-card-border: rgba(148, 163, 184, 0.2);
+  --vr-accent: #22c55e;
+  --vr-accent-soft: rgba(34, 197, 94, 0.18);
+  --vr-text: #e5e7eb;
+  --vr-text-soft: #9ca3af;
+  --vr-text-muted: #6b7280;
+  --vr-chip-bg: rgba(15, 23, 42, 0.9);
+  --vr-radius-lg: 18px;
+  --vr-radius-pill: 999px;
+  --vr-shadow-soft: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body.vr-body {
+  min-height: 100vh;
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(34, 197, 94, 0.18), transparent 55%),
+    radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.18), transparent 55%),
+    var(--vr-bg);
+  color: var(--vr-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  box-sizing: border-box;
+}
+
+/* Contenedor principal */
+
+.vr-shell {
+  width: 100%;
+  max-width: 880px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Header / Marca */
+
+.vr-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.vr-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: var(--vr-radius-pill);
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  backdrop-filter: blur(18px);
+}
+
+.vr-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--vr-accent);
+  box-shadow: 0 0 14px rgba(34, 197, 94, 0.9);
+}
+
+.vr-brand-text {
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--vr-text-soft);
+}
+
+/* Estado */
+
+.vr-status {
+  padding: 6px 14px;
+  border-radius: var(--vr-radius-pill);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+
+.vr-status--ok {
+  border-color: var(--vr-accent-soft);
+  background: rgba(5, 46, 22, 0.8);
+  color: #bbf7d0;
+}
+
+/* Tarjeta */
+
+.vr-card {
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(2, 6, 23, 0.98));
+  border-radius: 24px;
+  border: 1px solid var(--vr-card-border);
+  box-shadow: var(--vr-shadow-soft);
+  padding: 22px 22px 20px;
+  box-sizing: border-box;
+}
+
+@media (min-width: 720px) {
+  .vr-card {
+    padding: 26px 28px 24px;
+  }
+}
+
+/* Título y texto introductorio */
+
+.vr-title {
+  margin: 0 0 10px 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+@media (min-width: 720px) {
+  .vr-title {
+    font-size: 1.55rem;
+  }
+}
+
+.vr-lead {
+  margin: 0 0 16px;
+  font-size: 0.95rem;
+  color: var(--vr-text-soft);
+  line-height: 1.6;
+}
+
+/* Grid de datos */
+
+.vr-grid {
+  margin: 0;
+  padding: 14px 0 6px;
+  border-top: 1px solid rgba(148, 163, 184, 0.25);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vr-row {
+  display: grid;
+  grid-template-columns: minmax(0, 140px) minmax(0, 1fr);
+  gap: 10px;
+  padding: 6px 0;
+}
+
+@media (min-width: 640px) {
+  .vr-row {
+    grid-template-columns: minmax(0, 160px) minmax(0, 1fr);
+  }
+}
+
+.vr-row dt {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--vr-text-muted);
+}
+
+.vr-row dd {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--vr-text);
+}
+
+/* Notas */
+
+.vr-note {
+  margin: 14px 0 6px;
+  font-size: 0.88rem;
+  color: var(--vr-text-soft);
+  line-height: 1.6;
+}
+
+.vr-note--small {
+  font-size: 0.8rem;
+  color: var(--vr-text-muted);
+}
+
+/* Footer */
+
+.vr-foot {
+  margin-top: 4px;
+  font-size: 0.78rem;
+  text-align: center;
+  color: var(--vr-text-muted);
+}

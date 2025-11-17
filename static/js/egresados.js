@@ -103,29 +103,53 @@
 
   // ---------- Sidebar pagination (para ambas listas) ----------
   function setupPager(listEl, dotsEl) {
-    if (!listEl || !dotsEl) return;
+    if (!listEl) return;
 
-    const pageSize = parseInt(listEl.dataset.pageSize || '6', 10);
-    const items = Array.from(listEl.children);
-    const pages = Math.max(1, Math.ceil(items.length / pageSize));
+    // Solo paginamos li.card
+    const items = Array.from(listEl.querySelectorAll('li.card'));
+    if (!items.length) {
+      if (dotsEl) dotsEl.innerHTML = '';
+      return;
+    }
+
+    let pageSize = parseInt(listEl.dataset.pageSize || '0', 10);
+    if (!pageSize || pageSize <= 0) {
+      pageSize = items.length; // si no hay pageSize válido, todo en una página
+    }
+
+    // Si todos caben en una sola página: no ocultes nada ni muestres dots
+    if (items.length <= pageSize) {
+      items.forEach(el => el.classList.remove('is-hidden'));
+      if (dotsEl) dotsEl.innerHTML = '';
+      return;
+    }
+
+    const pages = Math.ceil(items.length / pageSize);
 
     function render(page) {
       items.forEach((el, i) => {
         const p = Math.floor(i / pageSize);
         el.classList.toggle('is-hidden', p !== page);
       });
-      dotsEl.querySelectorAll('button').forEach((b, i) =>
-        b.classList.toggle('is-active', i === page)
-      );
+
+      if (dotsEl) {
+        dotsEl.querySelectorAll('button').forEach((b, i) =>
+          b.classList.toggle('is-active', i === page)
+        );
+      }
     }
 
-    dotsEl.innerHTML = '';
-    for (let i = 0; i < pages; i++) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.addEventListener('click', () => render(i));
-      dotsEl.appendChild(b);
+    if (dotsEl) {
+      dotsEl.innerHTML = '';
+      for (let i = 0; i < pages; i++) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'dotpager__dot' + (i === 0 ? ' is-active' : '');
+        b.addEventListener('click', () => render(i));
+        dotsEl.appendChild(b);
+      }
     }
+
     render(0);
   }
 

@@ -7,17 +7,17 @@
   if (!pollUrl) return;
 
   // ====== Mapa de estados (texto, subtítulo, color y posición en stepper) ======
-  const statusMap = {
-    pending:    { title: "Solicitud enviada",            sub: "Estamos procesando tu solicitud.",                 kind: "ok",   pos: 1 },
-    review:     { title: "Tu solicitud está en revisión.", sub: "Te avisaremos por correo cuando sea aprobada.", kind: "info", pos: 2 },
-    accepted:   { title: "¡Aprobada!",                   sub: "Estamos preparando tu documento.",               kind: "ok",   pos: 3 },
-    generating: { title: "Generando documento…",         sub: "Puede tardar unos dias.",                        kind: "info", pos: 4 },
-    emailed:    { title: "Documento enviado por correo.", sub: "Revisa tu bandeja de entrada.",                 kind: "info", pos: 5 },
-    downloaded: { title: "Documento descargado.",        sub: "¡Listo! Guarda tu archivo.",                     kind: "ok",   pos: 6 },
-    rejected:   { title: "Solicitud rechazada",          sub: "Se registró un rechazo.",                         kind: "bad",  pos: 3 }, // se corta en el 3
-    downloaded: { title: "Documento descargado.",        sub: "¡Listo! Guarda tu archivo.", kind: "ok",   pos: 6 },
-    finalizado: { title: "Documento finalizado.",        sub: "Tu constancia CPROEM está lista para descargar.", kind: "ok", pos: 6 },
-  };
+const statusMap = {
+  pending:    { title: "Solicitud enviada",            sub: "Estamos procesando tu solicitud.",                 kind: "ok",   pos: 1 },
+  review:     { title: "Tu solicitud está en revisión.", sub: "Te avisaremos por correo cuando sea aprobada.", kind: "info", pos: 2 },
+  accepted:   { title: "¡Aprobada!",                   sub: "Estamos preparando tu documento.",               kind: "ok",   pos: 3 },
+  generating: { title: "Generando documento…",         sub: "Puede tardar unos dias.",                        kind: "info", pos: 4 },
+  emailed:    { title: "Documento enviado por correo.", sub: "Revisa tu bandeja de entrada.",                 kind: "info", pos: 5 },
+  downloaded: { title: "Documento descargado.",        sub: "¡Listo! Guarda tu archivo.",                     kind: "ok",   pos: 6 },
+  rejected:   { title: "Solicitud rechazada",          sub: "Se registró un rechazo.",                         kind: "bad",  pos: 3 },
+  finalizado: { title: "Documento finalizado.",        sub: "Tu constancia CPROEM está lista para descargar.", kind: "ok",   pos: 6 },
+};
+
 
   // ====== DOM refs ======
   const liveTitle = document.getElementById("liveTitle");

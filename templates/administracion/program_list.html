@@ -115,6 +115,10 @@
                         data-code="{{ d.programa }}"
                         data-name="{{ d.programa_full }}"
                         data-constancia="{{ d.constancia }}"
+                        data-diploma-tpl="{{ d.tpl_diploma_id|default_if_none:'' }}"
+                        data-dc3-front="{{ d.tpl_dc3_front_id|default_if_none:'' }}"
+                        data-dc3-back="{{ d.tpl_dc3_back_id|default_if_none:'' }}"
+                        data-cproem-tpl="{{ d.tpl_cproem_id|default_if_none:'' }}"
                         data-url="{% url 'administracion:program_edit' d.program_admin_id %}"
                       >
                         Editar
@@ -232,6 +236,64 @@
                 </label>
               </div>
             </div>
+
+            <!-- NUEVO: PLANTILLA DE DIPLOMA -->
+            <div class="field" id="fieldTplDiploma">
+              <label for="editTplDiploma" class="field__label">Plantilla de diploma</label>
+              <select id="editTplDiploma" class="field__input">
+                <option value="">Selecciona una plantilla…</option>
+                {% for tpl in diploma_templates %}
+                  <option value="{{ tpl.id }}">{{ tpl.title }}</option>
+                {% endfor %}
+              </select>
+              <p id="editTplDiplomaCurrent" class="field__help"></p>
+            </div>
+
+            <!-- BLOQUE: PLANTILLAS PARA DC3 (FRONTAL / REVERSO) -->
+            <div class="field" id="fieldTplDc3">
+              <span class="field__label">Plantillas DC3</span>
+
+              <div class="field__inline field__inline--stack">
+                <div class="field">
+                  <label for="editTplDc3Front" class="field__label field__label--small">
+                    Frontal (_F)
+                  </label>
+                  <select id="editTplDc3Front" class="field__input">
+                    <option value="">Selecciona frontal…</option>
+                    {% for tpl in dc3_templates %}
+                      <option value="{{ tpl.id }}">{{ tpl.title }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+
+                <div class="field">
+                  <label for="editTplDc3Back" class="field__label field__label--small">
+                    Reverso (_R)
+                  </label>
+                  <select id="editTplDc3Back" class="field__input">
+                    <option value="">Selecciona reverso…</option>
+                    {% for tpl in dc3_templates %}
+                      <option value="{{ tpl.id }}">{{ tpl.title }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+              </div>
+
+              <p id="editTplDc3Current" class="field__help"></p>
+            </div>
+
+            <!-- BLOQUE: PLANTILLA PARA CPROEM (SOLO UNA) -->
+            <div class="field" id="fieldTplCproem">
+              <label for="editTplCproem" class="field__label">Plantilla CPROEM</label>
+              <select id="editTplCproem" class="field__input">
+                <option value="">Selecciona una plantilla…</option>
+                {% for tpl in cproem_templates %}
+                  <option value="{{ tpl.id }}">{{ tpl.title }}</option>
+                {% endfor %}
+              </select>
+              <p id="editTplCproemCurrent" class="field__help"></p>
+            </div>
+
           </form>
         </div>
 

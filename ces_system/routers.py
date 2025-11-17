@@ -1,25 +1,27 @@
-# ces_system/routers.py
-
 class SimulationRouter:
     """
-    Mantén 'default' (ces_db) como base real de Django.
-    Protege 'ces' (ces_simulacion): sin migraciones y sin escrituras accidentales.
-    No forzamos lecturas a 'ces'; usar .using('ces') solo cuando lo pidas explícitamente.
+    Envía ProgramSim a la base 'ces' (ces_simulacion)
+    Todo lo demás queda en 'default'
     """
+
+    app_labels_sim = {"administracion"}   # apps que contienen ProgramSim
+    model_names_sim = {"programsim"}      # modelos que van a la simulación
+
     def db_for_read(self, model, **hints):
-        # No desviamos lecturas; Django usará 'default' salvo que llames .using('ces')
+        if model._meta.model_name in self.model_names_sim:
+            return "ces"
         return None
 
     def db_for_write(self, model, **hints):
-        # Todas las escrituras a 'default' (ces_db)
-        return 'default'
+        if model._meta.model_name in self.model_names_sim:
+            return "ces"
+        return None
 
     def allow_relation(self, obj1, obj2, **hints):
-        # Permite relaciones entre objetos (no restringimos por DB)
         return True
 
     def allow_migrate(self, db, app_label, model_name=None, **hints):
-        # Nunca migres contra 'ces' (simulación)
-        if db == 'ces':
+        # ProgramSim NO migra
+        if model_name in self.model_names_sim:
             return False
-        return True
+        return None

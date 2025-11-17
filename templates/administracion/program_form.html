@@ -49,7 +49,7 @@
         </header>
       </section>
 
-      <!-- ALERTAS (si usas messages de Django) -->
+      <!-- ALERTAS (Django messages) -->
       {% if messages %}
         <section class="alert-stack">
           {% for message in messages %}
@@ -106,7 +106,7 @@
                   type="text"
                   class="field__input"
                   placeholder="Ej. DETN-01"
-                  value="{{ item.code|default_if_none:''|default:'' }}"
+                  value="{{ item.code|default_if_none:'' }}"
                   required
                 >
                 <p class="field__help">
@@ -122,7 +122,7 @@
                   type="text"
                   class="field__input"
                   placeholder="Nombre del diplomado o curso"
-                  value="{{ item.name|default_if_none:''|default:'' }}"
+                  value="{{ item.name|default_if_none:'' }}"
                   required
                 >
                 <p class="field__help">
@@ -137,22 +137,24 @@
                 Tipo de constancia
               </label>
 
-              {% with current=item.constancia_type|default:ConstanciaType.CEPROEM %}
-                <select
-                  id="constancia_type"
-                  name="constancia_type"
-                  class="field__input"
+              <select
+                id="constancia_type"
+                name="constancia_type"
+                class="field__input"
+              >
+                <option
+                  value="cproem"
+                  {% if item.constancia_type == "cproem" or not item.constancia_type %}selected{% endif %}
                 >
-                  {% for value,label in ConstanciaType.choices %}
-                    <option
-                      value="{{ value }}"
-                      {% if value == current %}selected{% endif %}
-                    >
-                      {{ label }}
-                    </option>
-                  {% endfor %}
-                </select>
-              {% endwith %}
+                  CEPROEM
+                </option>
+                <option
+                  value="dc3"
+                  {% if item.constancia_type == "dc3" %}selected{% endif %}
+                >
+                  DC3
+                </option>
+              </select>
 
               <p class="field__help">
                 Define si las constancias emitidas serán CEPROEM o DC3.

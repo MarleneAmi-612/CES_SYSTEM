@@ -1,15 +1,91 @@
 {% load static %}
 <!doctype html>
-<link rel="icon" href="{% static 'favicon/favicon.ico' %}">
 <html lang="es">
   <head>
     <meta charset="utf-8">
-    <title>Verificación</title></head>
-<body>
-  <h1>Documento verificado</h1>
-  <p><strong>Token:</strong> {{ token }}</p>
-  <p><strong>Tipo:</strong> {{ tipo|upper }}</p>
-  <p><strong>Alumno:</strong> {{ alumno }}</p>
-  <p><strong>Programa:</strong> {{ programa }}</p>
-  <p><strong>Inicio:</strong> {{ inicio|date:"d/m/Y" }} — <strong>Fin:</strong> {{ fin|date:"d/m/Y" }}</p>
-</body></html>
+    <title>Verificación de documento | CES</title>
+
+    <link rel="icon" href="{% static 'favicon/favicon.ico' %}">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="{% static 'css/verify_result.css' %}">
+  </head>
+  <body class="vr-body">
+    <main class="vr-shell">
+      <!-- Encabezado / Marca -->
+      <header class="vr-header">
+        <div class="vr-brand" aria-label="CES · Verificación de documentos">
+          <span class="vr-dot" aria-hidden="true"></span>
+          <span class="vr-brand-text">CES · Verificación de documentos</span>
+        </div>
+
+        <span class="vr-status vr-status--ok">Documento válido</span>
+      </header>
+
+      <!-- Tarjeta principal -->
+      <section class="vr-card" aria-labelledby="vr-title">
+        <h1 id="vr-title" class="vr-title">Documento verificado correctamente</h1>
+
+        <p class="vr-lead">
+          Los datos mostrados a continuación provienen del sistema oficial del Centro de Estudios Superiores.
+          El documento presentado por el portador debe coincidir con esta información para considerarse auténtico.
+        </p>
+
+        <dl class="vr-grid">
+          <div class="vr-row">
+            <dt>Tipo de documento</dt>
+            <dd>{{ tipo|upper }}</dd>
+          </div>
+
+          <div class="vr-row">
+            <dt>Alumno</dt>
+            <dd>{{ alumno }}</dd>
+          </div>
+
+          <div class="vr-row">
+            <dt>Programa</dt>
+            <dd>{{ programa }}</dd>
+          </div>
+
+          <div class="vr-row">
+            <dt>Periodo cursado</dt>
+            <dd>
+              {% if inicio or fin %}
+                {% if inicio %}Del {{ inicio|date:"d/m/Y" }}{% endif %}
+                {% if fin %} al {{ fin|date:"d/m/Y" }}{% endif %}
+              {% else %}
+                No disponible
+              {% endif %}
+            </dd>
+          </div>
+
+          <div class="vr-row">
+            <dt>Estado de verificación</dt>
+            <dd>VÁLIDO en el momento de la consulta</dd>
+          </div>
+
+          <div class="vr-row">
+            <dt>Fecha y hora de verificación</dt>
+            <dd>{% now "d/m/Y H:i" %}</dd>
+          </div>
+        </dl>
+
+        <p class="vr-note">
+          Este comprobante es de carácter informativo. La validez del documento está respaldada por los
+          registros internos de CES y puede volver a consultarse utilizando el mismo código QR o enlace
+          de verificación.
+        </p>
+
+        <p class="vr-note vr-note--small">
+          En caso de duda sobre la autenticidad del documento, comuníquese con la institución para una
+          confirmación adicional.
+        </p>
+      </section>
+
+      <footer class="vr-foot">
+        © {% now "Y" %} Centro de Estudios Superiores · Todos los derechos reservados
+      </footer>
+    </main>
+  </body>
+</html>

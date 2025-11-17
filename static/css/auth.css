@@ -1,0 +1,325 @@
+/* ==============================
+   Variables base (mismos tonos CES)
+   ============================== */
+:root {
+  --bg: #05070b;
+  --bg-elevated: #151922;
+  --bg-elevated-soft: #181d26;
+  --border-subtle: #242a33;
+  --text: #e9eef5;
+  --text-subtle: #9ba4b5;
+  --accent: #ff8b3d;
+  --accent-soft: #ffb671;
+  --accent-2: #3e76c4;
+  --shadow-soft: 0 18px 40px rgba(0, 0, 0, 0.65);
+  --radius-lg: 22px;
+}
+
+/* ==============================
+   Fondo con orbes (como en el resto)
+   ============================== */
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial,
+    sans-serif;
+  color: var(--text);
+  background: radial-gradient(
+    1200px 900px at 10% 10%,
+    #12151a 0%,
+    var(--bg) 55%,
+    #0c0f13 100%
+  );
+}
+
+/* orbes luminosos */
+.bg-orbs::before,
+.bg-orbs::after {
+  content: "";
+  position: fixed;
+  width: 650px;
+  height: 650px;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.22;
+  z-index: 0;
+  pointer-events: none;
+  animation: floaty 18s ease-in-out infinite;
+}
+
+.bg-orbs::before {
+  background: linear-gradient(135deg, var(--accent), #ffb671);
+  top: -120px;
+  right: -120px;
+}
+
+.bg-orbs::after {
+  background: linear-gradient(135deg, var(--accent-2), #3e76c4);
+  bottom: -140px;
+  left: -140px;
+  animation-delay: -7s;
+}
+
+@keyframes floaty {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(0, -10px, 0) scale(1.02);
+  }
+}
+
+/* ==============================
+   Layout auth: centra la tarjeta
+   ============================== */
+
+body.auth-bg {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 32px 16px;
+  box-sizing: border-box;
+}
+
+.auth-shell {
+  position: relative;
+  z-index: 1; /* por encima de los orbes */
+  width: 100%;
+  max-width: 760px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ==============================
+   Tarjeta principal
+   ============================== */
+
+.auth-card {
+  width: 100%;
+  max-width: 560px;
+  background: radial-gradient(
+    circle at 0 0,
+    #1a2028 0,
+    #10141a 55%,
+    #0b0e13 100%
+  );
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(27, 36, 48, 0.95);
+  box-shadow: var(--shadow-soft);
+  padding: 26px 32px 24px;
+  box-sizing: border-box;
+  color: var(--text);
+}
+
+/* cabecera con ícono */
+.auth-card__header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 12px;
+}
+
+.auth-card__icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 20px;
+  background: radial-gradient(
+    circle at 30% 20%,
+    #ffdfc7 0,
+    #f5b48b 40%,
+    #c4704d 100%
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.6);
+  flex-shrink: 0;
+}
+
+.auth-card__icon-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  background: linear-gradient(145deg, #faf5ff, #d0c3ff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 16px rgba(32, 17, 60, 0.4);
+  font-size: 17px;
+  color: #8450ff;
+}
+
+.auth-card__title {
+  font-size: 1.35rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  margin: 0 0 3px;
+}
+
+.auth-card__subtitle {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-subtle);
+}
+
+/* cuerpo de texto */
+.auth-card__body {
+  margin-top: 10px;
+  font-size: 0.96rem;
+  line-height: 1.7;
+  color: var(--text-subtle);
+}
+
+.auth-card__body p {
+  margin: 0 0 8px;
+}
+
+/* acciones / botón */
+.auth-card__actions {
+  margin-top: 22px;
+}
+
+/* ==============================
+   Botones
+   ============================== */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0.65rem 1.6rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  border: 0;
+  cursor: pointer;
+  outline: none;
+  text-decoration: none;
+  transition: transform 0.12s ease-out, box-shadow 0.12s ease-out,
+    background-color 0.12s ease-out, filter 0.12s ease-out;
+  white-space: nowrap;
+}
+
+.btn--primary {
+  background: linear-gradient(135deg, var(--accent), #ffb671);
+  color: #1a1109;
+  box-shadow: 0 12px 22px rgba(0, 0, 0, 0.55);
+}
+
+.btn--primary:hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+  box-shadow: 0 16px 28px rgba(0, 0, 0, 0.7);
+}
+
+.btn--primary:active {
+  transform: translateY(0);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.55);
+}
+
+/* ==============================
+   Foot / copy
+   ============================== */
+
+.auth-footer {
+  font-size: 0.8rem;
+  text-align: center;
+  color: rgba(148, 163, 184, 0.9);
+}
+
+/* ==============================
+   Enlaces
+   ============================== */
+
+a {
+  color: #9fc1ff;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* ==============================
+   Formulario (reset de contraseña)
+   ============================== */
+
+.auth-form {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field__label {
+  font-size: 0.86rem;
+  font-weight: 500;
+  color: #c0cad8;
+}
+
+.auth-card input[type="password"],
+.auth-card input[type="text"] {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 12px;
+  border: 1px solid rgba(47, 57, 73, 0.9);
+  background: rgba(10, 14, 20, 0.9);
+  padding: 9px 11px;
+  font-size: 0.95rem;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.12s ease-out, box-shadow 0.12s ease-out,
+    background-color 0.12s ease-out;
+}
+
+.auth-card input[type="password"]:focus,
+.auth-card input[type="text"]:focus {
+  border-color: var(--accent-soft);
+  box-shadow: 0 0 0 1px rgba(255, 184, 116, 0.35);
+  background: rgba(15, 20, 28, 0.98);
+}
+
+/* errores */
+.form-errors,
+.field__errors {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  color: #fecaca;
+}
+
+.form-errors {
+  margin-bottom: 8px;
+}
+
+/* ==============================
+   Responsive
+   ============================== */
+
+@media (max-width: 640px) {
+  .auth-card {
+    padding: 22px 18px 20px;
+  }
+
+  .auth-card__title {
+    font-size: 1.18rem;
+  }
+
+  .auth-card__header {
+    align-items: flex-start;
+  }
+}

@@ -2,106 +2,245 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
+<title>Constancia DC-3</title>
 <style>
-  @page { size: A4; margin: 15mm; }
-  body { font-family: "DejaVu Sans", Arial, sans-serif; font-size: 10pt; color:#111; }
-  h1 { font-size: 14pt; margin: 0 0 10px 0; text-align:center; }
-  .box { border: 1px solid #333; padding: 8px 10px; margin-bottom: 8px; }
-  .row { display: flex; gap: 8px; }
-  .col { flex: 1; }
-  .label { font-weight: 700; font-size: 9pt; margin-bottom: 2px; }
-  .val { border-bottom: 1px solid #444; padding: 3px 2px; min-height: 16px; }
-  .folio { text-align: right; font-size: 9pt; margin-bottom: 6px; }
-  .small { font-size: 8.5pt; color:#333; }
-  .qr { margin-top: 8px; width: 28mm; }
-  .qr img { width: 28mm; height: 28mm; }
-  .signs { margin-top: 14px; }
-  .sign { border-top: 1px solid #444; text-align:center; padding-top: 4px; font-size: 9pt; }
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: "DejaVu Sans", Arial, sans-serif;
+    font-size: 9pt;
+    color: #111;
+  }
+
+  .page {
+    position: relative;
+    width: 210mm;
+    height: 297mm;
+    page-break-after: always;
+  }
+
+  .page.back {
+    page-break-after: auto;
+  }
+
+  .page.front {
+    {% if dc3_front_url %}
+    background: url("{{ dc3_front_url }}") center top no-repeat;
+    background-size: contain;
+    {% endif %}
+  }
+
+  .page.back {
+    {% if dc3_back_url %}
+    background: url("{{ dc3_back_url }}") center top no-repeat;
+    background-size: contain;
+    {% endif %}
+  }
+
+  .folio {
+    position: absolute;
+    top: 18mm;
+    right: 20mm;
+    font-size: 7.5pt;
+  }
+
+  /* NOMBRE en el recuadro de "Nombre (Anotar apellido paterno...)" */
+  .nombre-box {
+    position: absolute;
+    top: 61mm;   /* tus valores actuales */
+    left: 10mm;
+    right: 15mm;
+    font-size: 8pt;
+    white-space: nowrap;
+  }
+
+  /* Base para todos los campos sueltos */
+  .field-box {
+    position: absolute;
+    font-size: 8pt;
+    white-space: nowrap;
+  }
+
+  /* === FILA CURP / RFC / PUESTO / GIRO === */
+  .curp-box {
+    top: 72mm;
+    left: 10mm;
+    right: 130mm;
+  }
+
+  .rfc-box {
+    top: 110mm;
+    left: 10mm;
+    right: 20mm;
+  }
+
+  .puesto-box {
+    top: 81mm;
+    left: 10mm;
+    right: 132mm;
+  }
+
+  .giro-box {
+    top: 72mm;
+    left: 104.5mm;
+    right: 10mm;
+  }
+
+  /* === DATOS DE LA EMPRESA === */
+  .empresa-box {
+    top: 100mm;
+    left: 10mm;
+    right: 20mm;
+  }
+
+  /* === DATOS DEL PROGRAMA DE CAPACITACIÓN === */
+  .curso-box {
+    top: 128mm;
+    left: 10mm;
+    right: 80mm;
+  }
+
+  .horas-box {
+    top: 109mm;
+    left: 145mm;
+    right: 20mm;
+  }
+
+  /* === PERIODO DE EJECUCIÓN: AÑO / MES / DÍA, AÑO / MES / DÍA === */
+  /* Ajusta estos mm para que caigan justo en los cuadritos de tu formato */
+
+    /* Inicio: año, mes, día */
+  .inicio-anio-box {
+    top: 138mm;
+    left: 94mm;
+  }
+
+  .inicio-mes-box {
+    top: 138mm;
+    left: 113.8mm;
+  }
+
+  .inicio-dia-box {
+    top: 138mm;
+    left: 128.5mm;
+  }
+
+  /* Fin: año, mes, día */
+  .fin-anio-box {
+    top: 138mm;
+    left: 155mm;
+  }
+
+  .fin-mes-box {
+    top: 138mm;
+    left: 177mm;
+  }
+
+  .fin-dia-box {
+    top: 138mm;
+    left: 192mm;
+  }
+
+  /* QR */
+  .qr-box {
+    position: absolute;
+    bottom: 45mm;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+  }
+
+  .qr-box img {
+    width: 25mm;
+    height: 25mm;
+    display: block;
+    margin: 0 auto;
+  }
+
+  .qr-box span {
+    font-size: 7pt;
+  }
 </style>
 </head>
 <body>
 
-<div class="folio">Folio: {{ folio }}</div>
-<h1>CONSTANCIA DE COMPETENCIAS O DE HABILIDADES LABORALES (DC-3)</h1>
+<div class="page front">
+  <div class="folio">Folio: {{ folio }}</div>
 
-<div class="box">
-  <div class="label">DATOS DEL TRABAJADOR</div>
-  <div class="row">
-    <div class="col">
-      <div class="label">Nombre</div>
-      <div class="val">{{ nombre }}</div>
-    </div>
+  <!-- NOMBRE (apellido paterno, materno, nombre) -->
+  <div class="nombre-box">
+    {{ dc3_nombre }}
   </div>
-  <div class="row">
-    <div class="col">
-      <div class="label">CURP</div>
-      <div class="val">{{ curp|default:"—" }}</div>
-    </div>
-    <div class="col">
-      <div class="label">RFC</div>
-      <div class="val">{{ rfc|default:"—" }}</div>
-    </div>
+
+  <!-- CURP solo dato -->
+  <div class="field-box curp-box">
+    {{ curp|default:"—" }}
   </div>
-  <div class="row">
-    <div class="col">
-      <div class="label">Puesto</div>
-      <div class="val">{{ puesto|default:"—" }}</div>
-    </div>
-    <div class="col">
-      <div class="label">Giro (Ocupación específica)</div>
-      <div class="val">{{ giro|default:"—" }}</div>
-    </div>
+
+  <!-- RFC solo dato -->
+  <div class="field-box rfc-box">
+    {{ rfc|default:"—" }}
+  </div>
+
+  <!-- Puesto -->
+  <div class="field-box puesto-box">
+    {{ puesto|default:"—" }}
+  </div>
+
+  <!-- Giro / Ocupación específica -->
+  <div class="field-box giro-box">
+    {{ giro|default:"—" }}
+  </div>
+
+  <!-- Nombre o razón social -->
+  <div class="field-box empresa-box">
+    {{ razon_social|default:"—" }}
+  </div>
+
+  <!-- Nombre del curso -->
+  <div class="field-box curso-box">
+    {{ programa|default:"—" }}
+  </div>
+
+  <!-- Duración en horas -->
+  <div class="field-box horas-box">
+    {{ horas|default:"—" }}
+  </div>
+
+  <!-- Periodo de ejecución: inicio (AÑO/MES/DÍA) -->
+  <div class="field-box inicio-anio-box">
+    {% if inicio %}{{ inicio|date:"Y" }}{% endif %}
+  </div>
+  <div class="field-box inicio-mes-box">
+    {% if inicio %}{{ inicio|date:"m" }}{% endif %}
+  </div>
+  <div class="field-box inicio-dia-box">
+    {% if inicio %}{{ inicio|date:"d" }}{% endif %}
+  </div>
+
+  <!-- Periodo de ejecución: fin (AÑO/MES/DÍA) -->
+  <div class="field-box fin-anio-box">
+    {% if fin %}{{ fin|date:"Y" }}{% endif %}
+  </div>
+  <div class="field-box fin-mes-box">
+    {% if fin %}{{ fin|date:"m" }}{% endif %}
+  </div>
+  <div class="field-box fin-dia-box">
+    {% if fin %}{{ fin|date:"d" }}{% endif %}
   </div>
 </div>
 
-<div class="box">
-  <div class="label">DATOS DE LA EMPRESA</div>
-  <div class="row">
-    <div class="col">
-      <div class="label">Nombre o razón social</div>
-      <div class="val">{{ razon_social|default:"—" }}</div>
-    </div>
-  </div>
-</div>
-
-<div class="box">
-  <div class="label">DATOS DEL PROGRAMA DE CAPACITACIÓN</div>
-  <div class="row">
-    <div class="col">
-      <div class="label">Nombre del curso</div>
-      <div class="val">{{ programa|default:"—" }}</div>
-    </div>
-    <div class="col">
-      <div class="label">Duración (horas)</div>
-      <div class="val">{{ horas|default:"—" }}</div>
-    </div>
-  </div>
-  <div class="row">
-    <div class="col">
-      <div class="label">Periodo (de)</div>
-      <div class="val">{% if inicio %}{{ inicio|date:"d/m/Y" }}{% else %}—{% endif %}</div>
-    </div>
-    <div class="col">
-      <div class="label">Periodo (a)</div>
-      <div class="val">{% if fin %}{{ fin|date:"d/m/Y" }}{% else %}—{% endif %}</div>
-    </div>
-  </div>
-
-  <div class="row" style="align-items:flex-end; margin-top:6px;">
-    <div class="col small">
-      Los datos asentados se realizan bajo protesta de decir verdad.
-      <div class="signs">
-        <div class="row" style="gap:20mm;">
-          <div class="col sign">Instructor o tutor</div>
-          <div class="col sign">Patrón o representante legal</div>
-          <div class="col sign">Representante de los trabajadores</div>
-        </div>
-      </div>
-    </div>
-    <div class="qr">
-      <img src="{{ qr_url }}" alt="QR verificación">
-    </div>
-  </div>
+<div class="page back">
+  <!-- solo el fondo reverso -->
 </div>
 
 </body>

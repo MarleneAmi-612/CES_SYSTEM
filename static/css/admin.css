@@ -368,3 +368,185 @@ a:hover{ text-decoration: none; }
 
 /* ===== Utilidades ===== */
 .is-hidden{ display:none !important; }
+/* =========================
+   Mensajes de formulario
+   ========================= */
+.form-msg {
+  display: none;
+  margin-top: 0.85rem;
+  padding: 0.75rem 0.95rem;
+  border-radius: 0.9rem;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.form-msg.is-visible {
+  display: flex;
+}
+
+.form-msg__icon {
+  font-size: 1.1rem;
+}
+
+/* Éxito */
+.form-msg--ok {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.45);
+  color: #10b981;
+}
+
+/* Error */
+.form-msg--err {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  color: #f97373;
+}
+/* === Filtro de orden en "Últimas solicitudes" === */
+
+.card-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.card-head-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.sortform {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.85rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 12px 30px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(18px);
+}
+
+.sortform-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
+.sortform-select-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.sortform-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  border: none;
+  padding: 0.25rem 1.6rem 0.25rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.83rem;
+  font-weight: 500;
+  background: rgba(15, 15, 30, 0.9);
+  color: #f5f7ff;
+  outline: none;
+  cursor: pointer;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.sortform-select:focus {
+  box-shadow:
+    0 0 0 1px rgba(92, 179, 255, 0.9),
+    0 0 0 3px rgba(92, 179, 255, 0.25);
+}
+
+.sortform-caret {
+  position: absolute;
+  right: 0.55rem;
+  pointer-events: none;
+  font-size: 0.7rem;
+  opacity: 0.8;
+}
+
+/* En pantallas pequeñas el filtro se baja a la siguiente línea */
+@media (max-width: 768px) {
+  .card-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .card-head-tools {
+    width: 100%;
+  }
+
+  .sortform {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .sortform-select-wrap,
+  .sortform-select {
+    width: 100%;
+  }
+}
+/* ===== Filtro de orden en panel ===== */
+.sortbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+  background: var(--card-bg);
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.sortbar__label {
+  font-size: 14px;
+  color: var(--txt-muted);
+  font-weight: 600;
+}
+
+.sortbar__select {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  color: var(--txt);
+  font-size: 14px;
+  outline: none;
+  cursor: pointer;
+}
+
+.sortbar__select:hover {
+  border-color: var(--accent);
+}
+.sortbar__btn {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.1s ease;
+}
+
+.sortbar__btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(0,0,0,0.12);
+}
+
+.sortbar__btn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}

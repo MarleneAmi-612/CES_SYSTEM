@@ -92,39 +92,124 @@
 
   // ---------- Modal editar programa ----------
   function initProgramEditModal() {
-    const modal = $("#programEditModal");
-    const form = $("#programEditForm");
+    const modal   = $("#programEditModal");
+    const form    = $("#programEditForm");
     const saveBtn = $("#programEditSave");
     if (!modal || !form || !saveBtn) return;
 
-    const inputId = $("#editId");
+    const inputId   = $("#editId");
     const inputCode = $("#editCode");
     const inputName = $("#editName");
 
+    // >>> NUEVO: referencias a campo de DIPLOMA
+    const fieldDiploma    = $("#fieldTplDiploma");
+    const selectDiploma   = $("#editTplDiploma");
+    const helpDiploma     = $("#editTplDiplomaCurrent");
+    // <<< NUEVO
+
+    const fieldDc3        = $("#fieldTplDc3");
+    const fieldCproem     = $("#fieldTplCproem");
+    const selectDc3Front  = $("#editTplDc3Front");
+    const selectDc3Back   = $("#editTplDc3Back");
+    const selectCproem    = $("#editTplCproem");
+    const helpDc3         = $("#editTplDc3Current");
+    const helpCproem      = $("#editTplCproemCurrent");
+
     let activeButton = null;
-    let activeRow = null;
+    let activeRow    = null;
+
+    function updateTemplateVisibility(constancia) {
+      const c = (constancia || "").toLowerCase();
+      if (fieldDc3)    fieldDc3.style.display    = c === "dc3"    ? "" : "none";
+      if (fieldCproem) fieldCproem.style.display = c === "cproem" ? "" : "none";
+      // El diploma siempre se puede editar, así que no lo escondemos.
+    }
+
+    function setSelectValue(selectEl, value) {
+      if (!selectEl) return;
+      if (!value) {
+        selectEl.value = "";
+        return;
+      }
+      const opt = selectEl.querySelector(`option[value="${value}"]`);
+      selectEl.value = opt ? value : "";
+    }
+
+    function optionLabel(selectEl, value) {
+      if (!selectEl || !value) return null;
+      const opt = selectEl.querySelector(`option[value="${value}"]`);
+      return opt ? opt.textContent.trim() : null;
+    }
 
     function openModalForButton(btn) {
       activeButton = btn;
       const tr = btn.closest("tr");
       activeRow = tr || null;
 
-      const id = btn.dataset.id;
-      const code = btn.dataset.code || "";
-      const name = btn.dataset.name || "";
+      const id         = btn.dataset.id;
+      const code       = btn.dataset.code || "";
+      const name       = btn.dataset.name || "";
       const constancia = (btn.dataset.constancia || "").toLowerCase();
 
-      if (inputId) inputId.value = id || "";
+      // IDs de plantillas actuales
+      const dc3FrontId    = btn.dataset.dc3Front    || "";
+      const dc3BackId     = btn.dataset.dc3Back     || "";
+      const cproemTplId   = btn.dataset.cproemTpl   || "";
+      const diplomaTplId  = btn.dataset.diplomaTpl  || "";  // >>> NUEVO
+
+      if (inputId)   inputId.value   = id || "";
       if (inputCode) inputCode.value = code;
       if (inputName) inputName.value = name;
 
+      // Radios constancia
       const radios = $$("input[name='editConstancia']", form);
-      radios.forEach(r => {
-        r.checked = r.value === constancia;
-      });
+      radios.forEach(r => { r.checked = r.value === constancia; });
       if (!radios.some(r => r.checked)) {
         const dc3 = radios.find(r => r.value === "dc3");
         if (dc3) dc3.checked = true;
+      }
+
+      const finalConst = (radios.find(r => r.checked)?.value || constancia || "dc3").toLowerCase();
+      updateTemplateVisibility(finalConst);
+
+      // Preseleccionar selects con los valores actuales
+      setSelectValue(selectDc3Front, dc3FrontId);
+      setSelectValue(selectDc3Back,  dc3BackId);
+      setSelectValue(selectCproem,   cproemTplId);
+      setSelectValue(selectDiploma,  diplomaTplId);  // >>> NUEVO
+
+      // Texto informativo de plantillas actuales
+      // --- DIPLOMA (siempre visible) ---
+      if (helpDiploma) {  // >>> NUEVO
+        const lblDip = optionLabel(selectDiploma, diplomaTplId);
+        helpDiploma.textContent = lblDip
+          ? `Plantilla actual de diploma: ${lblDip}`
+          : "Este programa aún no tiene plantilla de diploma asociada.";
+      }
+
+      if (finalConst === "dc3") {
+        const lblF = optionLabel(selectDc3Front, dc3FrontId);
+        const lblR = optionLabel(selectDc3Back,  dc3BackId);
+
+        if (helpDc3) {
+          if (!lblF && !lblR) {
+            helpDc3.textContent = "Este programa aún no tiene plantillas DC3 asociadas.";
+          } else {
+            const parts = [];
+            parts.push(`frontal: ${lblF || "sin frontal asociado"}`);
+            parts.push(`reverso: ${lblR || "sin reverso asociado"}`);
+            helpDc3.textContent = `Plantillas actuales · ${parts.join(" · ")}`;
+          }
+        }
+        if (helpCproem) helpCproem.textContent = "";
+      } else if (finalConst === "cproem") {
+        const lbl = optionLabel(selectCproem, cproemTplId);
+        if (helpCproem) {
+          helpCproem.textContent = lbl
+            ? `Plantilla actual: ${lbl}`
+            : "Este programa aún no tiene plantilla CPROEM asociada.";
+        }
+        if (helpDc3) helpDc3.textContent = "";
       }
 
       modal.classList.add("is-open");
@@ -159,6 +244,13 @@
       el.addEventListener("click", closeModal);
     });
 
+    // Si cambian el radio de constancia dentro del modal, cambiar los bloques visibles
+    $$("input[name='editConstancia']", form).forEach(radio => {
+      radio.addEventListener("change", () => {
+        updateTemplateVisibility(radio.value);
+      });
+    });
+
     // Guardar cambios (AJAX)
     saveBtn.addEventListener("click", async () => {
       if (!activeButton) return;
@@ -169,8 +261,8 @@
         return;
       }
 
-      const code = inputCode.value.trim();
-      const name = inputName.value.trim();
+      const code  = inputCode.value.trim();
+      const name  = inputName.value.trim();
       const radio = $("input[name='editConstancia']:checked", form);
       const constancia = radio ? radio.value : "";
 
@@ -179,13 +271,22 @@
         return;
       }
 
-      const payload = {
-        programa: code,
-        programa_full: name,
-        constancia: constancia,
-        sim_id: inputId ? inputId.value : null,  
-      };
+      // IDs de plantillas seleccionadas
+      const tplDc3FrontId   = selectDc3Front  ? (selectDc3Front.value  || "") : "";
+      const tplDc3BackId    = selectDc3Back   ? (selectDc3Back.value   || "") : "";
+      const tplCproemId     = selectCproem    ? (selectCproem.value    || "") : "";
+      const tplDiplomaId    = selectDiploma   ? (selectDiploma.value   || "") : "";  // >>> NUEVO
 
+      const payload = {
+        programa:         code,
+        programa_full:    name,
+        constancia:       constancia,
+        sim_id:           inputId ? inputId.value : null,
+        tpl_dc3_front_id: tplDc3FrontId,
+        tpl_dc3_back_id:  tplDc3BackId,
+        tpl_cproem_id:    tplCproemId,
+        tpl_diploma_id:   tplDiplomaId          // >>> NUEVO
+      };
 
       const csrftoken = getCsrfToken();
 
@@ -195,8 +296,7 @@
           headers: {
             "Content-Type": "application/json",
             "X-CSRFToken": csrftoken || "",
-            "X-Requested-With": "XMLHttpRequest",
-
+            "X-Requested-With": "XMLHttpRequest"
           },
           body: JSON.stringify(payload),
         });
@@ -222,17 +322,31 @@
 
         // Actualizar la fila en la tabla, si la tenemos
         if (activeRow) {
-          const colCode = activeRow.querySelector(".js-col-code");
-          const colName = activeRow.querySelector(".js-col-name");
+          const colCode  = activeRow.querySelector(".js-col-code");
+          const colName  = activeRow.querySelector(".js-col-name");
           const colConst = activeRow.querySelector(".js-col-constancia");
 
-          if (colCode) colCode.textContent = data.data.programa;
-          if (colName) colName.textContent = data.data.programa_full;
+          if (colCode)  colCode.textContent  = data.data.programa;
+          if (colName)  colName.textContent  = data.data.programa_full;
           if (colConst) colConst.textContent = data.data.constancia;
 
-          activeButton.dataset.code = data.data.programa;
-          activeButton.dataset.name = data.data.programa_full;
+          activeButton.dataset.code       = data.data.programa;
+          activeButton.dataset.name       = data.data.programa_full;
           activeButton.dataset.constancia = data.data.constancia;
+
+          // Actualizar datasets de plantillas (si tu vista los devuelve)
+          if (data.data.tpl_dc3_front_id !== undefined) {
+            activeButton.dataset.dc3Front = data.data.tpl_dc3_front_id || "";
+          }
+          if (data.data.tpl_dc3_back_id !== undefined) {
+            activeButton.dataset.dc3Back = data.data.tpl_dc3_back_id || "";
+          }
+          if (data.data.tpl_cproem_id !== undefined) {
+            activeButton.dataset.cproemTpl = data.data.tpl_cproem_id || "";
+          }
+          if (data.data.tpl_diploma_id !== undefined) {            // >>> NUEVO
+            activeButton.dataset.diplomaTpl = data.data.tpl_diploma_id || "";
+          }
         }
 
         showAlert("success", data.message || "Programa actualizado correctamente.");

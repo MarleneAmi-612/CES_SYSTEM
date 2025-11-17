@@ -1,8 +1,12 @@
+import os
 from django.db import models
 from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin,BaseUserManager
 from alumnos.models import Request
 from django.urls import reverse
+from django.db.models.signals import post_delete, pre_save
+from django.dispatch import receiver
+
 
 class AdminUserManager(BaseUserManager):
     def create_user(self, email, username=None, password=None, **extra_fields):
@@ -11,9 +15,20 @@ class AdminUserManager(BaseUserManager):
         """
         if not email:
             raise ValueError("El usuario debe tener un correo electrónico")
+
         email = self.normalize_email(email)
-        user = self.model(email=email, username=username, **extra_fields)
-        user.set_password(password)  # 🔒 guarda el hash, no la contraseña en claro
+        # por si acaso
+        extra_fields.setdefault("is_active", True)
+
+        user = self.model(
+            email=email,
+            username=username,
+            **extra_fields,
+        )
+        if password:
+            user.set_password(password)  # 🔒 guarda el hash
+        else:
+            user.set_unusable_password()
         user.save(using=self._db)
         return user
 
@@ -33,6 +48,11 @@ class AdminUserManager(BaseUserManager):
 class AdminUser(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True, max_length=254)
     username = models.CharField(max_length=100, unique=True, null=True, blank=True)
+
+    # 🔹 NUEVOS CAMPOS PARA EL PERFIL
+    first_name = models.CharField("nombre", max_length=150, blank=True)
+    last_name  = models.CharField("apellidos", max_length=150, blank=True)
+
     is_active = models.BooleanField(default=True)
     is_superuser = models.BooleanField(default=False)
     failed_attempts = models.IntegerField(default=0)
@@ -255,3 +275,89 @@ class Organization(models.Model):
     def __str__(self):
         return self.name
 
+# === Mapeo a la tabla legacy ces_simulacion.diplomado ===
+class ProgramSim(models.Model):
+    """
+    Mapea la tabla REAL 'diplomado' de ces_simulacion.
+    """
+    id = models.AutoField(primary_key=True, db_column="id")
+
+    # código corto
+    abbreviation = models.CharField(
+        "Código",
+        max_length=50,
+        db_column="programa"
+    )
+
+    # nombre completo
+    name = models.CharField(
+        "Nombre completo",
+        max_length=255,
+        db_column="programa_full"
+    )
+
+    # tipo de constancia (0 = CPROEM, 1 = DC3)
+    certificate_type = models.IntegerField(
+        "Tipo de constancia",
+        db_column="constancia"
+    )
+
+    # ESTA ES LA ÚNICA FECHA QUE EXISTE EN LA TABLA REAL
+    updated_at = models.DateTimeField(db_column="update_at", null=True, blank=True)
+
+    class Meta:
+        managed = False
+        db_table = "diplomado"
+
+    def __str__(self):
+        return f"{self.abbreviation} — {self.name}"
+
+class DiplomaBackground(models.Model):
+    # código del diplomado: DAIE, DAP, DTC, etc.
+    code = models.CharField("Código", max_length=20, unique=True)
+
+    # nombre completo del diplomado (opcional, solo para que se vea bonito en admin)
+    name = models.CharField("Nombre programa", max_length=255, blank=True)
+
+    # archivo de imagen que antes ponías en static/img/diplomas
+    image = models.ImageField(
+        "Imagen de fondo",
+        upload_to="diplomas/",   # se guardará en MEDIA_ROOT/diplomas/
+    )
+
+    is_active = models.BooleanField("Activo", default=True)
+
+    class Meta:
+        verbose_name = "Fondo de diploma"
+        verbose_name_plural = "Fondos de diploma"
+
+    def __str__(self):
+        return f"{self.code} - {self.name or self.image.name}"
+    
+@receiver(post_delete, sender=DiplomaBackground)
+def delete_bg_file_on_delete(sender, instance, **kwargs):
+    """
+    Cuando borras la plantilla en admin, se borra también el archivo físico.
+    """
+    if instance.image:
+        instance.image.delete(save=False)
+
+
+@receiver(pre_save, sender=DiplomaBackground)
+def delete_old_file_on_change(sender, instance, **kwargs):
+    """
+    Si cambias la imagen en una plantilla existente, borra el archivo anterior.
+    """
+    if not instance.pk:
+        return  # es nueva, no hay archivo viejo
+
+    try:
+        old = DiplomaBackground.objects.get(pk=instance.pk)
+    except DiplomaBackground.DoesNotExist:
+        return
+
+    old_file = old.image
+    new_file = instance.image
+
+    if old_file and old_file != new_file:
+        old_file.delete(save=False)    

@@ -27,12 +27,16 @@
           <li>Verifica que pusiste tu <strong>nombre completo</strong> correctamente.</li>
         </ul>
 
-        <p style="margin-top: 32px; text-align: center;">
+        <!-- 🔹 SIN style="" -->
+        <p class="help-note">
           Si el problema persiste, puedes regresar al inicio.
         </p>
 
-        <div class="actions" style="margin-top: 28px;">
-          <a href="{% url 'alumnos:start' %}" class="btn-ghost btn-ghost--center">Volver al inicio</a>
+        <!-- 🔹 SIN style="" -->
+        <div class="actions actions--spaced">
+          <a href="{% url 'alumnos:start' %}" class="btn-ghost btn-ghost--center">
+            Volver al inicio
+          </a>
         </div>
       </div>
 

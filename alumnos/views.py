@@ -1,6 +1,7 @@
 from datetime import timedelta, date
 import unicodedata
 import datetime
+from datetime import datetime, date, time
 from django.urls import reverse
 from datetime import timedelta
 from django.shortcuts import render, redirect, get_object_or_404
@@ -10,7 +11,8 @@ from django.http import JsonResponse
 from .models_ces import Alumnos as AlumnoSim  # BD simulada (alias 'ces')
 from .models import Program, Request, RequestEvent
 from .forms import EmailForm, BasicDataForm, ExtrasCPROEMForm, ExtrasDC3Form
-
+from .models_ces import Alumnos as AlumnoSim, Diplomado
+from .models import Program
 RESUBMIT_DAYS = 10  
 
 def help_view(request):
@@ -33,6 +35,38 @@ def _add_business_days(d: date, days: int) -> date:
             remaining -= 1
     return cur
 
+def _get_sim_program_queryset():
+    """
+    Regresa un queryset de Program (alumnos_program) limitado
+    SOLO a los diplomados que existen en la BD simulada (ces_simulacion.diplomado),
+    usando el campo 'programa' como abreviatura.
+    """
+    # Traemos los códigos de diplomado.programa de la BD simulada
+    codigos = (
+        Diplomado.objects.using("ces")
+        .exclude(programa__isnull=True)
+        .exclude(programa__exact="")
+        .values_list("programa", flat=True)
+    )
+
+    codigos = [c.strip() for c in codigos if c and c.strip()]
+    if not codigos:
+        return Program.objects.none()
+
+    # Filtramos Program por esas abreviaturas
+    return Program.objects.filter(abbreviation__in=codigos).order_by("name")
+
+
+def _to_aware_dt(val):
+    """Normaliza date/datetime -> datetime TZ-aware (o None)."""
+    if val is None:
+        return None
+    if isinstance(val, datetime):
+        return val if timezone.is_aware(val) else timezone.make_aware(val, timezone.get_current_timezone())
+    if isinstance(val, date):
+        base = datetime.combine(val, time.min)
+        return timezone.make_aware(base, timezone.get_current_timezone())
+    return None
 
 
 def _route_for_program(program):
@@ -103,8 +137,16 @@ def basic(request):
     alumno_db = AlumnoSim.objects.using("ces").filter(correo=email).first()
     missing_fields = []
 
+    # Siempre calculamos el queryset de programas válidos (solo ces_simulacion)
+    sim_program_qs = _get_sim_program_queryset()
+
     if request.method == "POST":
         form = BasicDataForm(request.POST)
+
+        # 🔹 Forzamos que el campo 'program' solo muestre programas de ces_simulacion
+        if "program" in form.fields:
+            form.fields["program"].queryset = sim_program_qs
+
         if form.is_valid():
             # Validar contra simulación si hay nombre/apellido
             db_nombre = getattr(alumno_db, "nombre", None)
@@ -114,6 +156,7 @@ def basic(request):
                     form.add_error("name", "El nombre no coincide con el registrado en CES.")
                 if _norm_name(form.cleaned_data["lastname"]) != _norm_name(db_apellido):
                     form.add_error("lastname", "Los apellidos no coinciden con los registrados en CES.")
+
             if form.errors:
                 for field, errors in form.errors.items():
                     label = form.fields[field].label
@@ -135,6 +178,9 @@ def basic(request):
                     missing_fields.append(f"{label}: {e}")
     else:
         form = BasicDataForm()
+        # 🔹 En GET también ajustamos el queryset del select
+        if "program" in form.fields:
+            form.fields["program"].queryset = sim_program_qs
 
     return render(request, "alumnos/basic.html", {"form": form, "missing_fields": missing_fields})
 
@@ -341,6 +387,10 @@ def _build_tracking_steps(req: Request):
 
 
 def _build_history(req: Request, steps=None):
+    """
+    Construye el feed cronológico normalizando TODAS las fechas a datetime aware.
+    Evita comparar date vs datetime y naïve vs aware.
+    """
     def label_for(key: str) -> str:
         return {
             "sent": "Solicitud enviada",
@@ -354,31 +404,42 @@ def _build_history(req: Request, steps=None):
 
     items = []
 
+    # 1) Pasos del stepper con su timestamp (si existe)
     if steps:
         for st in steps:
-            ts = st.get("timestamp")
+            ts_raw = st.get("timestamp")
+            ts = _to_aware_dt(ts_raw)
             if not ts:
                 continue
-            key = st.get("key")
+
+            key  = st.get("key")
             tone = "bad" if key == "rejected" else ("ok" if key in ("sent", "accepted", "downloaded") else "info")
             items.append({
                 "when": ts,
                 "title": label_for(key),
-                "tone": tone,
-                "note": "Actualización registrada.",
+                "tone":  tone,
+                "note":  "Actualización registrada.",
             })
 
+    # 2) Eventos extra (reenvíos, etc.)
     extra_qs = req.events.filter(status__in=["resubmitted", "resubmitted_from"]).order_by("created_at")
     for ev in extra_qs:
+        ts = _to_aware_dt(ev.created_at)
+        if not ts:
+            continue
+
         title = "Solicitud reenviada" if ev.status == "resubmitted" else "Reenvío desde solicitud anterior"
         items.append({
-            "when": ev.created_at,
+            "when":  ts,
             "title": title,
-            "tone": "info",
-            "note": (ev.note or "Actualización registrada."),
+            "tone":  "info",
+            "note":  (ev.note or "Actualización registrada."),
         })
 
+    # 3) Sanitiza y ordena (ya todo es datetime aware)
+    items = [it for it in items if it.get("when") is not None]
     items.sort(key=lambda x: x["when"])
+
     return items
 
 @require_GET
@@ -428,8 +489,22 @@ def tracking(request, request_id):
     sent_local = timezone.localtime(req.sent_at).date() if req.sent_at else timezone.localdate()
     eta_date = _add_business_days(sent_local, 10)
 
-    # Motivo de rechazo (si aplica)
-    rejection_reason = getattr(req, "status_reason", "") or ""
+    # ========= Motivo de rechazo (si aplica) =========
+    rejection_reason = ""
+    if status == "rejected":
+        # 1) Campo directo en Request (nuevo flujo)
+        rejection_reason = (getattr(req, "status_reason", "") or "").strip()
+
+        # 2) Si viene vacío, tomamos la nota del último evento "rejected" (flujo viejo)
+        if not rejection_reason:
+            last_rej = (
+                req.events
+                .filter(status="rejected")
+                .order_by("-created_at")
+                .first()
+            )
+            if last_rej and last_rej.note:
+                rejection_reason = last_rej.note.strip()
 
     # Historial (incluye pasos con timestamp y eventos adicionales)
     history = _build_history(req, steps)

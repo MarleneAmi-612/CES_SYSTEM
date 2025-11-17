@@ -32,7 +32,7 @@
       </div>
 
       <nav class="appbar__right">
-        <!-- Abrir/Importar… (no se muestra JSON al usuario) -->
+        <!-- Abrir/Importar… -->
         <form id="importForm" action="{% url 'administracion:plantilla_import' %}"
               method="post" enctype="multipart/form-data">
           {% csrf_token %}
@@ -43,16 +43,18 @@
           </button>
         </form>
 
-        <a class="btn btn--sm" href="{% url 'administracion:plantillas_catalogo' %}">Catálogo</a>
-        <a class="btn btn--sm" href="{% url 'administracion:plantilla_create' %}">+ Nueva</a>
-        <a class="btn btn--sm" href="{% url 'administracion:home' %}">Inicio</a>
+        <!-- Solo dejamos Inicio -->
+        <a class="btn btn--sm" href="{% url 'administracion:plantillas' %}">Panel</a>
       </nav>
     </header>
 
     <main class="content content--wide">
       <h1 class="h1">Administración de plantillas</h1>
-      <p class="sub">Importa documentos (PDF/DOCX/PPTX/Imágenes) o edita las plantillas existentes.</p>
-
+      <p class="sub">Importa documentos (PDF/DOCX/PPTX/Imágenes) o elimina las plantillas que ya no se usen.</p>
+      <p class="sub">Para un funcionamiento adecuado las constancias DC3 se deben subir indivudalmento con el siguiente nombre
+      (DC3_<programa>_F) para frontal y _R para reverso, CPROEM (Diploma_CPROEM_WEB o Constancia_CPOREM_impresa) y los Diplomas
+      con la abreviatura del programa.</p>
+  
       <!-- Flash messages -->
       {% if messages %}
         <div class="alerts">
@@ -92,6 +94,7 @@
               {% if t.thumb %}
                 <img class="thumb__img" src="{{ t.thumb.url }}" alt="Vista previa de {{ t.title }}">
               {% else %}
+                <!-- Miniatura generada con canvas a partir de json_active -->
                 <canvas class="tpl" aria-label="Miniatura de {{ t.title }}"></canvas>
               {% endif %}
             </div>
@@ -105,28 +108,15 @@
             </div>
 
             <div class="card__actions">
-              <a class="btn btn--primary btn--sm"
-                 href="{% url 'administracion:plantilla_edit' t.id %}" title="Editar (E)">Editar</a>
-
-              <!-- Versionar SIN textarea: manda el json actual oculto -->
-              <form method="post" action="{% url 'administracion:plantilla_new_version' t.id %}">
-                {% csrf_token %}
-                <input type="hidden" name="json" value='{{ t.json_active|escapejs }}'>
-                <input type="hidden" name="note" value="Nueva versión desde el listado">
-                <button class="btn btn--sm" type="submit" title="Versionar (V)">Versionar</button>
-              </form>
-
-              <form method="post" action="{% url 'administracion:plantilla_duplicate' t.id %}">
-                {% csrf_token %}
-                <button class="btn btn--sm" type="submit" title="Duplicar (D)">Duplicar</button>
-              </form>
-
+              <!-- Botón Eliminar con confirmación -->
               <form method="post"
                     action="{% url 'administracion:plantilla_delete' t.id %}"
                     class="js-confirm"
                     data-confirm="¿Seguro que deseas eliminar la plantilla «{{ t.title }}»? Esta acción no se puede deshacer.">
                 {% csrf_token %}
-                <button class="btn btn--danger btn--sm" type="submit" title="Eliminar">Eliminar</button>
+                <button class="btn btn--danger btn--sm" type="submit" title="Eliminar">
+                  Eliminar
+                </button>
               </form>
             </div>
           </article>
@@ -138,18 +128,25 @@
       <footer class="foot">© {{ now|date:"Y" }} CES</footer>
     </main>
   </div>
-
-  <!-- Modal confirm (reutilizado por .js-confirm) -->
-  <div id="confirmModal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
-    <div class="modal__overlay" data-close></div>
-    <div class="modal__dialog" role="document">
-      <h2 id="confirmTitle" class="modal__title">Confirmar eliminación</h2>
-      <p id="confirmMsg" class="modal__text">¿Seguro que deseas continuar?</p>
-      <div class="modal__actions">
-        <button id="confirmCancel" type="button" class="btn">Cancelar</button>
-        <button id="confirmOk" type="button" class="btn btn--danger">Eliminar</button>
+    <!-- Modal de confirmación bonito -->
+  <div id="confirmModal" class="c-modal" aria-hidden="true">
+    <div class="c-modal__backdrop"></div>
+    <div class="c-modal__panel" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+      <div class="c-modal__icon">
+        <span>⚠️</span>
+      </div>
+      <h2 id="confirmTitle" class="c-modal__title">Confirmar eliminación</h2>
+      <p id="confirmText" class="c-modal__text">
+        ¿Seguro que deseas eliminar esta plantilla? Esta acción no se puede deshacer.
+      </p>
+      <div class="c-modal__actions">
+        <button type="button" id="confirmCancel" class="btn btn--subtle">Cancelar</button>
+        <button type="button" id="confirmOk" class="btn btn--danger">Eliminar</button>
       </div>
     </div>
   </div>
+</body>
+</html>
+
 </body>
 </html>

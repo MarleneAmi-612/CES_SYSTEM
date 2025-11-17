@@ -8,10 +8,22 @@
 
   const resendUrl   = root.getAttribute("data-resend-url");
   const redirectUrl = root.getAttribute("data-redirect-url") || "/";
-  const csrf        = document.querySelector('meta[name="csrf-token"]')?.content || "";
 
-  function showBlockingModal(seconds = 10) {
-    // crea overlay modal
+  // --- CSRF helpers ---
+  function getCookie(name) {
+    const v = `; ${document.cookie}`;
+    const p = v.split(`; ${name}=`);
+    if (p.length === 2) return p.pop().split(";").shift();
+  }
+  // 1) intenta <meta name="csrf-token" content="...">; 2) cae a cookie csrftoken
+  function getCsrfToken() {
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    return (meta && meta.content) ? meta.content : getCookie("csrftoken");
+  }
+
+  function showBlockingModal(seconds = 10, opts) {
+    const { icon = "✅", title = "¡Solicitud reenviada!", text = null } = (opts || {});
+
     let ov = document.getElementById("resendOverlay");
     if (ov) ov.remove();
 
@@ -21,23 +33,20 @@
     ov.innerHTML = `
       <div class="overlay__backdrop" aria-hidden="true"></div>
       <div class="overlay__dialog" role="dialog" aria-modal="true" aria-live="assertive">
-        <div class="overlay__icon" aria-hidden="true">✅</div>
-        <h3 class="overlay__title">¡Solicitud reenviada!</h3>
+        <div class="overlay__icon" aria-hidden="true">${icon}</div>
+        <h3 class="overlay__title">${title}</h3>
         <p class="overlay__text">
-          Tu solicitud volvió a la etapa <strong>Pendiente</strong>. 
-          Serás redirigido al inicio en <strong id="redirCount">${seconds}</strong> segundos…
+          ${text || `Tu solicitud volvió a la etapa <strong>Pendiente</strong>. 
+          Serás redirigido al inicio en <strong id="redirCount">${seconds}</strong> segundos…`}
         </p>
       </div>
     `;
     document.body.appendChild(ov);
-    // bloquea scroll/interacción
     document.body.style.overflow = "hidden";
 
-    // simple “focus trap” (en este modal no hay controles)
     ov.tabIndex = -1;
     ov.focus();
 
-    // countdown + redirect
     let remain = seconds;
     const span = ov.querySelector("#redirCount");
     const t = setInterval(() => {
@@ -56,39 +65,34 @@
         method: "POST",
         headers: {
           "X-Requested-With": "XMLHttpRequest",
-          "X-CSRFToken": csrf
+          "X-CSRFToken": getCsrfToken(),
         },
-        credentials: "same-origin"
+        credentials: "same-origin",
       });
-      const data = await resp.json();
+
+      let data = {};
+      try { data = await resp.json(); } catch (_) {}
 
       if (!resp.ok || !data.ok) {
-        // en caso de error, también bloqueamos con aviso
-        showBlockingModal(10);
-        const title = document.querySelector("#resendOverlay .overlay__title");
-        const text  = document.querySelector("#resendOverlay .overlay__text");
-        const icon  = document.querySelector("#resendOverlay .overlay__icon");
-        if (title) title.textContent = "No se pudo reenviar";
-        if (text)  text.innerHTML = (data.msg || "Ocurrió un problema. Redirigiendo al inicio…") +
-                                    ` <strong id="redirCount">10</strong>`;
-        if (icon)  icon.textContent = "⚠️";
+        showBlockingModal(10, {
+          icon: "⚠️",
+          title: "No se pudo reenviar",
+          text: `${(data && data.msg) ? data.msg : "Ocurrió un problema. Redirigiendo al inicio…"} <strong id="redirCount">10</strong>`,
+        });
         return;
       }
 
-      // éxito: actualiza chip visualmente y muestra modal bloqueante
+      // éxito: actualiza chip y muestra modal
       const tag = document.getElementById("statusTag");
       if (tag) { tag.className = "tag pending"; tag.textContent = "Pendiente"; }
 
       showBlockingModal(10);
-
     } catch (e) {
-      showBlockingModal(10);
-      const title = document.querySelector("#resendOverlay .overlay__title");
-      const text  = document.querySelector("#resendOverlay .overlay__text");
-      const icon  = document.querySelector("#resendOverlay .overlay__icon");
-      if (title) title.textContent = "Error de red";
-      if (text)  text.innerHTML = "No fue posible contactar al servidor. Redirigiendo al inicio en <strong id='redirCount'>10</strong> segundos…";
-      if (icon)  icon.textContent = "🌐";
+      showBlockingModal(10, {
+        icon: "🌐",
+        title: "Error de red",
+        text: "No fue posible contactar al servidor. Redirigiendo al inicio en <strong id='redirCount'>10</strong> segundos…",
+      });
     }
   }
 

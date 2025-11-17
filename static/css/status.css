@@ -104,6 +104,16 @@ form { display: flex; flex-direction: column; gap: 12px; }
 .card-left .name { font-weight: 600; }
 .meta { font-size: 13px; color: var(--muted); }
 
+/* meta con margen extra (equivale a style="margin-top:6px;") */
+.meta.meta--spaced {
+  margin-top: 6px;
+}
+
+/* bloque de acciones debajo del detalle individual */
+.single-actions {
+  margin-top: 12px;
+}
+
 /* badge de estatus */
 .badge {
   display: inline-block;

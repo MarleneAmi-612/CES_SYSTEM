@@ -22,8 +22,11 @@
 
       <div class="top-actions">
         <!-- 🔎 Buscador -->
-        <form class="search" method="get" action="{% url 'administracion:home' %}" role="search" aria-label="Buscar solicitudes">
-          <input name="q" type="search" placeholder="Buscar por correo, nombre, CURP, programa…" value="{{ q }}">
+        <form class="search" method="get" action="{% url 'administracion:home' %}"
+              role="search" aria-label="Buscar solicitudes">
+          <input name="q" type="search"
+                 placeholder="Buscar por correo, nombre, CURP, programa…"
+                 value="{{ q }}">
         </form>
 
         <!-- Usuario / Menú -->
@@ -102,7 +105,6 @@
 
       <!-- Acciones rápidas -->
       <section class="quick" aria-label="Acciones rápidas">
-        <!-- ✅ ahora apunta al tablero de solicitudes del admin -->
         <a class="qbtn" href="{% url 'administracion:requests_board' %}">Solicitudes</a>
         <a class="qbtn" href="{% url 'administracion:egresados' %}">Egresados</a>
         <a class="qbtn" href="{% url 'administracion:plantillas' %}">Plantillas</a>
@@ -113,7 +115,18 @@
         <section class="card card--wide" aria-label="Últimas solicitudes">
           <div class="card-head">
             <h2 class="card-title">Últimas solicitudes</h2>
-            {% if not q %}<a class="link" href="{% url 'administracion:home' %}?q=">Ver más</a>{% endif %}
+
+            <!-- 🔽 Filtro de orden (solo frontend) -->
+            <form id="requestSortForm" class="sortbar" onsubmit="return false;">
+              <label class="sortbar__label" for="order">Ordenar por:</label>
+              <select name="order" id="order" class="sortbar__select">
+                <option value="date_desc">Fecha · más recientes</option>
+                <option value="date_asc">Fecha · más antiguas</option>
+                <option value="name_asc">Nombre · A → Z</option>
+                <option value="name_desc">Nombre · Z → A</option>
+              </select>
+              <button type="button" class="sortbar__btn" id="orderApplyBtn">Aplicar</button>
+            </form>
           </div>
 
           <div class="table-wrap" role="region" aria-label="Tabla de solicitudes" tabindex="0">
@@ -127,9 +140,12 @@
                   <th>Estatus</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody id="requestsBody">
                 {% for r in recent_requests %}
-                <tr class="rowlink" data-href="{% url 'alumnos:tracking' r.id %}">
+                <tr class="rowlink"
+                    data-href="{% url 'alumnos:tracking' r.id %}"
+                    data-sent-at="{{ r.sent_at|date:'Y-m-d H:i' }}"
+                    data-name="{{ r.name }} {{ r.lastname }}">
                   <td class="t-col t-date">{{ r.sent_at|date:"Y-m-d H:i" }}</td>
                   <td class="t-col t-name">{{ r.name }} {{ r.lastname }}</td>
                   <td class="t-col t-mail muted"><a href="mailto:{{ r.email }}">{{ r.email }}</a></td>

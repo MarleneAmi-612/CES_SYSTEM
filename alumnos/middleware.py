@@ -1,4 +1,3 @@
-# alumnos/middleware.py
 from datetime import timedelta
 
 from django.shortcuts import redirect
@@ -9,8 +8,9 @@ from django.utils import timezone
 class AlumnosSessionGuard:
     """
     Protege TODAS las rutas /alumnos/*, excepto:
-      - /alumnos/          (start)
-      - /alumnos/estatus/  (status)   -> públicas
+      - /alumnos/           (start)
+      - /alumnos/estatus/   (status)   -> públicas
+      - /alumnos/help/      (help)     -> pública
 
     /alumnos/api/tracking/<id>/ es pública (la usa el polling del tracking).
 
@@ -29,6 +29,7 @@ class AlumnosSessionGuard:
             self._public_exact = {
                 reverse("alumnos:start"),
                 reverse("alumnos:status"),
+                reverse("alumnos:help"),     # 👈 AHORA help también es pública
             }
 
         path = request.path
@@ -58,7 +59,9 @@ class AlumnosSessionGuard:
                 try:
                     issued_dt = timezone.datetime.fromisoformat(issued)
                     if timezone.is_naive(issued_dt):
-                        issued_dt = timezone.make_aware(issued_dt, timezone.get_current_timezone())
+                        issued_dt = timezone.make_aware(
+                            issued_dt, timezone.get_current_timezone()
+                        )
                 except Exception:
                     issued_dt = None
 

@@ -33,7 +33,7 @@
         podrás elegir cuál consultar.
       </p>
 
-      <form method="post" novalidate>
+      <form method="post" action="{% url 'alumnos:status' %}" novalidate>
         {% csrf_token %}
         <input
           class="input"
@@ -55,7 +55,7 @@
       {% if results != None %}
 
         {% if results|length == 0 %}
-          <div class="alert" style="margin-top:12px;">
+          <div class="alert">
             No encontramos solicitudes para ese correo.
           </div>
 
@@ -69,18 +69,18 @@
                 {% if r.program.abbreviation %} ({{ r.program.abbreviation }}){% endif %}
               </div>
 
-              <div class="meta">
+              <div class="meta meta--spaced">
                 Enviada: {{ r.sent_at|date:"d/m/Y H:i" }}
               </div>
 
-              <div class="meta" style="margin-top:6px;">
+              <div class="single-actions">
                 Estatus:
                 <span class="badge {{ r.status }}">
                   {{ r.get_status_display|default:r.status|title }}
                 </span>
               </div>
 
-              <div style="margin-top:12px;">
+              <div class="single-actions">
                 <a class="btn-pill cta" href="{% url 'alumnos:tracking' r.id %}">
                   Ver seguimiento ›
                 </a>

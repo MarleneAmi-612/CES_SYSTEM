@@ -17,7 +17,7 @@ from datetime import timedelta,datetime,date
 from pathlib import Path
 from typing import Optional   
 from alumnos.models import Request
-
+from types import SimpleNamespace
 # ============================
 # Terceros (third-party)
 # ============================
@@ -87,7 +87,7 @@ from django.views.generic import TemplateView, FormView
 # Apps locales
 # ============================
 from alumnos.models import Request  # u otros modelos que sí existan
-from administracion.models import Graduate
+from administracion.models import Graduate,DocToken,DiplomaBackground
 egresados = Graduate.objects.all()
 
 # App "alumnos"
@@ -106,6 +106,8 @@ from .models import (
     DesignTemplate,
     DesignTemplateVersion,
     TemplateAsset,
+    ProgramSim,
+    CertificateType,
     Program,               # modelo base
     Program as ProgramAdmin,  # alias usado en vistas
     ConstanciaType,
@@ -160,9 +162,26 @@ DIPLOMA_BG_BY_CODE = {
     "DPI":  "DPIE.png",
     "DTC":  "DTCN.png",
     "DTS":  "DTSN.png",
-    # aquí puedes seguir agregando códigos nuevos si subes más PNG
+    "DMVC": "DMVC.png"
 }
 
+def get_diploma_bg_for_code(code: str) -> str:
+    """
+    Devuelve la URL del fondo para el código de diplomado.
+
+    1) Busca en DiplomaBackground (BD).
+    2) Si no encuentra, regresa un PNG por defecto en static.
+    """
+    code = (code or "").strip().upper()
+    if not code:
+        return static("img/diplomas/DEFAULT.png")  # pon aquí tu fondo genérico
+
+    try:
+        bg = DiplomaBackground.objects.get(code=code, is_active=True)
+        # si usas WeasyPrint con rutas absolutas, quizá quieras bg.image.path
+        return bg.image.path   # o bg.image.url según como lo uses
+    except DiplomaBackground.DoesNotExist:
+        return static("img/diplomas/DEFAULT.png")
 # ====================== Endpoint well-known (Chrome DevTools) ======================
 @require_GET
 def wellknown_devtools(request):
@@ -184,21 +203,21 @@ def _in_admin_group(user) -> bool:
         return False
 
 def _admin_allowed(user) -> bool:
-    return (
-        getattr(user, "is_authenticated", False)
-        and getattr(user, "is_active", False)
-        and (
-            getattr(user, "is_superuser", False)
-            or getattr(user, "is_staff", False)
-            or _in_admin_group(user)
-        )
-    )
+    """
+    Versión relajada:
+    Por ahora, cualquier usuario autenticado y activo puede usar el panel
+    (no diferenciamos entre superuser / staff / grupos).
+    """
+    return getattr(user, "is_authenticated", False) and getattr(user, "is_active", False)
+
 
 class StaffRequiredMixin(UserPassesTestMixin):
     def test_func(self):
         return _admin_allowed(self.request.user)
+
     def handle_no_permission(self):
         return redirect("administracion:login")
+
 
 class OTPRequiredMixin(StaffRequiredMixin):
     """Exige 2FA (TOTP) para acceder al panel."""
@@ -350,6 +369,59 @@ class AdminPasswordResetCompleteView(PasswordResetCompleteView):
 
 
 # =========================== Endpoints AJAX (cuenta) ===========================
+@login_required
+def home(request):
+    q = (request.GET.get("q") or "").strip()
+    order = (request.GET.get("order") or "date_desc").strip()
+
+    # Base queryset de solicitudes
+    req_qs = Request.objects.select_related("program")
+
+    if q:
+        req_qs = req_qs.filter(
+            Q(email__icontains=q) |
+            Q(name__icontains=q) |
+            Q(lastname__icontains=q) |
+            Q(curp__icontains=q) |
+            Q(program__name__icontains=q) |
+            Q(program__abbreviation__icontains=q)
+        )
+
+    # ---------- ORDEN ----------
+    if order == "date_asc":
+        req_qs = req_qs.order_by("sent_at","id")
+    elif order == "name_asc":
+        req_qs = req_qs.order_by("name", "lastname","id")
+    elif order == "name_desc":
+        req_qs = req_qs.order_by("-name", "-lastname","-id")
+    else:
+        # default: más recientes primero
+        order = "date_desc"
+        req_qs = req_qs.order_by("-sent_at","-id")
+
+    recent_requests = req_qs[:50]
+
+    # KPIs
+    total_requests = Request.objects.count()
+    pending = Request.objects.filter(status="pending").count()
+    accepted = Request.objects.filter(status="accepted").count()
+    rejected = Request.objects.filter(status="rejected").count()
+
+    # Logs de seguridad
+    recent_logs = AdminAccessLog.objects.select_related("user")[:10]
+
+    ctx = {
+        "q": q,
+        "order": order,
+        "recent_requests": recent_requests,
+        "total_requests": total_requests,
+        "pending": pending,
+        "accepted": accepted,
+        "rejected": rejected,
+        "recent_logs": recent_logs,
+        "now": timezone.now(),
+    }
+    return render(request, "administracion/home.html", ctx)
 
 @require_POST
 def password_change_inline(request):
@@ -372,55 +444,124 @@ def password_change_inline(request):
     update_session_auth_hash(request, user)
     return JsonResponse({"ok": True})
 
+@login_required
+@csrf_protect
 @require_POST
 def create_admin_inline(request):
-    me = request.user
-    if not _admin_allowed(me):
-        return JsonResponse({"ok": False, "error": "No autorizado."}, status=403)
+    """
+    Crea un nuevo usuario admin desde el modal inline.
+    Siempre responde JSON, incluso si hay errores internos.
+    """
+    try:
+        me = request.user
+        if not _admin_allowed(me):
+            # Respuesta amigable para el modal (no 403 duro)
+            return JsonResponse({"ok": False, "error": "No autorizado."}, status=200)
 
-    email = (request.POST.get("email") or "").strip().lower()
-    username = (request.POST.get("username") or "").strip()
-    first_name = (request.POST.get("first_name") or "").strip()
-    last_name = (request.POST.get("last_name") or "").strip()
-    pw1 = (request.POST.get("password1") or "").strip()
-    pw2 = (request.POST.get("password2") or "").strip()
+        email      = (request.POST.get("email") or "").strip().lower()
+        username   = (request.POST.get("username") or "").strip()
+        first_name = (request.POST.get("first_name") or "").strip()
+        last_name  = (request.POST.get("last_name") or "").strip()
+        pw1        = (request.POST.get("password1") or "").strip()
+        pw2        = (request.POST.get("password2") or "").strip()
 
-    if not email or "@" not in email:
-        return JsonResponse({"ok": False, "error": "Email inválido."}, status=400)
-    if pw1 != pw2 or len(pw1) < 8:
-        return JsonResponse({"ok": False, "error": "La contraseña no es válida o no coincide."}, status=400)
+        # --------- Validaciones de negocio ---------
+        if not email or "@" not in email:
+            return JsonResponse({"ok": False, "error": "Email inválido."}, status=200)
 
-    if not username:
-        base = slugify(email.split("@")[0]) or "admin"
-        candidate, i = base, 1
-        while User.objects.filter(username=candidate).exists():
-            i += 1
-            candidate = f"{base}{i}"
-        username = candidate
+        if pw1 != pw2:
+            return JsonResponse({"ok": False, "error": "Las contraseñas no coinciden."}, status=200)
 
-    if User.objects.filter(email__iexact=email).exists():
-        return JsonResponse({"ok": False, "error": "Ya existe un usuario con ese email."}, status=400)
-    if User.objects.filter(username=username).exists():
-        return JsonResponse({"ok": False, "error": "El nombre de usuario ya está en uso."}, status=400)
+        if len(pw1) < 8:
+            return JsonResponse(
+                {"ok": False, "error": "La contraseña debe tener al menos 8 caracteres."},
+                status=200,
+            )
 
-    u = User.objects.create_user(
-        username=username,
-        email=email,
-        first_name=first_name,
-        last_name=last_name,
-        password=pw1,
-        is_active=True,
-    )
+        # Generar username si viene vacío
+        if not username:
+            base = slugify(email.split("@")[0]) or "admin"
+            candidate, i = base, 1
+            while User.objects.filter(username=candidate).exists():
+                i += 1
+                candidate = f"{base}{i}"
+            username = candidate
 
-    if hasattr(u, "is_staff"):
-        u.is_staff = True
-        u.save(update_fields=["is_staff"])
+        # Duplicados
+        if User.objects.filter(email__iexact=email).exists():
+            return JsonResponse(
+                {"ok": False, "error": "Ya existe un usuario con ese email."},
+                status=200,
+            )
 
-    grp, _ = Group.objects.get_or_create(name="AdministradoresCES")
-    u.groups.add(grp)
+        if User.objects.filter(username=username).exists():
+            return JsonResponse(
+                {"ok": False, "error": "El nombre de usuario ya está en uso."},
+                status=200,
+            )
 
-    return JsonResponse({"ok": True, "user": {"id": u.id, "username": u.username, "email": u.email}})
+        # --------- Crear usuario (OJO: AdminUser no acepta first_name/last_name como kwargs) ---------
+        u = User.objects.create_user(
+            username=username,
+            email=email,
+            password=pw1,
+            is_active=True,
+        )
 
+        # Si tu modelo tiene campos de nombre, los llenamos de forma segura
+        if first_name or last_name:
+            changed = False
+
+            # Caso 1: tu modelo define first_name / last_name
+            if hasattr(u, "first_name"):
+                u.first_name = first_name
+                changed = True
+            if hasattr(u, "last_name"):
+                u.last_name = last_name
+                changed = True
+
+            # Caso 2: modelo con un solo campo de nombre (name / full_name / nombre)
+            if not changed:
+                full = f"{first_name} {last_name}".strip()
+                for attr in ("name", "full_name", "nombre"):
+                    if hasattr(u, attr):
+                        setattr(u, attr, full)
+                        changed = True
+                        break
+
+            if changed:
+                u.save()
+
+        # Convertirlo en staff/admin
+        if hasattr(u, "is_staff"):
+            u.is_staff = True
+            u.save(update_fields=["is_staff"])
+
+        grp, _ = Group.objects.get_or_create(name="AdministradoresCES")
+        u.groups.add(grp)
+
+        return JsonResponse(
+            {
+                "ok": True,
+                "user": {
+                    "id": u.id,
+                    "username": u.username,
+                    "email": u.email,
+                },
+            },
+            status=200,
+        )
+
+    except Exception as e:
+        # Cualquier cosa rara (constraints, campos obligatorios extra, etc.)
+        log.exception("Error en create_admin_inline")
+        return JsonResponse(
+            {
+                "ok": False,
+                "error": f"Error interno: {e.__class__.__name__}: {e}",
+            },
+            status=200,
+        )
 
 # ======================== Plantillas (portada) ========================
 
@@ -642,11 +783,8 @@ def egresados(request, req_id=None):
     """
     Panel de egresados.
 
-    - Muestra a la izquierda las solicitudes en estado "generating".
-    - Agrega también una lista de solicitudes en estado "finalizado".
-    - Para el alumno activo, intenta tomar las fechas desde Graduate
-      (validity_start / validity_end) y, si no existen, desde Request
-      (start_date / end_date).
+    - EN PROCESO: solicitudes con status "generating".
+    - FINALIZADOS: solicitudes que YA tienen Graduate asociado, sin depender del status.
     """
 
     # -----------------------
@@ -661,12 +799,13 @@ def egresados(request, req_id=None):
 
     # -----------------------
     #  Solicitudes FINALIZADAS
+    #   (todas las que ya tienen Graduate, sin importar status)
     # -----------------------
     finished = (
         Request.objects
-        .filter(status="finalizado")
-        .select_related("program")
-        .order_by("-sent_at")
+        .filter(graduate__isnull=False)
+        .select_related("program", "graduate")
+        .order_by("-graduate__completion_date", "-sent_at", "-id")
     )
 
     # Alumno activo (si viene un id en la URL)
@@ -713,8 +852,8 @@ def egresados(request, req_id=None):
 
     ctx = {
         # Listas de la columna izquierda
-        "generating_reqs": generating,   # ← nombre que usa la plantilla
-        "finished_reqs": finished,       # ← NUEVO
+        "generating_reqs": generating,   # en proceso
+        "finished_reqs": finished,       # finalizados (por Graduate)
 
         # Alumno seleccionado
         "active_req": active_req,
@@ -733,7 +872,7 @@ def egresados(request, req_id=None):
         "constancia_label": const_label,
         "const_kind": const_kind,
 
-        # Dummies para que el template no truene aunque estén vacíos
+        # Dummies para plantillas
         "diploma": {},
         "constancia": {},
 
@@ -741,6 +880,7 @@ def egresados(request, req_id=None):
         "csrf_token": get_token(request),
     }
     return render(request, "administracion/egresados.html", ctx)
+
 
 @csp_update({
     'img-src': ("'self'", "data:", "blob:"),
@@ -1476,12 +1616,13 @@ def _diploma_background_for_request(req):
 
     Regla:
       - Toma el código del programa (abbreviation / programa / code).
-      - Busca en /static/img/diplomas/:
-          1) <CODIGO>.png
-          2) <CODIGO>N.png
-      - Usa el primero que exista.
-      - Si no hay ninguno, no rompe: devuelve el primer candidato,
-        pero en la práctica verás la hoja en blanco (señal de que falta el PNG).
+      - Intenta primero nombres "bonitos" estándar:
+          1) static/img/diplomas/<CODIGO>.png
+          2) static/img/diplomas/<CODIGO>N.png
+      - Si no existen, busca en static/img/diplomas cualquier PNG que
+        contenga <CODIGO> en el nombre (por ejemplo: 'Diploma_DGE_2025.png').
+      - Si aún así no hay nada, devuelve el primer candidato aunque no exista;
+        en la práctica verás la hoja en blanco (señal de que falta el PNG).
     """
     program_obj = getattr(req, "program", None)
 
@@ -1500,7 +1641,7 @@ def _diploma_background_for_request(req):
     if not code:
         return None, True
 
-    # Candidatos de nombre de archivo
+    # 1) Candidatos estándar
     candidates = [
         f"img/diplomas/{code}.png",
         f"img/diplomas/{code}N.png",
@@ -1512,10 +1653,154 @@ def _diploma_background_for_request(req):
             # Para fondos específicos normalmente el título ya va impreso
             return rel_path, False
 
-    # Ninguno encontrado: devolvemos el primero como fallback
-    # (no truena; simplemente el fondo no se verá hasta que subas la imagen)
+    # 2) Búsqueda flexible en static/img/diplomas:
+    #    cualquier PNG cuyo nombre contenga la abreviatura.
+    try:
+        static_dir = Path(settings.BASE_DIR) / "static" / "img" / "diplomas"
+        if static_dir.exists():
+            for fname in os.listdir(static_dir):
+                if not fname.lower().endswith(".png"):
+                    continue
+                if code in fname.upper():
+                    # Ej.: 'Diploma_DGE_2025.png' -> 'img/diplomas/Diploma_DGE_2025.png'
+                    return f"img/diplomas/{fname}", False
+    except Exception:
+        # fallback silencioso, no queremos romper la generación del PDF
+        pass
+
+    # 3) Ninguno encontrado: devolvemos el primero como fallback.
+    # En la práctica se verá blanco, lo que te avisa que falta el PNG real.
     return candidates[0], True
 
+def _dc3_background_for_request(req):
+    """
+    Devuelve rutas *relativas* a static para el frente y reverso de la DC-3,
+    de acuerdo al programa abreviado.
+
+    Archivos esperados: STATIC/img/DC3/DC3_<ABREVIATURA>_F.png y _R.png
+    Ejemplo: DC3_DAP_F.png, DC3_DAP_R.png
+    """
+    program = getattr(req, "program", None)
+
+    abbr = ""
+    if program is not None:
+        abbr = (
+            getattr(program, "abbreviation", None)
+            or getattr(program, "code", None)
+            or ""
+        )
+
+    abbr = (abbr or "").upper().strip()
+
+    if not abbr:
+        # fondo genérico si no hay abreviatura
+        return ("img/DC3/DC3_GENERIC_F.png", "img/DC3/DC3_GENERIC_R.png")
+
+    front_rel = f"img/DC3/DC3_{abbr}_F.png"
+    back_rel  = f"img/DC3/DC3_{abbr}_R.png"
+    return front_rel, back_rel
+
+def _render_ctx_and_template(request, req, tipo_real: str, *, use_published_if_exists: bool):
+    # Nombre completo "normal"
+    nombre = f"{getattr(req, 'name', '')} {getattr(req, 'lastname', '')}".strip()
+
+    program_obj = getattr(req, "program", None)
+    programa = getattr(program_obj, "name", "") or ""
+    program_name_lower = programa.lower()
+
+    # Fechas del curso: primero Graduate, luego Request
+    grad = getattr(req, 'graduate', None)
+    if grad:
+        inicio = getattr(grad, 'validity_start', None)
+        fin = getattr(grad, 'validity_end', None)
+    else:
+        inicio = getattr(req, 'start_date', None)
+        fin = getattr(req, 'end_date', None)
+
+    # Token de verificación
+    if use_published_if_exists:
+        published = _get_existing_token(req, tipo_real)
+        token = published.token if published else _random_hex_25()
+    else:
+        token = _random_hex_25()
+
+    verify_url = request.build_absolute_uri(
+        reverse("administracion:verificar_token", args=[token])
+    )
+    qr_url = _qr_png_data_url(verify_url, box_size=12)
+
+    # ======================================================
+    #  D I P L O M A S
+    # ======================================================
+    if tipo_real == "diploma":
+        # Fondo según programa (tu helper actual)
+        bg_static, show_program_text = _diploma_background_for_request(req)
+        bg_url = static(bg_static) if bg_static else ""
+
+        tpl = "administracion/pdf_diploma.html"
+        ctx = {
+            "folio": f"DIP-{req.id:06d}",
+            "nombre": nombre,
+            "programa": programa,
+            "inicio": inicio,
+            "fin": fin,
+            "qr_url": qr_url,
+            "bg_url": bg_url,
+            "show_program_text": show_program_text,
+        }
+
+    # ======================================================
+    #  C O N S T A N C I A S  (DC-3 y CPROEM)
+    # ======================================================
+    else:
+        if tipo_real == "dc3":
+            # Nombre especial para DC3: "APELLIDOS NOMBRE"
+            first = getattr(req, "name", "") or ""
+            last = getattr(req, "lastname", "") or ""
+            dc3_nombre = f"{last} {first}".strip()
+
+            # Fondos específicos por programa (F/R)
+            front_rel, back_rel = _dc3_background_for_request(req)
+            dc3_front_url = static(front_rel) if front_rel else ""
+            dc3_back_url  = static(back_rel) if back_rel else ""
+
+            tpl = "administracion/pdf_constancia_dc3.html"
+            ctx = {
+                "folio": f"CON-{req.id:06d}",
+                "nombre": nombre,                     # por si lo necesitas en otro lado
+                "dc3_nombre": dc3_nombre or nombre,   # ESTE es el que usa el HTML
+                "programa": programa,
+                "inicio": inicio,
+                "fin": fin,
+                "curp": getattr(req, "curp", None),
+                "rfc": getattr(req, "rfc", None),
+                "puesto": getattr(req, "job_title", None),
+                "giro": getattr(req, "industry", None),
+                "razon_social": getattr(req, "business_name", None),
+                "horas": getattr(req, "hours", None),
+                "qr_url": qr_url,
+                "dc3_front_url": dc3_front_url,
+                "dc3_back_url": dc3_back_url,
+            }
+        else:
+            # CPROEM
+            tpl = "administracion/pdf_constancia_cproem.html"
+            ctx = {
+                "folio": f"CON-{req.id:06d}",
+                "nombre": nombre,
+                "programa": programa,
+                "inicio": inicio,
+                "fin": fin,
+                "curp": getattr(req, "curp", None),
+                "rfc": getattr(req, "rfc", None),
+                "puesto": getattr(req, "job_title", None),
+                "giro": getattr(req, "industry", None),
+                "razon_social": getattr(req, "business_name", None),
+                "horas": getattr(req, "hours", None),
+                "qr_url": qr_url,
+            }
+
+    return tpl, ctx
 
 # ==================== Seguridad PDF ====================
 
@@ -1730,14 +2015,16 @@ class RequestsBoardView(LoginRequiredMixin, TemplateView):
         return ctx
 
 
-
+@login_required
 @require_POST
 def request_update_status(request):
+    """
+    Actualiza el status de una solicitud desde el tablero (AJAX).
+    Ahora cualquier usuario autenticado y activo puede hacerlo.
+    """
     me = request.user
-    if not me.is_authenticated:
-        return JsonResponse({"ok": False, "msg": "No autenticado."}, status=401)
-    if not _admin_allowed(me):
-        return JsonResponse({"ok": False, "msg": "No autorizado."}, status=403)
+    if not me.is_active:
+        return JsonResponse({"ok": False, "msg": "Usuario inactivo."}, status=403)
 
     rid = request.POST.get("id")
     action = (request.POST.get("action") or "").strip()
@@ -1749,6 +2036,7 @@ def request_update_status(request):
         "reject":     "rejected",
         "generating": "generating",
     }
+
     if not rid or action not in STATUS_MAP:
         return JsonResponse({"ok": False, "msg": "Parámetros inválidos."}, status=400)
 
@@ -1762,6 +2050,7 @@ def request_update_status(request):
     if new_status == "rejected" and not reason:
         return JsonResponse({"ok": False, "msg": "Falta el motivo de rechazo."}, status=400)
 
+    # Actualizar estatus + motivo (si aplica)
     if new_status == "rejected":
         req_obj.status_reason = reason
         req_obj.status = new_status
@@ -1770,12 +2059,15 @@ def request_update_status(request):
         req_obj.status = new_status
         req_obj.save(update_fields=["status"])
 
+    # Registrar evento de la solicitud (bitácora)
     if not RequestEvent.objects.filter(request=req_obj, status=new_status).exists():
-        RequestEvent.objects.create(request=req_obj, status=new_status, note=(reason or None))
+        RequestEvent.objects.create(
+            request=req_obj,
+            status=new_status,
+            note=(reason or None),
+        )
 
     return JsonResponse({"ok": True, "new_status": new_status})
-
-
 # ===================== (NUEVO) Guardar edición inline =====================
 
 @login_required
@@ -1950,21 +2242,33 @@ def asset_upload(request):
 @login_required
 @require_http_methods(["POST"])
 def asset_delete(request, pk: int):
-    """Elimina un asset y, si existe, el archivo físico en disco."""
+    """
+    Elimina un asset y, si existe, el archivo físico en disco.
+    Además intenta borrar la copia en static/img/diplomas o static/img/DC3
+    generada por _mirror_png_to_static_background.
+    """
     asset = get_object_or_404(TemplateAsset, pk=pk)
-    file_path = None
-    if asset.file and hasattr(asset.file, "path"):
-        file_path = asset.file.path
+
+    # Guardamos datos ANTES de borrar el registro
+    file_path  = asset.file.path if asset.file and hasattr(asset.file, "path") else None
+    asset_name = asset.name
+
+    # Borrar registro del modelo
     asset.delete()
+
+    # 1) Borrar archivo en MEDIA
     if file_path:
         try:
             os.remove(file_path)
         except Exception:
             pass
+
+    # 2) Borrar posible copia en static/img/...
+    _delete_mirrored_static_by_asset_name(asset_name)
+
     if request.headers.get("x-requested-with") == "XMLHttpRequest":
         return JsonResponse({"ok": True})
     return redirect("administracion:assets_library")
-
 
 # ========== PROGRAMAS / DIPLOMADOS ==========
 
@@ -2103,32 +2407,91 @@ def program_edit(request, pk: int):
         },
     )
 
+def _build_item_from_data(data=None):
+    data = data or {}
+
+    const_type = (data.get("constancia_type") or "cproem").lower()
+
+    return {
+        "code": (data.get("code") or "").strip(),
+        "name": (data.get("name") or "").strip(),
+        "constancia_type": const_type,  # 'cproem' o 'dc3'
+        "plantilla_diploma_id": data.get("plantilla_diploma") or None,
+        "plantilla_constancia_id": data.get("plantilla_constancia") or None,
+    }
 
 @login_required
-@require_http_methods(["GET", "POST"])
 def program_create(request):
-    if request.method == "POST":
-        name = request.POST.get("name")
-        code = request.POST.get("code")
-        ctype = request.POST.get("constancia_type") or ConstanciaType.CEPROEM
-        plantilla_d = request.POST.get("plantilla_diploma") or None
-        plantilla_c = request.POST.get("plantilla_constancia") or None
-
-        ProgramAdmin.objects.create(
-            name=name,
-            code=code,
-            constancia_type=ctype,
-            plantilla_diploma=DesignTemplate.objects.filter(id=plantilla_d).first() if plantilla_d else None,
-            plantilla_constancia=DesignTemplate.objects.filter(id=plantilla_c).first() if plantilla_c else None,
-        )
-        return redirect("administracion:program_list")
-
     plantillas = DesignTemplate.objects.all().order_by("title")
-    return render(
-        request,
-        "administracion/program_form.html",
-        {"mode": "create", "plantillas": plantillas, "ConstanciaType": ConstanciaType},
-    )
+
+    if request.method == "POST":
+        code = (request.POST.get("code") or "").strip().upper()
+        name = (request.POST.get("name") or "").strip()
+        raw_const = request.POST.get("constancia_type") or ConstanciaType.CEPROEM
+
+        # Puede venir 0/1 o CEPROEM/DC3
+        if str(raw_const) in ("0", "1"):
+            constancia = ConstanciaType.DC3 if str(raw_const) == "1" else ConstanciaType.CEPROEM
+        else:
+            constancia = raw_const
+
+        plantilla_diploma_id = request.POST.get("plantilla_diploma") or None
+        plantilla_constancia_id = request.POST.get("plantilla_constancia") or None
+
+        item = {
+            "code": code,
+            "name": name,
+            "constancia_type": constancia,
+            "plantilla_diploma_id": plantilla_diploma_id,
+            "plantilla_constancia_id": plantilla_constancia_id,
+        }
+
+        if not code or not name:
+            messages.error(request, "Código y nombre son obligatorios.")
+            return render(request, "administracion/program_form.html",
+                {"mode": "create", "item": item, "plantillas": plantillas}
+            )
+
+        try:
+            with transaction.atomic():
+
+                # === 1) Crear Program en ces_db (tabla principal) ===
+                program = Program.objects.create(
+                    code=code,
+                    name=name,
+                    constancia_type=constancia,
+                    plantilla_diploma_id=plantilla_diploma_id or None,
+                    plantilla_constancia_id=plantilla_constancia_id or None,
+                )
+
+                # === 2) Insertar en ces_simulacion.diplomado ===
+                constancia_sim = 1 if constancia == ConstanciaType.DC3 else 0
+
+                with connections["ces"].cursor() as cur:
+                    cur.execute("""
+                        INSERT INTO diplomado (programa, programa_full, constancia, update_at)
+                        VALUES (%s, %s, %s, NOW())
+                    """, [code, name, constancia_sim])
+
+            messages.success(request, "Programa creado correctamente.")
+            return redirect("administracion:program_list")
+
+        except Exception as exc:
+            messages.error(request, f"No se pudo crear el programa: {exc}")
+            return render(request, "administracion/program_form.html",
+                {"mode": "create", "item": item, "plantillas": plantillas})
+
+    empty_item = {
+        "code": "",
+        "name": "",
+        "constancia_type": ConstanciaType.CEPROEM,
+        "plantilla_diploma_id": None,
+        "plantilla_constancia_id": None,
+    }
+    return render(request, "administracion/program_form.html",
+        {"mode": "create", "item": empty_item, "plantillas": plantillas})
+
+
 @csrf_exempt
 @login_required
 @require_http_methods(["GET", "POST"])
@@ -2392,10 +2755,26 @@ def plantilla_regen_thumb(request, tpl_id: int):
 @login_required
 @require_http_methods(["POST"])
 def plantilla_delete(request, tpl_id: int):
+    """
+    Elimina una DesignTemplate y, además, intenta borrar la copia PNG en
+    static/img/diplomas o static/img/DC3 que se generó al importar el documento.
+    """
     tpl = get_object_or_404(DesignTemplate, pk=tpl_id)
-    title = tpl.title
+
+    # Guardamos el título ANTES de borrar (ej. 'diploma-18.pdf', 'DC3__F.docx', etc.)
+    title = tpl.title or ""
+
+    # Borramos la plantilla
     tpl.delete()
-    messages.success(request, f'Plantilla «{title}» eliminada.')
+
+    # Intentamos borrar el PNG espejado en static/img/...
+    if title:
+        _delete_mirrored_static_by_asset_name(title)
+
+    messages.success(
+        request,
+        f"Se eliminó la plantilla «{title}»."
+    )
     return redirect("administracion:plantillas_admin")
 
 @login_required
@@ -2410,6 +2789,7 @@ def plantilla_import(request):
       usando `_pdf_to_png_bytes` / `_office_to_pdf_bytes`.
     - Si la conversión falla o no hay dependencias → crea una plantilla en blanco con
       un texto "Adjunto: <nombre>", pero el archivo original queda guardado como asset.
+    - Siempre regresa al listado de plantillas (plantillas_admin); ya no abre el editor.
     """
     f = request.FILES.get("file")
     if not f:
@@ -2446,16 +2826,34 @@ def plantilla_import(request):
                 }],
             }]
         }
+
         tpl = DesignTemplate.objects.create(
             title=name,
             kind=DesignTemplate.DESIGN,
             json_active=data,
         )
+
+        # Miniatura: usamos directamente la imagen original como thumb (si el modelo la tiene)
+        try:
+            if hasattr(tpl, "thumb") and asset_original.file:
+                # leemos los bytes del archivo original
+                with asset_original.file.open("rb") as fh:
+                    img_bytes = fh.read()
+                thumb_name = Path(name).name  # mismo nombre de archivo
+                tpl.thumb.save(
+                    thumb_name,
+                    ContentFile(img_bytes, name=thumb_name),
+                    save=True,
+                )
+        except Exception:
+            # si algo falla, no rompemos el flujo
+            pass
+
         messages.success(
             request,
             f"Se importó «{name}» como imagen de fondo. También se guardó el archivo original en la biblioteca de assets."
         )
-        return redirect("administracion:plantilla_edit", tpl_id=tpl.id)
+        return redirect("administracion:plantillas_admin")
 
     # 2) PDF / Office → intentar generar PNG de 1ª página
     png_bytes = None
@@ -2482,14 +2880,21 @@ def plantilla_import(request):
     except Exception:
         png_bytes = None
 
-    # Si pudimos generar PNG → usarlo como fondo
+    # Si pudimos generar PNG → usarlo como fondo y como miniatura
     if png_bytes:
         img_name = Path(name).with_suffix(".png").name
+
+        # 1) Asset en MEDIA (como ya hacías)
         asset_png = TemplateAsset.objects.create(
             name=img_name,
             file=ContentFile(png_bytes, name=img_name),
             mime="image/png",
         )
+
+        # 2) Copia en static/img/diplomas o static/img/DC3
+        _mirror_png_to_static_background(img_name, png_bytes)
+
+        # 3) JSON activo con la imagen de fondo
         data = {
             "pages": [{
                 "width": 1920,
@@ -2505,16 +2910,31 @@ def plantilla_import(request):
                 }],
             }]
         }
+
+        # 4) Crear la plantilla
         tpl = DesignTemplate.objects.create(
             title=name,
             kind=DesignTemplate.DESIGN,
             json_active=data,
         )
+
+        # 5) Usar el mismo PNG como miniatura (thumb) para la tarjeta
+        try:
+            if hasattr(tpl, "thumb"):
+                thumb_name = img_name  # por ejemplo "diploma-18.png"
+                tpl.thumb.save(
+                    thumb_name,
+                    ContentFile(png_bytes, name=thumb_name),
+                    save=True,
+                )
+        except Exception:
+            pass
+
         messages.success(
             request,
             f"Se importó «{name}» y se generó una vista previa de la primera página."
         )
-        return redirect("administracion:plantilla_edit", tpl_id=tpl.id)
+        return redirect("administracion:plantillas_admin")
 
     # 3) Fallback → plantilla en blanco con texto "Adjunto: <nombre>"
     data = {
@@ -2543,8 +2963,7 @@ def plantilla_import(request):
         "Se adjuntó el archivo original pero no se pudo generar la vista previa. "
         "Verifica que LibreOffice y Poppler estén instalados en el servidor si deseas convertir a imagen."
     )
-    return redirect("administracion:plantilla_edit", tpl_id=tpl.id)
-
+    return redirect("administracion:plantillas_admin")
 
 
 def _pdf_to_png_bytes(pdf_bytes: bytes):
@@ -2703,7 +3122,8 @@ def asset_convert_to_image(request, asset_id: int):
             try:
                 from PIL import Image
                 im = Image.open(asset.file)
-                if im.mode != "RGB": im = im.convert("RGB")
+                if im.mode != "RGB":
+                    im = im.convert("RGB")
                 buff = io.BytesIO()
                 im.save(buff, format="PNG")
                 png_bytes = buff.getvalue()
@@ -2725,99 +3145,16 @@ def asset_convert_to_image(request, asset_id: int):
         file=ContentFile(png_bytes, name=img_name),
         mime="image/png",
     )
-    return JsonResponse({"ok": True, "id": new_asset.id, "name": new_asset.name, "url": new_asset.file.url})
-def _build_abs_media_url(request, rel_path):
-    """Devuelve URL absoluta pública a un archivo en MEDIA_ROOT."""
-    return request.build_absolute_uri(settings.MEDIA_URL + rel_path.replace("\\", "/"))
-@login_required
-@require_POST
-def plantilla_import_convert(request):
-    """
-    Recibe un archivo Office y lo convierte a PDF con LibreOffice headless.
-    Respuesta JSON:
-      { "pdf_url": "https://.../media/office_conv/<id>/file.pdf" }
-    """
-    f = request.FILES.get("file")
-    if not f:
-        return JsonResponse({"error": "file requerido"}, status=400)
 
-    # Carpeta destino dentro de MEDIA_ROOT (p.ej. media/office_conv/<uuid>/)
-    conv_root = Path(settings.MEDIA_ROOT) / "office_conv" / uuid.uuid4().hex
-    conv_root.mkdir(parents=True, exist_ok=True)
+    # Copia en static/img/diplomas o static/img/DC3
+    _mirror_png_to_static_background(img_name, png_bytes)
 
-    src_name = f.name
-    src_path = conv_root / src_name
-    with open(src_path, "wb") as out:
-        for chunk in f.chunks():
-            out.write(chunk)
-
-    # Comando LibreOffice (headless)
-    soffice = getattr(settings, "LIBREOFFICE_PATH", "soffice")
-
-    try:
-        # Convertir a PDF en la misma carpeta
-        # --headless: sin UI
-        # --convert-to pdf: salida pdf
-        # --outdir <dir>: carpeta de salida
-        proc = subprocess.run(
-            [soffice, "--headless", "--convert-to", "pdf", "--outdir", str(conv_root), str(src_path)],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=120
-        )
-        if proc.returncode != 0:
-            # Si LibreOffice no está instalado / no en PATH, devuelve 501
-            return JsonResponse(
-                {"error": "LibreOffice no disponible", "stderr": proc.stderr},
-                status=501
-            )
-    except FileNotFoundError:
-        return JsonResponse({"error": "LibreOffice no encontrado"}, status=501)
-    except subprocess.TimeoutExpired:
-        return JsonResponse({"error": "Tiempo de conversión excedido"}, status=504)
-
-    # Nombre del PDF generado (mismo nombre base, .pdf)
-    pdf_name = Path(src_name).with_suffix(".pdf").name
-    pdf_path = conv_root / pdf_name
-    if not pdf_path.exists():
-        return JsonResponse({"error": "Conversión fallida"}, status=500)
-
-    # Ruta relativa para componer URL
-    rel = str(pdf_path.relative_to(settings.MEDIA_ROOT))
-    return JsonResponse({"pdf_url": _build_abs_media_url(request, rel)})
-def _encrypt_with_permissions(working_pdf: bytes, *, allow_print_lowres=False) -> bytes:
-    with pikepdf.open(io.BytesIO(working_pdf)) as pdf:
-        # 1) limpiar metadatos (opcional pero recomendable)
-        try:
-            pdf.docinfo.clear()
-            if "/Metadata" in pdf.root:
-                del pdf.root["/Metadata"]
-        except Exception:
-            pass
-
-        # 2) permisos: abrir sin password pero pedir owner p/editar
-        desired = {
-            "print_lowres": allow_print_lowres,  # True si quieres permitir impresión baja
-            "print_highres": False,
-            "extract": False,
-            "modify": False,
-            "annotate": False,
-            "form": False,
-            "assemble": False,
-            "accessibility": False,
-        }
-        perm_params = set(inspect.signature(pikepdf.Permissions).parameters.keys())
-        filtered = {k: v for k, v in desired.items() if k in perm_params}
-        perms = pikepdf.Permissions(**filtered)
-
-        enc = pikepdf.Encryption(
-            user="",                         # <-- SIN contraseña de apertura
-            owner=secrets.token_hex(16),     # <-- contraseña de permisos (NO la compartas)
-            R=6,                             # AES-256
-            allow=perms
-        )
-
-        out = io.BytesIO()
-        pdf.save(out, encryption=enc, linearize=False)
-        return out.getvalue()
+    return JsonResponse({
+        "ok": True,
+        "id": new_asset.id,
+        "name": new_asset.name,
+        "url": new_asset.file.url,
+    })
 
 @require_POST
 @login_required
@@ -3201,6 +3538,15 @@ def program_list(request):
     """
     q = (request.GET.get("q") or "").strip()
 
+    # ============================
+    # PLANTILLAS (DC3, CPROEM y DIPLOMA)
+    # ============================
+    # Reutilizamos el mismo queryset para las 3 listas del modal
+    all_templates = DesignTemplate.objects.filter(kind="design").order_by("title")
+    dc3_templates = all_templates
+    cproem_templates = all_templates
+    diploma_templates = all_templates   # <-- para la lista de diploma
+
     # Program (tabla nueva) para la lista de la derecha (si la usas)
     programs_qs = Program.objects.all()
     if q:
@@ -3273,6 +3619,27 @@ def program_list(request):
                         constancia_type=constancia_model,
                     )
 
+        # ============================
+        # Plantillas guardadas en Program
+        # ============================
+        tpl_constancia_id = None
+        tpl_diploma_id = None
+
+        if prog_obj:
+            tpl_constancia_id = prog_obj.plantilla_constancia_id
+            tpl_diploma_id = prog_obj.plantilla_diploma_id  # <-- DIPLOMA
+
+        # Para DC3: frontal = plantilla_constancia (por ahora), reverso vacío
+        if constancia_ui == "dc3":
+            tpl_dc3_front_id = tpl_constancia_id
+            tpl_dc3_back_id = None
+            tpl_cproem_id = None
+        else:
+            # Para CPROEM usamos plantilla_constancia como plantilla CPROEM
+            tpl_dc3_front_id = None
+            tpl_dc3_back_id = None
+            tpl_cproem_id = tpl_constancia_id
+
         # Llenamos la lista para la tabla de la izquierda (ces_simulacion)
         sim_programs.append(
             {
@@ -3281,6 +3648,12 @@ def program_list(request):
                 "programa_full": programa_full,
                 "constancia": constancia_ui,
                 "program_admin_id": prog_obj.id if prog_obj else None,
+                # Ya los tenías para el modal:
+                "tpl_dc3_front_id": tpl_dc3_front_id,
+                "tpl_dc3_back_id": tpl_dc3_back_id,
+                "tpl_cproem_id": tpl_cproem_id,
+                # NUEVO: id de la plantilla de diploma
+                "tpl_diploma_id": tpl_diploma_id,
             }
         )
 
@@ -3291,5 +3664,125 @@ def program_list(request):
             "programs": programs,
             "sim_programs": sim_programs,
             "q": q,
+            "dc3_templates": dc3_templates,
+            "cproem_templates": cproem_templates,
+            "diploma_templates": diploma_templates,  # <-- para el select de diploma
         },
     )
+
+
+def verificar_documento(request, token):
+    # 1) Buscar el token activo
+    tok = get_object_or_404(
+        DocToken.objects.select_related("request__program"),
+        token=token,
+        is_active=True,
+    )
+
+    req = tok.request          # alumnos.Request
+    prog = getattr(req, "program", None)
+
+    # 2) Datos base
+    tipo = tok.tipo  # "diploma", "dc3", "cproem"
+    alumno = f"{req.name} {req.lastname}".strip()
+    programa = prog.name if prog else "Programa no disponible"
+
+    # Graduate enlazado a Request (OneToOne)
+    grad = getattr(req, "graduate", None)
+
+    if grad:
+        inicio = grad.validity_start
+        fin = grad.validity_end
+        folio = grad.curp or f"GRAD-{grad.id}"
+    else:
+        inicio = None
+        fin = None
+        folio = f"REQ-{req.id}"
+
+    # ⏰ Momento exacto de la verificación
+    verified_at = timezone.localtime()
+
+    ctx = {
+        "tipo": tipo,
+        "alumno": alumno,
+        "programa": programa,
+        "inicio": inicio,
+        "fin": fin,
+        "folio": folio,
+        "verified_at": verified_at,
+        # extra: por si en algún lado sigues usando {{ now }}
+        "now": verified_at,
+    }
+
+    return render(request, "administracion/verify_result.html", ctx)
+
+def _mirror_png_to_static_background(img_name: str, png_bytes: bytes) -> str | None:
+    """
+    Guarda una copia del PNG en:
+      - static/img/DC3/<NOMBRE>.png  si el nombre contiene 'DC3'
+      - static/img/diplomas/<NOMBRE>.png  para el resto
+
+    Ejemplos:
+      DC3_DAP_F.pdf      -> static/img/DC3/DC3_DAP_F.png
+      DC3__R.png         -> static/img/DC3/DC3__R.png
+      Diploma_CPROEM_WEB -> static/img/diplomas/DIPLOMA_CPROEM_WEB.png
+      Constancia_DAP     -> static/img/diplomas/CONSTANCIA_DAP.png
+    """
+    try:
+        base = Path(img_name).stem.upper()  # nombre sin extensión
+
+        # Regla DC3: cualquier nombre que contenga 'DC3'
+        is_dc3 = "DC3" in base
+
+        if is_dc3:
+            subdir = "DC3"
+        else:
+            subdir = "diplomas"
+
+        filename   = f"{base}.png"
+        static_dir = Path(settings.BASE_DIR) / "static" / "img" / subdir
+        static_dir.mkdir(parents=True, exist_ok=True)
+
+        target = static_dir / filename
+        with open(target, "wb") as fh:
+            fh.write(png_bytes)
+
+        return str(target)
+    except Exception:
+        # best effort; si falla no rompemos el flujo
+        return None
+    
+@login_required
+@require_http_methods(["POST"])
+def plantilla_import_convert(request):
+    # Simplemente reutiliza la lógica de plantilla_import
+    return plantilla_import(request)
+
+def _delete_mirrored_static_by_asset_name(asset_name: str) -> None:
+    """
+    Borra la copia PNG en static/img/diplomas o static/img/DC3
+    calculando el nombre EXACTAMENTE igual que en _mirror_png_to_static_background.
+    Acepta tanto 'diploma-18.pdf' como 'diploma-18.png'.
+    """
+    try:
+        stem = Path(asset_name).stem          # 'diploma-18', 'DC3__F', etc.
+        base_upper = stem.upper()             # 'DIPLOMA-18', 'DC3__F'
+
+        # Misma regla que en _mirror_png_to_static_background:
+        if base_upper.startswith("DC3_"):
+            subdir = "DC3"
+        else:
+            subdir = "diplomas"
+
+        filename   = f"{base_upper}.png"      # DIPLOMA-18.png, DC3__F.png
+        static_dir = Path(settings.BASE_DIR) / "static" / "img" / subdir
+        target     = static_dir / filename
+
+        if target.exists():
+            try:
+                os.remove(target)
+            except Exception:
+                pass
+    except Exception:
+        # best-effort, nunca romper el flujo
+        pass
