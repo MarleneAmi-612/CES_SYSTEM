@@ -207,6 +207,50 @@
     });
   }
 
+  // ---------- Alerta "Constancia publicada" ----------
+  const constAlert      = document.getElementById('egConstAlert');
+  const constAlertBody  = document.getElementById('egConstAlertBody');
+  const constAlertLink  = document.getElementById('egConstAlertLink');
+  const constAlertClose = document.getElementById('egConstAlertClose');
+
+  function openConstAlert(verifyText) {
+    // Fallback: si por algo no existe el modal, usamos alert clásico
+    if (!constAlert) {
+      if (verifyText) {
+        alert('Constancia publicada.\nVerificación: ' + verifyText);
+      } else {
+        alert('Constancia publicada.');
+      }
+      return;
+    }
+
+    const text = verifyText || '';
+
+    if (constAlertBody) {
+      constAlertBody.textContent = text || '—';
+    }
+
+    if (constAlertLink) {
+      if (/^https?:\/\//i.test(text)) {
+        constAlertLink.href = text;
+        constAlertLink.removeAttribute('aria-disabled');
+      } else {
+        constAlertLink.href = '#';
+        constAlertLink.setAttribute('aria-disabled', 'true');
+      }
+    }
+
+    constAlert.hidden = false;
+    document.body.classList.add('no-scroll');
+  }
+
+  if (constAlertClose) {
+    constAlertClose.addEventListener('click', () => {
+      constAlert.hidden = true;
+      document.body.classList.remove('no-scroll');
+    });
+  }
+
   // ---------- Confirmar constancia (publica token) ----------
   const chkConfirm = document.getElementById('chkConfirm');
   const btnConfirm = document.getElementById('btnConfirm');
@@ -216,12 +260,20 @@
       if (!confirmUrl || !chkConfirm.checked) return;
       btnConfirm.disabled = true;
       try {
-        const fd = new FormData(); fd.append('tipo', 'constancia');
+        const fd = new FormData();
+        fd.append('tipo', 'constancia');
         const data = await postForm(confirmUrl, fd);
-        if (data && data.verify_url) alert('Constancia publicada. Verificación: ' + data.verify_url);
+
+        const verify =
+          data && (data.verify_url || data.url || data.verification_url || '');
+
+        openConstAlert(verify || '');
       } catch (e) {
-        console.error(e); alert('No se pudo confirmar la constancia.\n' + e.message);
-      } finally { btnConfirm.disabled = false; }
+        console.error(e);
+        alert('No se pudo confirmar la constancia.\n' + e.message);
+      } finally {
+        btnConfirm.disabled = false;
+      }
     });
   }
 

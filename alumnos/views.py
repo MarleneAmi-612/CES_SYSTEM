@@ -512,19 +512,19 @@ def tracking(request, request_id):
     # ¿Se puede reenviar?
     can_resubmit = _can_resubmit(req)
 
-    # === Descarga CPROEM para el alumno ===
+    # === Descarga CPROEM para el alumno (versión WEB / digital) ===
     program   = getattr(req, "program", None)
     cert_type = getattr(program, "certificate_type", None)
     cert_name = (getattr(cert_type, "name", "") or "").strip().lower()
     is_cproem = "cproem" in cert_name
 
-    can_download_cproem = is_cproem and status in ("finalizado", "downloaded")
+    # Solo si es CPROEM, está finalizado/descargado y existe Graduate
+    can_download_cproem = is_cproem and status in ("finalizado", "downloaded") and grad is not None
     cproem_download_url = None
     if can_download_cproem:
-        cproem_download_url = (
-            reverse("administracion:doc_download", args=[req.id])
-            + "?tipo=constancia&fmt=pdf"
-        )
+        # 👉 aquí usamos el PDF DIGITAL (WEB)
+        #    la vista pdf_cproem_digital recibe graduate_id
+        cproem_download_url = reverse("administracion:pdf_cproem_digital", args=[grad.id])
 
     return render(request, "alumnos/tracking.html", {
         "req": req,
@@ -541,7 +541,6 @@ def tracking(request, request_id):
         "can_download_cproem": can_download_cproem,
         "cproem_download_url": cproem_download_url,
     })
-
 
 @require_GET
 def tracking_api(request, request_id):

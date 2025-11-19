@@ -134,6 +134,137 @@ except Exception:
     Egresado = None
 
 log = logging.getLogger(__name__)
+# Si ya tienes una función parecida para DC3, puedes reutilizarla o adaptarla.
+MESES_ES = [
+    "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+]
+
+
+def _formatear_fecha_es(fecha):
+    if not fecha:
+        return ""
+    return f"{fecha.day} de {MESES_ES[fecha.month - 1]} de {fecha.year}"
+
+
+def _build_cproem_context(graduate, request):
+    """
+    Construye un contexto "gordo" con muchos alias de nombres de variables
+    para que coincida con lo que usa tu template CPROEM (digital e impreso).
+    """
+
+    # Programa REAL: viene desde Request.program
+    program = _get_program_from_graduate(graduate)
+
+    # ==== Nombre del alumno ====
+    full_name = (
+        getattr(graduate, "full_name", None)
+        or getattr(graduate, "nombre_completo", None)
+        or f"{getattr(graduate, 'name', '')} {getattr(graduate, 'lastname', '')}".strip()
+        or str(graduate)
+    )
+
+    # ==== Fechas (usa primero validity_start / validity_end) ====
+    start = (
+        getattr(graduate, "validity_start", None)
+        or getattr(graduate, "start_date", None)
+        or getattr(graduate, "fecha_inicio", None)
+        or getattr(graduate, "inicio", None)
+    )
+    end = (
+        getattr(graduate, "validity_end", None)
+        or getattr(graduate, "end_date", None)
+        or getattr(graduate, "fecha_fin", None)
+        or getattr(graduate, "fin", None)
+    )
+
+    fecha_inicio_txt = _formatear_fecha_es(start)
+    fecha_fin_txt = _formatear_fecha_es(end)
+
+    # ==== Horas ====
+    horas = (
+        getattr(program, "hours", None)
+        or getattr(graduate, "hours", None)
+        or 120  # fallback
+    )
+
+    # ==== CURP / identificación ====
+    curp = getattr(graduate, "curp", "")
+
+    # ==== URL de verificación para el QR ====
+    try:
+        verificacion_url = request.build_absolute_uri(
+            reverse("alumnos:verificar_documento", args=[graduate.pk])
+        )
+    except Exception:
+        # Fallback: seguimiento del alumno si no existe esa url aún
+        verificacion_url = request.build_absolute_uri(
+            f"/alumnos/seguimiento/{graduate.pk}/"
+        )
+
+    # ==== Generar QR en base64 ====
+    qr = qrcode.QRCode(box_size=10, border=1)
+    qr.add_data(verificacion_url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    qr_data_uri = "data:image/png;base64," + b64encode(buffer.getvalue()).decode("utf-8")
+
+    ctx = {
+        # objeto completo
+        "graduate": graduate,
+
+        # nombre - varios alias
+        "full_name": full_name,
+        "nombre": full_name,
+        "nombre_completo": full_name,
+        "alumno_nombre": full_name,
+        "student_name": full_name,
+
+        # programa (objeto y nombre)
+        "program": program,
+        "programa": program,
+        "programa_nombre": getattr(program, "name", "") if program else "",
+        "program_name": getattr(program, "name", "") if program else "",
+
+        # horas
+        "horas": horas,
+        "hours": horas,
+
+        # curp / clave
+        "curp": curp,
+        "clave_curp": curp,
+
+        # fechas crudas
+        "start_date": start,
+        "end_date": end,
+        "vigencia_inicio": start,      # 🔹 lo que pide tu template digital
+        "vigencia_termino": end,       # 🔹 lo que pide tu template digital
+
+        # fechas formateadas (por si algún otro template las usa)
+        "fecha_inicio": fecha_inicio_txt,
+        "fecha_fin": fecha_fin_txt,
+        "inicio": fecha_inicio_txt,
+        "fin": fecha_fin_txt,
+        "fecha_inicio_txt": fecha_inicio_txt,
+        "fecha_fin_txt": fecha_fin_txt,
+
+        # verificación
+        "verificacion_url": verificacion_url,
+        "verification_url": verificacion_url,
+
+        # QR con varios nombres posibles
+        "qr_data_uri": qr_data_uri,
+        "qr_image": qr_data_uri,
+        "qr": qr_data_uri,
+        "qr_src": qr_data_uri,
+        "qr_url": qr_data_uri,         # 🔹 EXACTO el nombre que usa pdf_constancia_cproem_digital.html
+    }
+
+    return ctx
+
 
 # Campos que permitimos actualizar desde el form/JS
 ALLOWED_EGRESADO_FIELDS = [
@@ -3786,3 +3917,74 @@ def _delete_mirrored_static_by_asset_name(asset_name: str) -> None:
     except Exception:
         # best-effort, nunca romper el flujo
         pass
+    
+def _absolute_static(request, path):
+    """
+    Devuelve la URL ABSOLUTA para un archivo estático,
+    ej. http://127.0.0.1:8000/static/...
+    """
+    return request.build_absolute_uri(static(path))
+
+def _get_program_from_graduate(grad):
+    """
+    Intenta obtener el Program asociado al Graduate,
+    pasando por Request si existe esa relación.
+    """
+    req = getattr(grad, "request", None)
+    if req is not None:
+        return getattr(req, "program", None)
+    return None
+
+
+def pdf_cproem_digital(request, graduate_id, *args, **kwargs):
+    """
+    Genera el CPROEM digital del egresado con id = graduate_id.
+    URL esperada: /administracion/cproem/digital/<int:graduate_id>/
+    """
+    graduate = get_object_or_404(Graduate, pk=graduate_id)
+
+    # Contexto completo CPROEM
+    context = _build_cproem_context(graduate, request)
+
+    # Template DIGITAL
+    html = render_to_string(
+        "administracion/pdf_constancia_cproem_digital.html",
+        context,
+    )
+
+    pdf_bytes = HTML(
+        string=html,
+        base_url=request.build_absolute_uri("/"),
+    ).write_pdf()
+
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    response["Content-Disposition"] = (
+        f'inline; filename="constancia_cproem_digital_{graduate_id}.pdf"'
+    )
+    return response
+
+def pdf_cproem_impreso(request, graduate_id: int):
+    """
+    Versión IMPRESA de la constancia CPROEM.
+    Usa el mismo contexto que el CPROEM digital.
+    """
+    graduate = get_object_or_404(Graduate, pk=graduate_id)
+
+    # Usamos el contexto "gordo" que ya armamos para el digital
+    context = _build_cproem_context(graduate, request)
+
+    html = render_to_string(
+        "administracion/pdf_constancia_cproem_impresa.html",
+        context,
+    )
+
+    pdf = HTML(
+        string=html,
+        base_url=request.build_absolute_uri("/"),
+    ).write_pdf()
+
+    response = HttpResponse(pdf, content_type="application/pdf")
+    response["Content-Disposition"] = (
+        f'inline; filename="constancia_cproem_impresa_{graduate_id}.pdf"'
+    )
+    return response

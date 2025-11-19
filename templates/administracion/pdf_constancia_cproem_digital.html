@@ -1,132 +1,140 @@
 {% load static %}
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
-<head>
-<meta charset="utf-8">
-<title>Certificado CPROEM</title>
-<style>
-  @page { size: A4 landscape; margin: 0; }
-  html, body { margin:0; padding:0; height:100%; }
+  <head>
+    <meta charset="utf-8" />
+    <title>Certificado CPROEM (WEB)</title>
+    <style>
+      @page {
+        size: A4 landscape;
+        margin: 0;
+      }
 
-  body {
-    margin: 0;
-    background: url("{% static 'img/diplomas/Diploma_CPROEM_WEB.png' %}") center center no-repeat;
-    background-size: contain;
-    background-color: #fff;
-    font-family: "DejaVu Sans", Arial, sans-serif;
-    color: #000;
-  }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+      }
 
-  .page {
-    position: relative;
-    width: 297mm;
-    height: 210mm;
-  }
+      body {
+        margin: 0;
+        background: url("{% static 'img/diplomas/Constancia_CPROEM_WEB.png' %}")
+          center center no-repeat;
+        background-size: contain;
+        background-color: #fff;
+        font-family: "DejaVu Sans", Arial, sans-serif;
+        color: #000;
+      }
 
-  /* NOMBRE */
-  .nombre {
-    position: absolute;
-    top: 84mm;
-    left: 80mm;
-    right: 20mm;
-    text-align: center;
-    font-size: 20pt;
-    font-weight: 700;
-    color: #000;
-  }
+      .page {
+        position: relative;
+        width: 297mm;
+        height: 210mm;
+      }
 
-  /* CURP */
-  .curp {
-    position: absolute;
-    top: 98mm;
-    left: 213mm;
-    width: 80mm;
-    text-align: left;
-    font-size: 10pt;
-    font-style: italic;
-    font-weight: 600;
-    letter-spacing: 0.6pt;
-    color: #b00000;
-  }
+      /* NOMBRE */
+      .nombre {
+        position: absolute;
+        top: 84mm;
+        left: 80mm;
+        right: 20mm;
+        text-align: center;
+        font-size: 20pt;
+        font-weight: 700;
+        color: #000;
+      }
 
-  /* PROGRAMA */
-  .programa {
-    position: absolute;
-    top: 116mm;
-    left: 70mm;
-    right: 20mm;
-    text-align: center;
-    font-size: 18pt;
-    font-weight: 800;
-    color: #000;
-  }
+.curp {
+  position: absolute;
+  top: 97.5mm;
+  left: 213mm;  /* antes 70mm → más a la derecha */
+  right: 20mm;
+  text-align: left;
+  font-size: 10pt;
+  font-style: italic;
+  font-weight: 600;
+  letter-spacing: 0.6pt;
+  color: #b00000;
+  white-space: nowrap;
+}
 
-  /* FECHAS */
-  .periodo {
-    position: absolute;
-    top: 128mm;
-    left: 148mm;
-    font-size: 11pt;
-    color: #000;
-    text-align: left;
-  }
 
-  /* FECHA DE FIN – un poquito a la izquierda */
-  .periodo .fin-fecha {
-    display: inline-block;
-    margin-left: 8mm; /* antes 10mm */
-  }
+      /* PROGRAMA */
+      .programa {
+        position: absolute;
+        top: 116mm;
+        left: 70mm;
+        right: 20mm;
+        text-align: center;
+        font-size: 18pt;
+        font-weight: 800;
+        color: #000;
+      }
 
-  /* QR */
-  .qr {
-    position: absolute;
-    right: 43mm;
-    bottom: 20mm;
-    width: 32mm;
-    height: 32mm;
-  }
+      /* FECHAS: inicio y fin por separado (el fondo ya trae "EN EL PERÍODO DEL    AL") */
+      .periodo-inicio {
+        position: absolute;
+        top: 128mm; /* ↓ bajamos 1mm */
+        left: 150mm; /* inicio sigue a la derecha */
+        text-align: left;
+        font-size: 11pt;
+        color: #000;
+        white-space: nowrap;
+      }
 
-  .qr img {
-    width: 100%;
-    height: 100%;
-  }
-</style>
-</head>
-<body>
-  <div class="page">
+      .periodo-fin {
+        position: absolute;
+        top: 128mm; /* ↓ bajamos 1mm */
+        left: 183mm; /* término sigue a la izquierda */
+        text-align: left;
+        font-size: 11pt;
+        color: #000;
+        white-space: nowrap;
+      }
 
-    <!-- NOMBRE -->
-    <div class="nombre">
-      {{ nombre }}
-    </div>
+      /* QR */
+      .qr {
+        position: absolute;
+        right: 43mm;
+        bottom: 20mm;
+        width: 32mm;
+        height: 32mm;
+      }
 
-    <!-- CURP -->
-    {% if curp %}
-      <div class="curp">
-        {{ curp|upper }}
-      </div>
-    {% endif %}
+      .qr img {
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <!-- NOMBRE -->
+      <div class="nombre">{{ nombre }}</div>
 
-    <!-- PROGRAMA -->
-    <div class="programa">
-      {{ programa }}
-    </div>
-
-    <!-- FECHAS -->
-    <div class="periodo">
-      {% if inicio %}{{ inicio|date:"d/m/Y" }}{% endif %}
-      {% if inicio and fin %}
-        <span class="fin-fecha">{{ fin|date:"d/m/Y" }}</span>
-      {% elif fin %}
-        {{ fin|date:"d/m/Y" }}
+      <!-- CURP -->
+      {% if curp %}
+      <div class="curp">{{ curp|upper }}</div>
       {% endif %}
-    </div>
 
-    <!-- QR -->
-    <div class="qr">
-      <img src="{{ qr_url }}" alt="QR de verificación">
-    </div>
+      <!-- PROGRAMA -->
+      <div class="programa">{{ programa }}</div>
 
-  </div>
-</body>
+      <!-- FECHA DE INICIO (solo la fecha, sin texto) -->
+      {% if vigencia_inicio %}
+      <div class="periodo-inicio">{{ vigencia_inicio|date:"d/m/Y" }}</div>
+      {% endif %}
+
+      <!-- FECHA DE TÉRMINO (solo la fecha, sin texto) -->
+      {% if vigencia_termino %}
+      <div class="periodo-fin">{{ vigencia_termino|date:"d/m/Y" }}</div>
+      {% endif %}
+
+      <!-- QR -->
+      <div class="qr">
+        <img src="{{ qr_url }}" alt="QR de verificación" />
+      </div>
+    </div>
+  </body>
 </html>

@@ -57,9 +57,20 @@ class DesignTemplateVersionInline(admin.TabularInline):
 
 @admin.register(DesignTemplate)
 class DesignTemplateAdmin(admin.ModelAdmin):
-    list_display = ("title", "kind", "org", "updated_at", "is_system")
+    list_display = ("title", "kind", "updated_at")
+    list_filter = ("kind", "is_system")
     search_fields = ("title",)
-    inlines = [DesignTemplateVersionInline]
+
+    fieldsets = (
+        (None, {
+            "fields": ("title", "kind", "thumb", "json_active", "is_system")
+        }),
+        ("Fondos (CPROEM)", {
+            "fields": ("background_web", "background_print"),
+            "description": "Opcional: fondos usados para CPROEM WEB/IMPRESA"
+        }),
+    )
+
 
 @admin.register(Program)
 class ProgramAdmin(admin.ModelAdmin):

@@ -220,18 +220,43 @@ class DesignTemplate(models.Model):
 
     title = models.CharField(max_length=200)
     kind  = models.CharField(max_length=10, choices=KIND_CHOICES, default=DESIGN)
-    # último json "activo" (también habrá versiones)
     json_active = models.JSONField(default=dict, blank=True)
     thumb = models.ImageField(upload_to="plantillas/thumbs/", null=True, blank=True)
-    is_system = models.BooleanField(default=False)  # bloquear edición si es core
-
-    # opcional: organización
+    is_system = models.BooleanField(default=False)
     org = models.ForeignKey("administracion.Organization", null=True, blank=True, on_delete=models.SET_NULL)
+
+    # 🔥 NUEVO — Fondos dinámicos CPROEM
+    background_web = models.FileField(
+        upload_to="plantillas/backgrounds/",
+        null=True, blank=True,
+        help_text="Fondo WEB (vista previa y tracking)"
+    )
+
+    background_print = models.FileField(
+        upload_to="plantillas/backgrounds/",
+        null=True, blank=True,
+        help_text="Fondo IMPRESO (descarga final)"
+    )
 
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self): return f"{self.title} ({self.kind})"
+    def __str__(self): 
+        return f"{self.title} ({self.kind})"
+
+    # === NUEVO: métodos seguros para obtener URLs ===
+    def get_background_web_url(self):
+        from django.templatetags.static import static
+        if self.background_web:
+            return self.background_web.url
+        return static("img/diplomas/Diploma_CPROEM_WEB.png")
+
+    def get_background_print_url(self):
+        from django.templatetags.static import static
+        if self.background_print:
+            return self.background_print.url
+        return static("img/diplomas/Constancia_CPROEM_impresa.png")
+
 
 # === NUEVO: Versionado de plantillas (para "actualizar archivo")
 class DesignTemplateVersion(models.Model):

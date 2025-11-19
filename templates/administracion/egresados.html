@@ -425,15 +425,29 @@
               </div>
             </div>
 
+            <!-- 🔹 AQUÍ ES DONDE CAMBIAMOS LA VISTA PREVIA PARA CPROEM -->
             <div class="doc__actions">
               {% if active_req %}
-                <a id="btnPrevConst" class="btn"
-                   href="{% url 'administracion:egresados_preview_pdf' active_req.id %}?tipo=constancia"
-                   target="_blank" rel="noopener">Vista previa (PDF)</a>
+                {% if const_kind == "cproem" and active_req.graduate %}
+                  <!-- CPROEM: preview con versión WEB -->
+                  <a id="btnPrevConst" class="btn"
+                     href="{% url 'administracion:pdf_cproem_digital' active_req.graduate.id %}"
+                     target="_blank" rel="noopener">
+                    Vista previa (PDF)
+                  </a>
+                {% else %}
+                  <!-- DC3 u otros: se queda igual -->
+                  <a id="btnPrevConst" class="btn"
+                     href="{% url 'administracion:egresados_preview_pdf' active_req.id %}?tipo=constancia"
+                     target="_blank" rel="noopener">
+                    Vista previa (PDF)
+                  </a>
+                {% endif %}
               {% else %}
                 <a id="btnPrevConst" class="btn" aria-disabled="true">Vista previa (PDF)</a>
               {% endif %}
 
+              <!-- Este botón sigue usando doc_download (versión impresa) -->
               <button class="btn" id="btnDownConst" {% if not active_req %}disabled{% endif %}>Descargar archivo</button>
 
               <label class="chk">
@@ -505,7 +519,29 @@
             </div>
           </div>
         </div>
+      
+        <!-- ===== ALERTA Constancia publicada ===== -->
+<div id="egConstAlert" class="eg-alert" role="dialog"
+     aria-modal="true" aria-labelledby="egConstAlertTitle" hidden>
+  <div class="eg-alert__card">
+    <div class="eg-alert__icon">📜</div>
+    <h3 id="egConstAlertTitle" class="eg-alert__title">Constancia publicada</h3>
 
+    <p class="eg-alert__msg">
+      La constancia se ha publicado correctamente. Usa el botón de abajo para abrir la verificación.
+    </p>
+
+    <div class="eg-alert__actions">
+      <button type="button" class="egbtn" id="egConstAlertClose">Cerrar</button>
+      <a href="#" target="_blank" rel="noopener"
+         class="btn btn--primary" id="egConstAlertLink">
+        Abrir verificación
+      </a>
+    </div>
+  </div>
+</div>
+
+        
       </main>
     </div>
   </div>

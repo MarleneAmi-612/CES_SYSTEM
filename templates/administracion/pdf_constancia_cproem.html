@@ -3,14 +3,23 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<title>Certificado CPROEM</title>
+<title>Certificado CPROEM (impreso)</title>
 <style>
-  @page { size: A4 landscape; margin: 0; }
-  html, body { margin:0; padding:0; height:100%; }
+  @page { 
+    size: A4 landscape; 
+    margin: 0; 
+  }
+
+  html, body { 
+    margin:0; 
+    padding:0; 
+    height:100%; 
+  }
 
   body {
     margin: 0;
-    background: url("{% static 'img/diplomas/Constancia_CPOREM_impresa.png' %}") center center no-repeat;
+    background: url("{% static 'img/diplomas/Constancia_CPROEM_impresa.png' %}") 
+      center center no-repeat;
     background-size: contain;
     background-color: #fff;
     font-family: "DejaVu Sans", Arial, sans-serif;
@@ -23,7 +32,6 @@
     height: 210mm;
   }
 
-  /* NOMBRE */
   .nombre {
     position: absolute;
     top: 84mm;
@@ -35,21 +43,21 @@
     color: #000;
   }
 
-  /* CURP */
-  .curp {
-    position: absolute;
-    top: 98mm;
-    left: 213mm;
-    width: 80mm;
-    text-align: left;
-    font-size: 10pt;
-    font-style: italic;
-    font-weight: 600;
-    letter-spacing: 0.6pt;
-    color: #b00000;
-  }
+.curp {
+  position: absolute;
+  top: 97mm;
+  left: 20mm;      /* antes 25mm → más a la izquierda */
+  right: 30mm;
+  text-align: right;
+  font-size: 10pt;
+  font-style: italic;
+  font-weight: 600;
+  letter-spacing: 0.6pt;
+  color: #a60827;
+  white-space: nowrap;
+}
 
-  /* PROGRAMA */
+
   .programa {
     position: absolute;
     top: 116mm;
@@ -61,23 +69,28 @@
     color: #000;
   }
 
-  /* FECHAS */
-  .periodo {
-    position: absolute;
-    top: 128mm;
-    left: 148mm;
-    font-size: 11pt;
-    color: #000;
-    text-align: left;
-  }
+/* FECHAS */
+.periodo-inicio {
+  position: absolute;
+  top: 129mm;
+  left: 155mm;     /* antes 154mm → poquitito a la derecha */
+  text-align: left;
+  font-size: 11pt;
+  color: #000;
+  white-space: nowrap;
+}
 
-  /* FECHA DE FIN – un poquito a la izquierda */
-  .periodo .fin-fecha {
-    display: inline-block;
-    margin-left: 8mm; /* antes 10mm */
-  }
+.periodo-fin {
+  position: absolute;
+  top: 129mm;
+  left: 188.5mm;   /* antes 188mm → apenas un poquitito a la derecha */
+  text-align: left;
+  font-size: 11pt;
+  color: #000;
+  white-space: nowrap;
+}
 
-  /* QR */
+
   .qr {
     position: absolute;
     right: 43mm;
@@ -94,13 +107,12 @@
 </head>
 <body>
   <div class="page">
-
     <!-- NOMBRE -->
     <div class="nombre">
       {{ nombre }}
     </div>
 
-    <!-- CURP -->
+    <!-- CURP (solo la clave) -->
     {% if curp %}
       <div class="curp">
         {{ curp|upper }}
@@ -112,21 +124,24 @@
       {{ programa }}
     </div>
 
-    <!-- FECHAS -->
-    <div class="periodo">
-      {% if inicio %}{{ inicio|date:"d/m/Y" }}{% endif %}
-      {% if inicio and fin %}
-        <span class="fin-fecha">{{ fin|date:"d/m/Y" }}</span>
-      {% elif fin %}
-        {{ fin|date:"d/m/Y" }}
-      {% endif %}
-    </div>
+    <!-- FECHA DE INICIO (solo fecha, sin texto) -->
+    {% if vigencia_inicio %}
+      <div class="periodo-inicio">{{ vigencia_inicio|date:"d/m/Y" }}</div>
+    {% elif inicio %}
+      <div class="periodo-inicio">{{ inicio|date:"d/m/Y" }}</div>
+    {% endif %}
+
+    <!-- FECHA DE TÉRMINO (solo fecha, sin texto) -->
+    {% if vigencia_termino %}
+      <div class="periodo-fin">{{ vigencia_termino|date:"d/m/Y" }}</div>
+    {% elif fin %}
+      <div class="periodo-fin">{{ fin|date:"d/m/Y" }}</div>
+    {% endif %}
 
     <!-- QR -->
     <div class="qr">
       <img src="{{ qr_url }}" alt="QR de verificación">
     </div>
-
   </div>
 </body>
 </html>
