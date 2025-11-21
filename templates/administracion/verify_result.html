@@ -1,18 +1,31 @@
 {% load static %}
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
   <head>
-    <meta charset="utf-8">
+    <meta charset="utf-8" />
     <title>Verificación de documento | CES</title>
 
-    <link rel="icon" href="{% static 'favicon/favicon.ico' %}">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="{% static 'favicon/favicon.ico' %}" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
 
-    <link rel="stylesheet" href="{% static 'css/verify_result.css' %}">
+    <link rel="stylesheet" href="{% static 'css/verify_result.css' %}" />
   </head>
   <body class="vr-body">
     <main class="vr-shell">
+
+      <!-- Logo CES arriba (centrado) -->
+      <div class="vr-logo-wrap vr-logo-wrap--top">
+        <img
+          src="{% static 'img/CES_Logo.png' %}"
+          alt="Centro de Estudios Superiores en Negocios y Humanidades"
+          class="vr-logo"
+        />
+      </div>
+
       <!-- Encabezado / Marca -->
       <header class="vr-header">
         <div class="vr-brand" aria-label="CES · Verificación de documentos">
@@ -25,11 +38,14 @@
 
       <!-- Tarjeta principal -->
       <section class="vr-card" aria-labelledby="vr-title">
-        <h1 id="vr-title" class="vr-title">Documento verificado correctamente</h1>
+        <h1 id="vr-title" class="vr-title">
+          Documento verificado correctamente
+        </h1>
 
         <p class="vr-lead">
-          Los datos mostrados a continuación provienen del sistema oficial del Centro de Estudios Superiores.
-          El documento presentado por el portador debe coincidir con esta información para considerarse auténtico.
+          Los datos mostrados a continuación provienen del sistema oficial del
+          Centro de Estudios Superiores. El documento presentado por el portador
+          debe coincidir con esta información para considerarse auténtico.
         </p>
 
         <dl class="vr-grid">
@@ -72,19 +88,34 @@
         </dl>
 
         <p class="vr-note">
-          Este comprobante es de carácter informativo. La validez del documento está respaldada por los
-          registros internos de CES y puede volver a consultarse utilizando el mismo código QR o enlace
-          de verificación.
+          Este comprobante es de carácter informativo. Este documento ha sido
+          expedido por neuroeducacion.mx en virtudde acreditar nuestro diplomado
+          en su totalidad,siendo unica y exclusivamente de caracter de educacion
+          continua y actualizacion profesional, por lo que dicho diploma no es
+          equivalente ni representa un titulo o grado academico. La validez del
+          documento está respaldada por los registros internos de CES y puede
+          volver a consultarse utilizando el mismo código QR o enlace de
+          verificación.
         </p>
 
         <p class="vr-note vr-note--small">
-          En caso de duda sobre la autenticidad del documento, comuníquese con la institución para una
-          confirmación adicional.
+          En caso de duda sobre la autenticidad del documento, comuníquese con
+          la institución para una confirmación adicional.
         </p>
       </section>
 
+      <!-- Logo CES abajo (centrado) -->
+      <div class="vr-logo-wrap vr-logo-wrap--bottom">
+        <img
+          src="{% static 'img/CES_Logo.png' %}"
+          alt="Centro de Estudios Superiores en Negocios y Humanidades"
+          class="vr-logo"
+        />
+      </div>
+
       <footer class="vr-foot">
-        © {% now "Y" %} Centro de Estudios Superiores · Todos los derechos reservados
+        © {% now "Y" %} Centro de Estudios Superiores en Negocios y Humanidades · Todos los derechos
+        reservados
       </footer>
     </main>
   </body>

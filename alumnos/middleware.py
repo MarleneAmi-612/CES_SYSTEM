@@ -29,7 +29,9 @@ class AlumnosSessionGuard:
             self._public_exact = {
                 reverse("alumnos:start"),
                 reverse("alumnos:status"),
-                reverse("alumnos:help"),     # 👈 AHORA help también es pública
+                reverse("alumnos:help"),
+                reverse("alumnos:help_diploma"),
+
             }
 
         path = request.path

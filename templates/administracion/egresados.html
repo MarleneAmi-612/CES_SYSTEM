@@ -476,6 +476,16 @@
                 <label for="fmt-zip"><span class="dot"></span> Ambos (ZIP)</label>
               </fieldset>
 
+                <!-- controles de firma (solo para CPROEM) -->
+              <fieldset id="sigFieldset" class="segmented is-hidden" aria-label="Firma (CPROEM)">
+                <input id="sig-signed" type="radio" name="sig" value="signed" checked>
+                <label for="sig-signed"><span class="dot"></span> Con firma (firmado)</label>
+
+                <input id="sig-unsigned" type="radio" name="sig" value="unsigned">
+                <label for="sig-unsigned"><span class="dot"></span> Sin firma (editable)</label>
+              </fieldset>
+
+
               <div class="modal__footer">
                 <button type="button" class="btn btn--ghost" id="dlCancel">Cancelar</button>
                 <button type="submit" class="btn btn--primary" id="dlSubmit">Descargar</button>

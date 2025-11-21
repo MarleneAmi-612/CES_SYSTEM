@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Seguimiento de solicitud | CES</title>
+  <title>Seguimiento de solicitud | Centro de Estudios Superiores en Negocios y Humanidades</title>
 
   <!-- Favicons -->
   <link rel="icon" href="{% static 'favicon/favicon.ico' %}">
@@ -21,8 +21,42 @@
 
     {% if not_found %}
       <div class="panel">
-        <strong>No encontramos esa solicitud.</strong>
-        <a class="back-link" href="{% url 'alumnos:status' %}">Volver a buscar</a>
+        <div class="perma-alert" role="alert" aria-live="polite">
+          <div class="perma-alert__header">
+            <div class="perma-alert__icon" aria-hidden="true">✖</div>
+            <div>
+              <h2 class="perma-alert__title">
+                Tu solicitud fue rechazada de forma permanente o ya no está disponible.
+              </h2>
+              <p class="perma-alert__text">
+                La solicitud que estás intentando consultar ya no se encuentra activa en el sistema.
+                Esto sucede cuando la solicitud fue <strong>rechazada definitivamente</strong> y
+                posteriormente eliminada por el área de administración.
+              </p>
+            </div>
+          </div>
+
+          <p class="perma-alert__text">
+            Algunas de las razones más comunes por las que una solicitud puede ser rechazada permanentemente son:
+          </p>
+          <ul class="perma-alert__list">
+            <li>Los datos personales (nombre, apellidos, CURP o RFC) no coincidían con la documentación oficial.</li>
+            <li>La información del programa elegido no corresponde con los registros del CES.</li>
+            <li>Se detectaron errores o inconsistencias importantes en la CURP o RFC proporcionados.</li>
+            <li>Se envió más de una solicitud para el mismo diplomado y se consideró como duplicada.</li>
+            <li>La solicitud se realizó fuera del periodo o fecha límite establecidos para el programa.</li>
+          </ul>
+
+          <p class="perma-alert__footer">
+            Si deseas volver a contar con una solicitud activa, deberás regresar al inicio del portal,
+            <strong>registrarte nuevamente</strong> y llenar todo el formulario con tu información completa
+            y actualizada.
+          </p>
+        </div>
+
+        <a class="back-link" href="{% url 'alumnos:status' %}">
+          ← Volver al inicio / consultar otra solicitud
+        </a>
       </div>
     {% else %}
 
@@ -75,7 +109,9 @@
                 <div class="reject-banner__reason"><span>Motivo:</span> {{ rejection_reason }}</div>
               {% endif %}
               <div class="reject-banner__actions">
-                <a href="#" id="btnResend" class="back-link" role="button" aria-label="Reenviar solicitud">⟳ Reenviar solicitud</a>
+                <a href="#" id="btnResend" class="back-link" role="button" aria-label="Reenviar solicitud">
+                  ⟳ Reenviar solicitud
+                </a>
               </div>
             </div>
           </div>

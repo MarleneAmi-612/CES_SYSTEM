@@ -757,3 +757,67 @@ strong{font-weight:700;}
 .download-cta{
   margin: 20px 0;
 }
+/* ===== Alerta permanente para solicitudes eliminadas / no encontradas ===== */
+.perma-alert{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  padding:18px 18px 14px;
+  border-radius:16px;
+  border:1px solid rgba(255,107,107,.35);
+  background:rgba(20,22,28,.8);
+  box-shadow:0 18px 40px rgba(0,0,0,.55);
+  margin-bottom:16px;
+}
+
+.perma-alert__header{
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+}
+
+.perma-alert__icon{
+  width:32px;
+  height:32px;
+  border-radius:12px;
+  display:grid;
+  place-items:center;
+  background:linear-gradient(135deg,#ff4d4f,#ff9a9b);
+  color:#111;
+  font-weight:800;
+  box-shadow:0 0 0 6px rgba(255,77,79,.18);
+  flex:0 0 auto;
+}
+
+.perma-alert__title{
+  margin:0 0 4px;
+  font-size:20px;
+  font-weight:800;
+  letter-spacing:.2px;
+  color:#ffe2e2;
+}
+
+.perma-alert__text{
+  margin:0;
+  font-size:14px;
+  color:var(--text);
+  opacity:.9;
+}
+
+.perma-alert__list{
+  margin:4px 0 0 1.4rem;
+  padding:0;
+  list-style:disc;
+  font-size:14px;
+  color:var(--muted);
+}
+
+.perma-alert__list li{
+  margin-bottom:4px;
+}
+
+.perma-alert__footer{
+  margin-top:4px;
+  font-size:13px;
+  color:var(--muted);
+}

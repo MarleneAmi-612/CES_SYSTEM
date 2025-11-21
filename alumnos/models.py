@@ -1,4 +1,3 @@
-# alumnos/models.py
 from django.db import models
 from django.utils import timezone
 
@@ -52,7 +51,9 @@ class Request(models.Model):
     name = models.CharField(max_length=100)
     lastname = models.CharField(max_length=100)
     email = models.EmailField()
-
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    
     # Programa cursado
     program = models.ForeignKey(
         Program,
@@ -86,6 +87,11 @@ class Request(models.Model):
     def __str__(self):
         who = f"{self.name} {self.lastname}".strip() or self.email
         return f"Request #{self.id} · {who}"
+    
+    def mark_deleted(self):
+        self.is_deleted = True
+        self.deleted_at = timezone.now()
+        self.save(update_fields=["is_deleted", "deleted_at"])
 
 
 class RequestEvent(models.Model):
@@ -111,3 +117,13 @@ class RequestEvent(models.Model):
 
     def __str__(self):
         return f"#{self.request_id} → {self.status} @ {self.created_at:%Y-%m-%d %H:%M}"
+
+class RejectedArchive(models.Model):
+    email = models.EmailField()
+    name = models.CharField(max_length=150)
+    lastname = models.CharField(max_length=150)
+    reason = models.TextField()
+    deleted_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.email} — Rechazo permanente"

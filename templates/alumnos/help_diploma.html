@@ -1,0 +1,107 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Ayuda con tu diploma | CES</title>
+
+    <link rel="icon" href="{% static 'favicon/favicon.ico' %}">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <link rel="stylesheet" href="{% static 'css/help_diploma.css' %}">
+  </head>
+  <body class="bg-orbs">
+    <div class="container">
+      <div class="card">
+        <div class="card-header">
+          <div class="brand">
+            <span class="dot"></span> CES – Ayuda con tu diploma
+          </div>
+          <h1 class="title">¿Problemas con tu diploma?</h1>
+          <p class="subtitle">
+            Si ya enviaste tu solicitud pero no encuentras el correo con tu diploma o el enlace de descarga,
+            revisa estos puntos antes de contactarnos.
+          </p>
+        </div>
+
+        <div class="card-body">
+          <section class="section">
+            <h2 class="section-title">1. Revisa bien tu bandeja de correo</h2>
+            <p class="section-text">
+              El correo puede tardar unos minutos en llegar y, en algunos casos, se clasifica de forma automática
+              como <strong>Spam</strong> o <strong>Promociones</strong>.
+            </p>
+            <ul class="list">
+              <li>Abre tu correo y revisa las carpetas: <strong>Spam</strong>, <strong>No deseado</strong>, <strong>Promociones</strong> y <strong>Actualizaciones</strong>.</li>
+              <li>Busca por los remitentes: <strong>evaluacion@midiplomado.com</strong> o <strong>yadier472@gmail.com</strong>.</li>
+              <li>Escribe en el buscador de tu correo palabras como <strong>"CES"</strong>, <strong>"diploma"</strong> o <strong>"constancia"</strong>.</li>
+            </ul>
+          </section>
+
+          <section class="section">
+            <h2 class="section-title">2. Verifica el estatus de tu solicitud</h2>
+            <p class="section-text">
+              Tu diploma sólo estará disponible si tu solicitud ya fue aprobada y el documento fue generado.
+              Puedes revisar el avance desde el tablero de seguimiento:
+            </p>
+
+            <div class="info-box">
+              <p class="info-text">
+                Usa el botón de abajo para ir a <strong>Seguimiento de solicitud</strong>,
+                ingresa tu correo y verifica en qué paso vas.
+              </p>
+              <a class="btn primary" href="{% url 'alumnos:status' %}">
+                Ir al seguimiento de mi solicitud
+              </a>
+            </div>
+          </section>
+
+          <section class="section">
+            <h2 class="section-title">3. Aún no recibo nada, ¿qué hago?</h2>
+            <p class="section-text">
+              Si ya revisaste todas las carpetas de tu correo y confirmaste que tu solicitud está
+              en estado <strong>“Enviada por correo”</strong>, <strong>“Descargada”</strong> o <strong>“Finalizado”</strong>,
+              pero sigues sin encontrar el mensaje:
+            </p>
+            <ul class="list">
+              <li>Verifica que el correo que usaste en la solicitud esté correctamente escrito.</li>
+              <li>Intenta añadir el remitente a tu lista de contactos para que no se marque como spam.</li>
+              <li>Vuelve a intentar más tarde; algunos servicios de correo pueden tener retrasos puntuales.</li>
+            </ul>
+          </section>
+
+          <section class="section">
+            <h2 class="section-title">4. ¿Necesitas ayuda adicional?</h2>
+            <p class="section-text">
+              Si después de seguir estos pasos sigues sin encontrar tu diploma, comunícate con el
+              área correspondiente del CES indicando tu nombre completo, correo y diplomado.
+            </p>
+            <p class="section-text small">
+              Tip: Si tienes una captura del seguimiento donde se vea el estatus de tu solicitud,
+              puede acelerar la revisión.
+            </p>
+          </section>
+
+          <div class="actions">
+            <a class="link-back" href="{% url 'alumnos:start' %}">
+              ← Volver a la verificación de correo
+            </a>
+            <a class="link-secondary" href="{% url 'alumnos:status' %}">
+              Ir al seguimiento de solicitud →
+            </a>
+          </div>
+        </div>
+
+        <div class="hr"></div>
+        <div class="footer">
+          © {% now "Y" %} Centro de Estudios Superiores en Negocios y Humanidades.
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -1534,3 +1534,148 @@ body.no-scroll {
   justify-content: flex-end;
   gap: 0.75rem;
 }
+/* ========================================================
+   FIX: Inputs, selects y radios del modal EDITAR PROGRAMA
+   ======================================================== */
+
+/* ---- Estilo uniforme para los selects dentro del modal ---- */
+#programEditModal .field__input {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: #e8edf3;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05),
+              0 8px 20px rgba(0,0,0,.25);
+}
+
+/* Hover */
+#programEditModal .field__input:hover {
+  border-color: rgba(255,255,255,.22);
+  background: rgba(255,255,255,.08);
+}
+
+/* Focus */
+#programEditModal .field__input:focus {
+  border-color: rgba(244,119,30,.55) !important;
+  background: rgba(255,255,255,.10);
+  box-shadow: 0 0 0 2px rgba(244,119,30,.32);
+}
+
+/* Placeholder */
+#programEditModal .field__input option {
+  background: #0f1216;
+  color: #e8edf3;
+}
+
+/* ---- Radios DC3 / CPROEM ---- */
+#programEditModal .radio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #e8edf3;
+}
+
+#programEditModal .radio input[type="radio"] {
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.35);
+  background: rgba(255,255,255,.06);
+  cursor: pointer;
+  transition: .15s ease;
+}
+
+#programEditModal .radio input[type="radio"]:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+  box-shadow: 0 0 0 3px rgba(244,119,30,.25);
+}
+
+/* ---- Etiquetas y textos del modal ---- */
+#programEditModal .field__label {
+  color: #e8edf3;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+#programEditModal .field__help {
+  color: #9ca3af;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+/* ---- Modal refinado (sin tocar tu estructura previa) ---- */
+#programEditModal .modal__dialog {
+  background: linear-gradient(180deg, rgba(16,19,24,.92), rgba(10,12,16,.88));
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 18px;
+  box-shadow: 0 22px 60px rgba(0,0,0,.55);
+  padding: 22px 22px 20px;
+}
+
+/* Botones coherentes */
+#programEditModal .btn--ghost {
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.16);
+  color: #e8edf3;
+}
+
+#programEditModal .btn--primary {
+  background: linear-gradient(135deg, var(--accent), #ff9b45);
+  border-color: rgba(244,119,30,.55);
+  color: #0f1216;
+  font-weight: 900;
+}
+/* === Inputs y selects del modal "Editar programa" =============== */
+/* Fuerzo el mismo look oscuro / glass que usas en el panel */
+
+#programEditModal .field__input,
+#programEditModal input.field__input,
+#programEditModal select.field__input {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background:
+    linear-gradient(120deg,
+      rgba(244, 119, 30, 0.18),
+      rgba(47, 103, 198, 0.18)
+    );
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 8px 20px rgba(0, 0, 0, 0.35);
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+/* Estado focus, con borde naranja bonito */
+#programEditModal .field__input:focus {
+  outline: none;
+  border-color: rgba(244, 119, 30, 0.85);
+  box-shadow:
+    0 0 0 1px rgba(244, 119, 30, 0.7),
+    0 10px 24px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* Que el texto de los <option> sea claro también */
+#programEditModal select.field__input option {
+  background: #020617;
+  color: #e5e7eb;
+}

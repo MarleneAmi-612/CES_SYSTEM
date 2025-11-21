@@ -16,5 +16,7 @@ urlpatterns = [
     path("api/tracking/<int:request_id>/resend/", views.tracking_resend, name="tracking_resend"),
     path("resubmit/<int:request_id>/", views.resubmit, name="resubmit"),
     path('help/', views.help_view, name='help'),
+    path("tracking-archived/", views.tracking_archived, name="tracking_archived"),
+    path("ayuda/diploma/", views.help_diploma, name="help_diploma"),
 
 ]

@@ -13,10 +13,25 @@ from .models import Program, Request, RequestEvent
 from .forms import EmailForm, BasicDataForm, ExtrasCPROEMForm, ExtrasDC3Form
 from .models_ces import Alumnos as AlumnoSim, Diplomado
 from .models import Program
+from administracion.models import Request,RejectedArchive
+
 RESUBMIT_DAYS = 10  
 
 def help_view(request):
     return render(request, 'alumnos/help.html')
+
+def help_view(request):
+    """
+    Página de ayuda general de correo (la que ya tenías antes).
+    """
+    return render(request, "alumnos/help.html")
+
+
+def help_diploma(request):
+    """
+    Nueva página de ayuda específica para problemas con el diploma.
+    """
+    return render(request, "alumnos/help_diploma.html")
 #Utilidades
 
 def _norm_name(s: str) -> str:
@@ -289,41 +304,75 @@ def confirm(request):
 
 
 def status(request):
-    """
-    Búsqueda por correo:
-      - Si hay 0 → mostrar lista vacía
-      - Si hay 1 → redirigir a tracking
-      - Si hay >1 → mostrar lista para elegir
-    """
-    ctx = {"results": None, "error": None, "email_query": ""}
+    ctx = {
+        "results": None,
+        "error": None,
+        "email_query": "",
+    }
 
     if request.method == "POST":
         email = (request.POST.get("email") or "").strip().lower()
         ctx["email_query"] = email
+
+        # ✅ Sin correo → mensaje de error
         if not email:
             ctx["error"] = "Ingresa un correo para buscar."
             return render(request, "alumnos/status.html", ctx)
 
+        # ✅ Buscar solicitudes activas por correo
         qs = Request.objects.filter(email__iexact=email).order_by("-sent_at")
+
+        # ❌ NO hay solicitudes activas para ese correo
         if not qs.exists():
+            # Buscar si ya tiene rechazo permanente
+            arc = RejectedArchive.objects.filter(email__iexact=email).first()
+
+            if arc:
+                # Guardamos info en sesión para que tracking(0) muestre el mensaje permanente
+                request.session["archived_reject"] = {
+                    "email": arc.email,
+                    "full_name": arc.full_name,  # ← coincide con tu modelo
+                    "reason": arc.reason or "",
+                }
+                # ID 0 = modo "rechazo permanente" en tracking
+                return redirect("alumnos:tracking", request_id=0)
+
+            # No hay solicitud ni registro de rechazo → simplemente lista vacía
             ctx["results"] = []
             return render(request, "alumnos/status.html", ctx)
 
+        # 🟢 Solo UNA solicitud → redirigir directo al tracking
         if qs.count() == 1:
             req = qs.first()
-            # Pase temporal si lo necesitas (opcional)
             request.session["tracking_ok"] = True
-            request.session["tracking_issued_at"] = timezone.now().isoformat()
-            request.session["status_email"] = email
             return redirect("alumnos:tracking", request_id=req.id)
 
+        # 🟡 Varias solicitudes → mostrar tabla de resultados
         ctx["results"] = qs
         return render(request, "alumnos/status.html", ctx)
 
+    # GET simple → solo renderizar formulario
     return render(request, "alumnos/status.html", ctx)
 
-
 # Tracking
+def tracking_archived(request):
+    """
+    Muestra una página especial cuando la solicitud fue rechazada y eliminada,
+    pero el alumno aún quiere consultarla en tracking.
+    """
+    data = request.session.get("tracking_archived")
+
+    if not data:
+        return redirect("alumnos:status")
+
+    ctx = {
+        "name": data["name"],
+        "lastname": data["lastname"],
+        "reason": data["reason"],
+    }
+
+    return render(request, "alumnos/tracking_archived.html", ctx)
+
 
 def _status_rank(status: str) -> int:
     order = {
@@ -444,6 +493,28 @@ def _build_history(req: Request, steps=None):
 
 @require_GET
 def tracking(request, request_id):
+
+    # ============================================================
+    # 🔵 AGREGADO: SOPORTE PARA RECHAZO PERMANENTE (ID = 0)
+    # ============================================================
+    if request_id == 0:
+        # Buscar datos guardados en sesión desde status()
+        data = request.session.get("archived_reject")
+
+        if data:
+            # tracking.html usará not_found=True y mostrará tu alerta bonita
+            return render(request, "alumnos/tracking.html", {
+                "not_found": True,
+                "req": None,
+                "rejection_reason": data.get("reason", ""),
+            })
+
+        # Si llega sin datos → volver a status
+        return redirect("alumnos:status")
+
+    # ============================================================
+    # 🔵 PROCESO NORMAL SI LA SOLICITUD EXISTE (TU CÓDIGO ORIGINAL)
+    # ============================================================
     req = Request.objects.filter(id=request_id).first()
     if not req:
         return render(request, "alumnos/tracking.html", {"not_found": True})
@@ -471,31 +542,25 @@ def tracking(request, request_id):
     total_segments = TOTAL_STEPS - 1  # 5 tramos
 
     if status in ("downloaded", "finalizado"):
-        # Llega al 100%
         units = total_segments
     elif status == "rejected":
-        # Se queda justo en el 3 (sin 0.5 extra)
         units = (active_max - 1)
     else:
-        # Avanza medio tramo hacia el siguiente
         units = (active_max - 1) + 0.5
 
     progress_pct = int(round((units / total_segments) * 100))
 
-    # Eventos para el contador en el feed
+    # Eventos para el contador
     events_count = RequestEvent.objects.filter(request=req).count()
 
     # ETA (10 días hábiles desde la fecha de envío)
     sent_local = timezone.localtime(req.sent_at).date() if req.sent_at else timezone.localdate()
     eta_date = _add_business_days(sent_local, 10)
 
-    # ========= Motivo de rechazo (si aplica) =========
+    # ========= Motivo de rechazo =========
     rejection_reason = ""
     if status == "rejected":
-        # 1) Campo directo en Request (nuevo flujo)
         rejection_reason = (getattr(req, "status_reason", "") or "").strip()
-
-        # 2) Si viene vacío, tomamos la nota del último evento "rejected" (flujo viejo)
         if not rejection_reason:
             last_rej = (
                 req.events
@@ -506,24 +571,21 @@ def tracking(request, request_id):
             if last_rej and last_rej.note:
                 rejection_reason = last_rej.note.strip()
 
-    # Historial (incluye pasos con timestamp y eventos adicionales)
+    # Historial
     history = _build_history(req, steps)
 
     # ¿Se puede reenviar?
     can_resubmit = _can_resubmit(req)
 
-    # === Descarga CPROEM para el alumno (versión WEB / digital) ===
+    # Descarga CPROEM (solo si aplica)
     program   = getattr(req, "program", None)
     cert_type = getattr(program, "certificate_type", None)
     cert_name = (getattr(cert_type, "name", "") or "").strip().lower()
     is_cproem = "cproem" in cert_name
 
-    # Solo si es CPROEM, está finalizado/descargado y existe Graduate
     can_download_cproem = is_cproem and status in ("finalizado", "downloaded") and grad is not None
     cproem_download_url = None
     if can_download_cproem:
-        # 👉 aquí usamos el PDF DIGITAL (WEB)
-        #    la vista pdf_cproem_digital recibe graduate_id
         cproem_download_url = reverse("administracion:pdf_cproem_digital", args=[grad.id])
 
     return render(request, "alumnos/tracking.html", {
@@ -541,6 +603,7 @@ def tracking(request, request_id):
         "can_download_cproem": can_download_cproem,
         "cproem_download_url": cproem_download_url,
     })
+
 
 @require_GET
 def tracking_api(request, request_id):

@@ -50,16 +50,39 @@
   const docTabs   = document.querySelectorAll('.segmented[data-scope="doc"] .segmented__btn');
   const docPanels = document.querySelectorAll('.doc-tab');
 
+  // ---------- funciones para CPROEM (firma) ----------
+  const sigFieldset = document.getElementById('sigFieldset'); // debe existir en el modal HTML
+
+  function isCproemConstancia() {
+    // Solo cuando:
+    //  - el tipo activo es "constancia"
+    //  - y el programa es CPROEM
+    return activeTipo() === 'constancia' && constKind === 'cproem';
+  }
+
+  function updateSigVisibility() {
+    if (!sigFieldset) return;
+    const show = isCproemConstancia();
+    sigFieldset.classList.toggle('is-hidden', !show);
+  }
+
   function setDocTab(targetSel) {
+    // Quita el activo actual
     docTabs.forEach(b => b.classList.remove('is-active'));
     docPanels.forEach(p => p.classList.remove('is-active'));
 
-    const btn = Array.from(docTabs).find(b => b.dataset.target === targetSel);
+    // Activa el solicitado
+    const btn   = Array.from(docTabs).find(b => b.dataset.target === targetSel);
     const panel = document.querySelector(targetSel);
-    if (btn) btn.classList.add('is-active');
+
+    if (btn)   btn.classList.add('is-active');
     if (panel) panel.classList.add('is-active');
+
+    // 🔹 actualizar visibilidad de "con firma / sin firma"
+    updateSigVisibility();
   }
 
+  // Click en los botones de Diploma / Constancia
   docTabs.forEach(btn => {
     btn.addEventListener('click', () => {
       setDocTab(btn.dataset.target);
@@ -67,14 +90,19 @@
   });
 
   // Cambio automático a "Constancia" si el programa es CPROEM
-  if (constKind === 'cproem') setDocTab('#tabConstancia');
+  if (constKind === 'cproem') {
+    setDocTab('#tabConstancia');
+  }
 
   // También permite activar por query ?tab=constancia | diploma
   try {
     const params = new URLSearchParams(location.search);
     const tab = (params.get('tab') || '').toLowerCase();
-    if (tab === 'constancia') setDocTab('#tabConstancia');
-    else if (tab === 'diploma') setDocTab('#tabDiploma');
+    if (tab === 'constancia') {
+      setDocTab('#tabConstancia');
+    } else if (tab === 'diploma') {
+      setDocTab('#tabDiploma');
+    }
   } catch {}
 
   // ---------- Tabs sidebar (En proceso / Finalizados) ----------
@@ -277,7 +305,7 @@
     });
   }
 
-  // ---------- Modal Descarga ----------
+   // ---------- Modal Descarga ----------
   const dlModal  = document.getElementById('dlModal');
   const dlForm   = document.getElementById('dlForm');
   const dlCancel = document.getElementById('dlCancel');
@@ -285,6 +313,9 @@
 
   function openDlModal() {
     if (!dlModal) return;
+    // Actualizar visibilidad de "con firma / sin firma"
+    updateSigVisibility();
+
     dlModal.hidden = false;
     setTimeout(() => {
       const first = dlForm?.querySelector('input[name="fmt"]') || dlSubmit;
@@ -292,11 +323,13 @@
     }, 0);
     document.body.classList.add('no-scroll');
   }
+
   function closeDlModal() {
     if (!dlModal) return;
     dlModal.hidden = true;
     document.body.classList.remove('no-scroll');
   }
+
   if (dlCancel) dlCancel.addEventListener('click', closeDlModal);
   if (dlModal) dlModal.addEventListener('click', (e) => { if (e.target === dlModal) closeDlModal(); });
 
@@ -311,10 +344,17 @@
       if (!downloadUrl) return;
       const fmt = dlForm.querySelector('input[name="fmt"]:checked')?.value || 'pdf';
       const tipo = activeTipo();
-      const url = downloadUrl
+      let url = downloadUrl
         + (downloadUrl.includes('?') ? '&' : '?')
         + 'tipo=' + encodeURIComponent(tipo)
         + '&fmt=' + encodeURIComponent(fmt);
+
+      // Solo CPROEM constancia: mandamos sig=signed/unsigned
+      if (isCproemConstancia() && sigFieldset && !sigFieldset.classList.contains('is-hidden')) {
+        const sig = dlForm.querySelector('input[name="sig"]:checked')?.value || 'signed';
+        url += '&sig=' + encodeURIComponent(sig);
+      }
+
       window.location.href = url;
       closeDlModal();
     });

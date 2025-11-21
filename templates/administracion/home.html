@@ -116,17 +116,26 @@
           <div class="card-head">
             <h2 class="card-title">Últimas solicitudes</h2>
 
-            <!-- 🔽 Filtro de orden (solo frontend) -->
-            <form id="requestSortForm" class="sortbar" onsubmit="return false;">
-              <label class="sortbar__label" for="order">Ordenar por:</label>
-              <select name="order" id="order" class="sortbar__select">
-                <option value="date_desc">Fecha · más recientes</option>
-                <option value="date_asc">Fecha · más antiguas</option>
-                <option value="name_asc">Nombre · A → Z</option>
-                <option value="name_desc">Nombre · Z → A</option>
-              </select>
-              <button type="button" class="sortbar__btn" id="orderApplyBtn">Aplicar</button>
-            </form>
+            <!-- 🔽 Filtro de orden con diseño tipo basic.html -->
+            <div class="card-head-tools">
+              <form id="requestSortForm" class="sortform" onsubmit="return false;">
+                <span class="sortform-label">Ordenar por</span>
+
+                <div class="sortform-select-wrap">
+                  <select name="order" id="order" class="sortform-select">
+                    <option value="date_desc">Fecha · más recientes</option>
+                    <option value="date_asc">Fecha · más antiguas</option>
+                    <option value="name_asc">Nombre · A → Z</option>
+                    <option value="name_desc">Nombre · Z → A</option>
+                  </select>
+                  <span class="sortform-caret">▾</span>
+                </div>
+
+                <button type="button" class="sortform-apply" id="orderApplyBtn">
+                  Aplicar
+                </button>
+              </form>
+            </div>
           </div>
 
           <div class="table-wrap" role="region" aria-label="Tabla de solicitudes" tabindex="0">
@@ -198,7 +207,7 @@
       </div>
     </main>
 
-    <footer class="foot">© {{ now|date:"Y" }} CES</footer>
+    <footer class="foot">© {{ now|date:"Y" }} Centro de Estudios Superiores en Negocios y Humanidades</footer>
   </div>
 
   <!-- ===== Modales ===== -->

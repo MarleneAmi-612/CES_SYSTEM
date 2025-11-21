@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Solicitudes | Administración CES</title>
+  <title>Solicitudes | Administración Centro de Estudios Superiores en Negocios y Humanidades</title>
 
   <!-- Fuentes + estilos -->
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,6 +16,9 @@
   <!-- Tokens para el JS estático -->
   <meta name="csrf-token" content="{{ csrf_token }}">
   <meta name="requests-update-url" content="{% url 'administracion:request_update_status' %}">
+  <!-- Opcional / legacy: plantilla para borrar rechazadas vía fetch -->
+  <meta name="request-delete-url-template"
+        content="{% url 'administracion:request_delete_rejected' 999999 %}">
 </head>
 <body class="bg-orbs">
 <div class="shell">
@@ -152,6 +155,23 @@
                     <button class="a-btn ok"    data-action="approve"    data-id="{{ r.id }}">Aprobar</button>
                     <button class="a-btn bad"   data-action="reject"     data-id="{{ r.id }}">Rechazar</button>
                     <button class="a-btn"       data-action="generating" data-id="{{ r.id }}">Generando</button>
+
+                    {# NUEVO: botón para borrar solicitudes RECHAZADAS #}
+                    {% if r.status == 'rejected' %}
+                      <form id="del-rej-{{ r.id }}"
+                            method="post"
+                            action="{% url 'administracion:request_delete_rejected' r.id %}"
+                            class="inline-form">
+                        {% csrf_token %}
+                        <button type="button"
+                                class="a-btn bad"
+                                data-action="delete_rejected"
+                                data-form-id="del-rej-{{ r.id }}"
+                                data-alumno="{{ full_name }}">
+                          Borrar rechazada
+                        </button>
+                      </form>
+                    {% endif %}
                   </div>
                 </td>
               </tr>
@@ -166,7 +186,7 @@
 
   </main>
 
-  <footer class="foot">© {{ now|date:"Y" }} CES</footer>
+  <footer class="foot">© {{ now|date:"Y" }} Centro de Estudios Superiores en Negocios y Humanidades</footer>
 </div>
 
 <!-- Modal: Detalle bonito -->
@@ -239,6 +259,33 @@
         <button class="btn btn--secondary" type="button" data-close="#rejectModal">Cancelar</button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- NUEVO: Modal/overlay para borrar solicitudes rechazadas -->
+<div id="deleteRejectOverlay"
+     class="overlay is-hidden"
+     aria-hidden="true"
+     role="dialog"
+     aria-modal="true">
+  <div class="overlay__backdrop" data-del-dismiss="true"></div>
+  <div class="overlay__dialog">
+    <div class="overlay__icon" aria-hidden="true">🗑️</div>
+    <h2 class="overlay__title">Borrar solicitud rechazada</h2>
+    <p class="overlay__text">
+      ¿Borrar definitivamente la solicitud rechazada de
+      <strong id="delRejectName">este alumno</strong>?
+    </p>
+    <p class="overlay__text">
+      Esta acción <strong>no se puede deshacer</strong>.<br>
+      Si la persona desea solicitar de nuevo, tendrá que llenar una nueva solicitud desde cero.
+    </p>
+    <div class="overlay__actions">
+      <button type="button" class="btn" data-del-dismiss="true">Cancelar</button>
+      <button type="button" class="btn btn--danger" id="delRejectConfirm">
+        Sí, borrar definitivamente
+      </button>
+    </div>
   </div>
 </div>
 

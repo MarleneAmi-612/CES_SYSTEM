@@ -4,7 +4,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Verificación de correo | CES</title>
+    <title>Verificación de correo | Centro de Estudios Superiores en Negocios y Humanidades</title>
 
     <!-- Favicons -->
     <link rel="icon" href="{% static 'favicon/favicon.ico' %}">
@@ -62,7 +62,7 @@
           </form>
 
           <div class="cta-grid" aria-label="Acciones rápidas">
-            <!-- 🔹 Botón actualizado: redirige a help.html -->
+            <!-- Botón: problemas con correo -->
             <a class="cta" href="{% url 'alumnos:help' %}">
               <span class="icon-pill orange" aria-hidden="true">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -74,10 +74,10 @@
               <span>
                 <div class="label">¿Problemas con tu correo?</div>
                 <div class="sub">Haz clic aquí para ver algunos consejos</div>
-                
               </span>
             </a>
 
+            <!-- Botón: seguimiento -->
             <a class="cta" href="{% url 'alumnos:status' %}">
               <span class="icon-pill" aria-hidden="true">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -91,11 +91,28 @@
                 <div class="sub">Consulta el estatus de tu diploma</div>
               </span>
             </a>
+
+            <!-- ⭐ Nuevo botón: problemas con tu diploma -->
+            <a class="cta" href="{% url 'alumnos:help_diploma' %}">
+              <span class="icon-pill" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path d="M5 7h14v10H5z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+                  <path d="M9 5v2m6-2v2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                  <path d="M9 11h6m-6 3h4" stroke="currentColor" stroke-width="1.7"
+                        stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </span>
+              <span>
+                <div class="label">¿Problemas con tu diploma?</div>
+                <div class="sub">No encuentras el PDF o el enlace, revisa esta guía</div>
+              </span>
+            </a>
+            <!-- ⭐ Fin nuevo botón -->
           </div>
         </div>
 
         <div class="hr"></div>
-        <div class="footer">© {% now "Y" %} CES.</div>
+        <div class="footer">© {% now "Y" %} Centro de Estudios Superiores en Negocios y Humanidades.</div>
       </div>
     </div>
   </body>

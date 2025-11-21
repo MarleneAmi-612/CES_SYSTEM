@@ -6,8 +6,6 @@ from alumnos.models import Request
 from django.urls import reverse
 from django.db.models.signals import post_delete, pre_save
 from django.dispatch import receiver
-
-
 class AdminUserManager(BaseUserManager):
     def create_user(self, email, username=None, password=None, **extra_fields):
         """
@@ -386,3 +384,12 @@ def delete_old_file_on_change(sender, instance, **kwargs):
 
     if old_file and old_file != new_file:
         old_file.delete(save=False)    
+
+class RejectedArchive(models.Model):
+    email = models.EmailField(db_index=True)
+    full_name = models.CharField(max_length=255)
+    reason = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.full_name} <{self.email}>"

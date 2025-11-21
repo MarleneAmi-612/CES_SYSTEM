@@ -34,6 +34,7 @@ from django_otp.decorators import otp_required
 from django.apps import apps
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import (
     authenticate,
     login,
@@ -50,6 +51,7 @@ from django.contrib.auth.views import (
     PasswordResetConfirmView,
     PasswordResetCompleteView,
 )
+from django.core.exceptions import PermissionDenied
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
@@ -65,6 +67,8 @@ from django.http import (
     FileResponse,
     HttpResponseBadRequest,
     HttpResponseNotAllowed,
+    HttpResponseForbidden,
+    HttpResponseRedirect
 )
 from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404, redirect, render
@@ -87,7 +91,7 @@ from django.views.generic import TemplateView, FormView
 # Apps locales
 # ============================
 from alumnos.models import Request  # u otros modelos que sí existan
-from administracion.models import Graduate,DocToken,DiplomaBackground
+from administracion.models import Graduate,DocToken,DiplomaBackground,RejectedArchive
 egresados = Graduate.objects.all()
 
 # App "alumnos"
@@ -1458,14 +1462,18 @@ def doc_preview(request, req_id):
 @require_GET
 def doc_download(request, req_id: int):
     """
-    Descarga el documento del egresado:
+    Descarga documento del egresado:
       - ?tipo=diploma|constancia
       - ?fmt=pdf|docx|zip
-    PDF se genera con WeasyPrint y se endurece con _pdf_secure().
-    DOCX se genera con python-docx (formato simple).
-    ZIP incluye ambos (si alguno falla, añade un README con la razón).
+      - (solo CPROEM) ?sig=signed|unsigned
     """
-    # --- 1) Obtener registro y parámetros ---
+    # imports locales (evitan fallo si libs no instaladas hasta que se usen)
+    try:
+        from weasyprint import HTML
+    except Exception:
+        HTML = None
+
+    # --- 1) Obtener registro y params ---
     req = get_object_or_404(Request.objects.select_related("program"), pk=req_id)
 
     tipo = (request.GET.get("tipo") or "diploma").lower()
@@ -1476,17 +1484,24 @@ def doc_download(request, req_id: int):
     if fmt not in ("pdf", "docx", "zip"):
         return JsonResponse({"ok": False, "error": "Formato inválido."}, status=400)
 
-    # Determinar si la constancia es dc3 o cproem
+    # determinar tipo real (dc3 | cproem | diploma)
     tipo_real = "diploma" if tipo == "diploma" else constancia_kind_for_request(req)
 
-    # Publicar token (si aplica para constancias/diplomas publicados)
+    # sig param (solo para cproem)
+    sig_param = (request.GET.get("sig") or "").lower()
+    if sig_param not in ("", "signed", "unsigned"):
+        return JsonResponse({"ok": False, "error": "Parámetro 'sig' inválido."}, status=400)
+    signed_flag = None
+    if tipo_real == "cproem":
+        signed_flag = (sig_param != "unsigned")  # default: True (signed) si no se pasa nada
+
+    # intentar publicar token (no crítico)
     try:
         _ensure_published_token(req, tipo_real)
     except Exception:
-        # No es crítico para descarga; sólo logueamos
         log.exception("No se pudo asegurar token publicado para %s #%s", tipo_real, req.id)
 
-    # --- 2) Datos comunes para DOCX y para render de plantilla ---
+    # datos comunes
     program_name = getattr(getattr(req, "program", None), "name", "") or "—"
     full_name = f"{getattr(req, 'name', '') or ''} {getattr(req, 'lastname', '') or ''}".strip()
     start_date = getattr(req, "start_date", None)
@@ -1498,46 +1513,100 @@ def doc_download(request, req_id: int):
         except Exception:
             return str(d) if d else "—"
 
-    # --- 3) Helpers internos ---
-
-    def _make_pdf_bytes():
-        """Renderiza la plantilla HTML → PDF (WeasyPrint) y aplica _pdf_secure."""
-        # Traer plantilla y contexto ya listos
-        tpl, ctx = _render_ctx_and_template(
-            request, req, tipo_real, use_published_if_exists=True
-        )
-        # Render → PDF
-        try:
-            from weasyprint import HTML
-        except Exception as e:
-            raise RuntimeError(f"WeasyPrint no está instalado: {e}")
-
-        html = render_to_string(tpl, ctx, request=request)
-        raw_pdf = HTML(string=html, base_url=request.build_absolute_uri("/")).write_pdf()
-
-        # Endurecer / marcas (ajusta a lo que quieras)
+    # helper: render -> PDF y luego _pdf_secure
+    def _pdf_from_html_string(html_str):
+        if HTML is None:
+            raise RuntimeError("WeasyPrint no está instalado.")
+        base_url = request.build_absolute_uri("/")
+        raw_pdf = HTML(string=html_str, base_url=base_url).write_pdf()
         secured = _pdf_secure(
             raw_pdf,
-            user_pwd="",  # apertura sin password en visor
+            user_pwd="",
             watermark_text="CES · Solo lectura",
         )
         return secured
 
-    def _make_docx_bytes():
-        """Construye un DOCX simple con python-docx."""
+    # Construye contexto para plantilla CPROEM (firma incluida solo si include_signature=True)
+    def _build_cproem_render_context(req, graduate, include_signature: bool):
+        nombre = (f"{req.name or ''} {req.lastname or ''}".strip()) or getattr(graduate, "nombre", "") or "—"
+        programa = getattr(getattr(req, "program", None), "name", "") or "—"
+
+        # vigencias: preferir datos del graduate si existen (ajusta según tu modelo)
+        vigencia_inicio = getattr(graduate, "validity_start", None)
+        vigencia_termino = getattr(graduate, "validity_end", None)
+
+        # fallback fechas petición
+        inicio = getattr(req, "start_date", None)
+        fin = getattr(req, "end_date", None)
+
+        # QR: si el graduate tiene qr_url lo usamos; si no, intentamos formar una URL pública
+        qr_url = getattr(graduate, "qr_url", None) or ""
+        if not qr_url:
+            try:
+                if getattr(graduate, "id", None):
+                    # Ajusta la vista de verificación pública si tienes una distinta
+                    verify_url = request.build_absolute_uri(reverse("administracion:pdf_cproem_digital", args=[graduate.id]))
+                    qr_url = verify_url
+            except Exception:
+                qr_url = ""
+
+        # Firma: solo si include_signature -> construimos URL a static
+        signature_url = ""
+        if include_signature:
+            SIGNATURE_STATIC_PATH = "img/signatures/firma_cproem.png"  # ajusta si tu firma está en otra ruta
+            try:
+                signature_url = request.build_absolute_uri(static(SIGNATURE_STATIC_PATH))
+            except Exception:
+                signature_url = ""
+
+        return {
+            "nombre": nombre,
+            "programa": programa,
+            "vigencia_inicio": vigencia_inicio,
+            "vigencia_termino": vigencia_termino,
+            "inicio": inicio,
+            "fin": fin,
+            "curp": getattr(req, "curp", "") or "",
+            "qr_url": qr_url,
+            "signature_url": signature_url,
+        }
+
+    # Generadores PDF/DOCX
+    def _make_pdf_bytes_for_cproem(graduate, signed: bool):
+        try:
+            # Si signed -> plantilla digital (contiene la firma), si unsigned -> plantilla sin firma
+            tpl_signed = "administracion/pdf_constancia_cproem_digital.html"
+            tpl_unsigned = "administracion/pdf_constancia_cproem.html"
+
+            tpl_name = tpl_signed if signed else tpl_unsigned
+            ctx = _build_cproem_render_context(req, graduate, include_signature=signed)
+            html = render_to_string(tpl_name, ctx, request=request)
+            return _pdf_from_html_string(html)
+        except Exception as e:
+            raise RuntimeError(f"Error generando documento: {e}")
+
+    def _make_pdf_bytes_generic():
+        try:
+            tpl, ctx = _render_ctx_and_template(request, req, tipo_real, use_published_if_exists=True)
+            html = render_to_string(tpl, ctx, request=request)
+            return _pdf_from_html_string(html)
+        except Exception as e:
+            raise RuntimeError(f"Error generando documento: {e}")
+
+    def _make_docx_bytes_generic(include_cproem_note=False, signed=None):
         try:
             from docx import Document
         except Exception as e:
             raise RuntimeError(f"python-docx no está instalado: {e}")
 
         doc = Document()
-        doc.add_heading(f"{tipo_real.upper()} - {program_name}", level=1)
+        title = f"{tipo_real.upper()} - {program_name}" if tipo_real != "cproem" else f"CONSTANCIA CPROEM - {program_name}"
+        doc.add_heading(title, level=1)
         doc.add_paragraph(f"Nombre: {full_name or '—'}")
         doc.add_paragraph(f"Programa: {program_name}")
         doc.add_paragraph(f"Inicio: {_fmt_date(start_date)}")
         doc.add_paragraph(f"Fin: {_fmt_date(end_date)}")
 
-        # Campos extra de DC3 si existen
         curp = getattr(req, "curp", None)
         rfc  = getattr(req, "rfc", None)
         job  = getattr(req, "job_title", None)
@@ -1550,6 +1619,13 @@ def doc_download(request, req_id: int):
         if giro: doc.add_paragraph(f"Giro: {giro}")
         if biz:  doc.add_paragraph(f"Razón social: {biz}")
 
+        if include_cproem_note:
+            doc.add_paragraph("")
+            if signed is False:
+                doc.add_paragraph("Versión sin firma (sin imagen de firma).")
+            else:
+                doc.add_paragraph("Versión con firma (contiene imagen de firma).")
+
         doc.add_paragraph("")
         doc.add_paragraph("Documento generado automáticamente por CES System.")
 
@@ -1559,66 +1635,101 @@ def doc_download(request, req_id: int):
         return b.getvalue()
 
     # --- 4) Ramas por formato solicitado ---
+    # CPROEM
+    if tipo_real == "cproem":
+        # localizar graduate
+        grad = getattr(req, "graduate", None)
+        if not grad:
+            grad = Graduate.objects.filter(request=req).first()
+        if not grad:
+            return JsonResponse({"ok": False, "error": "No existe Graduate para CPROEM."}, status=400)
 
+        # PDF
+        if fmt == "pdf":
+            try:
+                signed = (signed_flag if signed_flag is not None else True)
+                pdf_bytes = _make_pdf_bytes_for_cproem(grad, signed=signed)
+                return FileResponse(io.BytesIO(pdf_bytes), content_type="application/pdf", filename=f"{tipo_real}-{req.id}.pdf")
+            except Exception as e:
+                log.exception("Fallo generando documento para cproem #%s (fmt=pdf sig=%s)", req.id, signed_flag)
+                return JsonResponse({"ok": False, "error": str(e)}, status=500)
+
+        # DOCX
+        if fmt == "docx":
+            try:
+                docx_bytes = _make_docx_bytes_generic(include_cproem_note=True, signed=(signed_flag if signed_flag is not None else True))
+                return FileResponse(io.BytesIO(docx_bytes), content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", filename=f"{tipo_real}-{req.id}.docx")
+            except Exception as e:
+                log.exception("Fallo generando DOCX CPROEM #%s", req.id)
+                return JsonResponse({"ok": False, "error": str(e)}, status=500)
+
+        # ZIP: ambos PDFs + docx
+        if fmt == "zip":
+            mem = io.BytesIO()
+            readme_lines = []
+            try:
+                with zipfile.ZipFile(mem, "w", zipfile.ZIP_DEFLATED) as zf:
+                    # signed pdf
+                    try:
+                        zf.writestr(f"{tipo_real}-{req.id}-signed.pdf", _make_pdf_bytes_for_cproem(grad, signed=True))
+                    except Exception as e:
+                        msg = f"[PDF signed] fallo: {e}"
+                        log.exception(msg); readme_lines.append(msg)
+                    # unsigned pdf
+                    try:
+                        zf.writestr(f"{tipo_real}-{req.id}-unsigned.pdf", _make_pdf_bytes_for_cproem(grad, signed=False))
+                    except Exception as e:
+                        msg = f"[PDF unsigned] fallo: {e}"
+                        log.exception(msg); readme_lines.append(msg)
+                    # docx
+                    try:
+                        zf.writestr(f"{tipo_real}-{req.id}.docx", _make_docx_bytes_generic(include_cproem_note=True, signed=True))
+                    except Exception as e:
+                        msg = f"[DOCX] fallo: {e}"
+                        log.exception(msg); readme_lines.append(msg)
+
+                    if readme_lines:
+                        zf.writestr("README.txt", "Algunos archivos no se pudieron generar:\n\n" + "\n".join(readme_lines))
+
+                mem.seek(0)
+                return FileResponse(mem, content_type="application/zip", filename=f"{tipo_real}-{req.id}.zip")
+            except Exception as e:
+                log.exception("Fallo generando ZIP CPROEM #%s", req.id)
+                return JsonResponse({"ok": False, "error": f"Error generando ZIP: {e}"}, status=500)
+
+    # no-CPROEM (diploma, dc3, etc.) — comportamiento previo
     if fmt == "pdf":
         try:
-            pdf_bytes = _make_pdf_bytes()
-            return FileResponse(
-                io.BytesIO(pdf_bytes),
-                content_type="application/pdf",
-                filename=f"{tipo_real}-{req.id}.pdf",
-            )
+            pdf_bytes = _make_pdf_bytes_generic()
+            return FileResponse(io.BytesIO(pdf_bytes), content_type="application/pdf", filename=f"{tipo_real}-{req.id}.pdf")
         except Exception as e:
             log.exception("Fallo generando PDF")
             return JsonResponse({"ok": False, "error": f"Error generando PDF: {e}"}, status=500)
 
     elif fmt == "docx":
         try:
-            docx_bytes = _make_docx_bytes()
-            return FileResponse(
-                io.BytesIO(docx_bytes),
-                content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                filename=f"{tipo_real}-{req.id}.docx",
-            )
+            docx_bytes = _make_docx_bytes_generic(include_cproem_note=False)
+            return FileResponse(io.BytesIO(docx_bytes), content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", filename=f"{tipo_real}-{req.id}.docx")
         except Exception as e:
             log.exception("Fallo generando DOCX")
             return JsonResponse({"ok": False, "error": f"Error generando DOCX: {e}"}, status=500)
 
-    else:  # fmt == "zip"
-        # Intentamos generar ambos; si alguno falla, lo omitimos y añadimos README.txt
+    else:  # zip
         readme_lines = []
         mem = io.BytesIO()
         with zipfile.ZipFile(mem, "w", zipfile.ZIP_DEFLATED) as zf:
-            # DOCX
             try:
-                docx_bytes = _make_docx_bytes()
-                zf.writestr(f"{tipo_real}-{req.id}.docx", docx_bytes)
+                zf.writestr(f"{tipo_real}-{req.id}.docx", _make_docx_bytes_generic(include_cproem_note=False))
             except Exception as e:
-                msg = f"[DOCX] No se pudo generar: {e}"
-                log.exception(msg)
-                readme_lines.append(msg)
-
-            # PDF
+                msg = f"[DOCX] No se pudo generar: {e}"; log.exception(msg); readme_lines.append(msg)
             try:
-                pdf_bytes = _make_pdf_bytes()
-                zf.writestr(f"{tipo_real}-{req.id}.pdf", pdf_bytes)
+                zf.writestr(f"{tipo_real}-{req.id}.pdf", _make_pdf_bytes_generic())
             except Exception as e:
-                msg = f"[PDF] No se pudo generar: {e}"
-                log.exception(msg)
-                readme_lines.append(msg)
-
+                msg = f"[PDF] No se pudo generar: {e}"; log.exception(msg); readme_lines.append(msg)
             if readme_lines:
-                zf.writestr(
-                    "README.txt",
-                    "Algunos archivos no se pudieron generar:\n\n" + "\n".join(readme_lines)
-                )
-
+                zf.writestr("README.txt", "Algunos archivos no se pudieron generar:\n\n" + "\n".join(readme_lines))
         mem.seek(0)
-        return FileResponse(
-            mem,
-            content_type="application/zip",
-            filename=f"{tipo_real}-{req.id}.zip",
-        )
+        return FileResponse(mem, content_type="application/zip", filename=f"{tipo_real}-{req.id}.zip")
 
 # ========================= Verificación =========================
 
@@ -3988,3 +4099,51 @@ def pdf_cproem_impreso(request, graduate_id: int):
         f'inline; filename="constancia_cproem_impresa_{graduate_id}.pdf"'
     )
     return response
+
+@login_required
+@require_POST
+def request_delete_rejected(request, pk):
+    req = Request.objects.filter(id=pk).first()
+    if not req:
+        messages.error(request, "Solicitud no encontrada.")
+        return redirect("administracion:requests_board")
+
+    # Guardar en archivo histórico antes de borrar
+    RejectedArchive.objects.create(
+        email=req.email,
+        full_name=f"{req.name} {req.lastname}",
+        reason=req.status_reason or "Solicitud rechazada permanentemente.",
+    )
+
+    # Eliminar la solicitud real
+    req.delete()
+
+    messages.success(request, "Solicitud rechazada archivada y eliminada correctamente.")
+    return redirect("administracion:requests_board")
+
+
+def requests_board(request):
+    estado = request.GET.get("estado") or "pending"
+    q = request.GET.get("q", "").strip()
+    program_id = request.GET.get("program")
+
+    qs = Request.objects.all()
+
+    # 🔹 NO mostrar las eliminadas
+    qs = qs.filter(is_deleted=False)
+
+    if estado:
+        qs = qs.filter(status=estado)
+
+    if q:
+        qs = qs.filter(
+            Q(email__icontains=q) |
+            Q(name__icontains=q) |
+            Q(lastname__icontains=q)
+        )
+
+    if program_id:
+        qs = qs.filter(program_id=program_id)
+
+    items = qs.order_by("-sent_at")
+    # ... resto igual ...

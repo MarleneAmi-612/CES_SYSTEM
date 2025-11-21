@@ -198,3 +198,48 @@ body.vr-body {
   text-align: center;
   color: var(--vr-text-muted);
 }
+/* Logos CES (arriba y abajo) */
+.vr-logo {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.vr-logo--top {
+  margin-bottom: 18px;
+}
+
+.vr-logo--bottom {
+  margin-top: 24px;
+  margin-bottom: 8px;
+}
+
+.vr-logo__img {
+  max-width: 160px;      /* ajusta si quieres más grande / pequeño */
+  height: auto;
+  object-fit: contain;
+}
+/* ===== Logos CES arriba/abajo ===== */
+.vr-logo-wrap {
+  display: flex;
+  justify-content: center;
+  margin-inline: auto;
+}
+
+.vr-logo-wrap--top {
+  margin-top: 20px;
+  margin-bottom: 10px;
+}
+
+.vr-logo-wrap--bottom {
+  margin-top: 24px;
+  margin-bottom: 10px;
+}
+
+.vr-logo {
+  max-width: 360px;      /* tamaño más pequeño y limpio */
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 10px 25px rgba(0, 0, 0, 0.35));
+  border-radius: 14px;   /* esquinas suaves para que se vea más moderno */
+}

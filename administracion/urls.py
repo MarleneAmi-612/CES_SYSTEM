@@ -87,7 +87,11 @@ urlpatterns = [
     # Tablero solicitudes
     path("solicitudes/", RequestsBoardView.as_view(), name="requests_board"),
     path("solicitudes/estado/", request_update_status, name="request_update_status"),
-
+    path(
+        "solicitudes/<int:pk>/eliminar-rechazada/",
+        views.request_delete_rejected,
+        name="request_delete_rejected",
+    ),
     # Plantillas (portada + variante con req_id) — nombres distintos
     path("plantillas/", plantillas, name="plantillas"),
     path("plantillas/<int:req_id>/", plantillas, name="plantillas_req"),
