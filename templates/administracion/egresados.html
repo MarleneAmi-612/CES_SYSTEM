@@ -303,6 +303,20 @@
                         autocomplete="off"
                       />
                     </div>
+                    <div class="field">
+                      <label class="label" for="eg-hours">Intensidad (horas)</label>
+                      <input
+                        id="eg-hours"
+                        class="input"
+                        type="number"
+                        min="1"
+                        step="1"
+                        name="hours"
+                        value="{{ hours|default_if_none:'' }}"
+                        autocomplete="off"
+                        inputmode="numeric"
+                      />
+                    </div>
                   </div>
 
                   <div class="edit-actions">

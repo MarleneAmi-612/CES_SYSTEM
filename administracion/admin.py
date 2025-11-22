@@ -1,5 +1,7 @@
 from django.contrib import admin
 from .models import DiplomaBackground,DesignTemplate,TemplateAsset,AdminAccessLog, AdminUser, Graduate, CertificateType, Template, Program,DesignTemplateVersion,Organization
+from .models import DocxTemplate
+
 # --- Helpers para registrar sin duplicar ---
 def safe_register(model, admin_class=None):
     """Registra un modelo en el admin solo si no está ya registrado."""
@@ -89,3 +91,9 @@ class DiplomaBackgroundAdmin(admin.ModelAdmin):
     list_display = ("code", "name", "is_active")
     search_fields = ("code", "name")
     list_filter = ("is_active",)
+    
+@admin.register(DocxTemplate)
+class DocxTemplateAdmin(admin.ModelAdmin):
+    list_display = ("name", "tipo", "is_active", "created_at")
+    list_filter  = ("tipo", "is_active")
+    search_fields = ("name",)

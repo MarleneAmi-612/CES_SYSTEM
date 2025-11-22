@@ -22,6 +22,7 @@ from urllib.request import Request as UrlReq, urlopen
 from django.contrib.staticfiles.finders import find as find_static
 from email.mime.image import MIMEImage
 from django.core.mail import EmailMultiAlternatives
+from django.utils.timezone import localdate
 
 # ============================
 # Terceros (third-party)
@@ -148,6 +149,143 @@ MESES_ES = [
     "enero", "febrero", "marzo", "abril", "mayo", "junio",
     "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
 ]
+
+def _fecha_es_larga(fecha):
+    """
+    Devuelve '11 de noviembre de 2025' a partir de un date/datetime.
+    Si viene None → '—'.
+    """
+    if not fecha:
+        return "—"
+
+    if isinstance(fecha, datetime.datetime):
+        fecha = fecha.date()
+    if not isinstance(fecha, datetime.date):
+        try:
+            fecha = localdate(fecha)
+        except Exception:
+            return str(fecha)
+
+    dia = fecha.day
+    mes = MESES_ES[fecha.month] if 1 <= fecha.month <= 12 else ""
+    anio = fecha.year
+    return f"{dia} de {mes} de {anio}"
+
+def _docx_placeholders_for_request(req, tipo_real: str, verify_url: str | None = None):
+    """
+    Construye un diccionario de placeholders para plantillas DOCX.
+
+    Ejemplo de claves que podrás usar en el DOCX:
+      [NOMBRE_COMPLETO]
+      [CURP]
+      [RFC]
+      [PROGRAMA]
+      [HORAS]
+      [FECHA_INICIO]
+      [FECHA_FIN]
+      [FECHA_INICIO_LETRA]
+      [FECHA_FIN_LETRA]
+      [FOLIO]
+      [VERIFICACION_URL]
+    """
+    # Nombre completo
+    nombre = f"{getattr(req, 'name', '')} {getattr(req, 'lastname', '')}".strip()
+    program_obj = getattr(req, "program", None)
+    programa = getattr(program_obj, "name", "") or ""
+
+    # Fechas: preferimos Graduate.validity_*
+    grad = getattr(req, "graduate", None)
+    if grad and (getattr(grad, "validity_start", None) or getattr(grad, "validity_end", None)):
+        inicio = getattr(grad, "validity_start", None)
+        fin    = getattr(grad, "validity_end", None)
+    else:
+        inicio = getattr(req, "start_date", None)
+        fin    = getattr(req, "end_date", None)
+
+    # Horas: usamos el campo 'hours' de Request (lo que ya añadimos)
+    horas = getattr(req, "hours", None)
+
+    # Folio según tipo
+    if tipo_real == "diploma":
+        folio = f"DIP-{req.id:06d}"
+    else:
+        folio = f"CON-{req.id:06d}"
+
+    return {
+        "NOMBRE_COMPLETO": nombre or "",
+        "NOMBRE": getattr(req, "name", "") or "",
+        "APELLIDOS": getattr(req, "lastname", "") or "",
+        "CURP": getattr(req, "curp", "") or "",
+        "RFC": getattr(req, "rfc", "") or "",
+        "PUESTO": getattr(req, "job_title", "") or "",
+        "GIRO": getattr(req, "industry", "") or "",
+        "RAZON_SOCIAL": getattr(req, "business_name", "") or "",
+        "EMAIL": getattr(req, "email", "") or "",
+        "PROGRAMA": programa,
+        "HORAS": str(horas) if horas is not None else "",
+        "FECHA_INICIO": inicio.strftime("%d/%m/%Y") if inicio else "",
+        "FECHA_FIN":    fin.strftime("%d/%m/%Y") if fin else "",
+        "FECHA_INICIO_LETRA": _fecha_es_larga(inicio),
+        "FECHA_FIN_LETRA":    _fecha_es_larga(fin),
+        "FOLIO": folio,
+        "VERIFICACION_URL": verify_url or "",
+    }
+
+def _render_docx_template_for_request(req, tipo_real: str, verify_url: str | None = None) -> bytes | None:
+    """
+    Busca una DocxTemplate activa para tipo_real y la rellena
+    reemplazando [VARIABLES] con datos de la Request.
+
+    Devuelve bytes del archivo DOCX generado, o None si no hay plantilla.
+    """
+    # Buscar la plantilla más reciente activa para este tipo
+    tpl = (
+        DocxTemplate.objects
+        .filter(tipo=tipo_real, is_active=True)
+        .order_by("-created_at")
+        .first()
+    )
+    if not tpl or not tpl.file:
+        return None
+
+    # Abrimos el DOCX
+    doc = Document(tpl.file)
+
+    # Mapeo de placeholders
+    mapping = _docx_placeholders_for_request(req, tipo_real, verify_url=verify_url)
+
+    def replace_in_run_text(text):
+        if not text:
+            return text
+        new_text = text
+        for key, val in mapping.items():
+            placeholder = f"[{key}]"
+            if placeholder in new_text:
+                new_text = new_text.replace(placeholder, val or "")
+        return new_text
+
+    # Reemplazar en párrafos
+    for p in doc.paragraphs:
+        if "[" not in p.text:
+            continue
+        for r in p.runs:
+            r.text = replace_in_run_text(r.text)
+
+    # Reemplazar en tablas
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                if "[" not in cell.text:
+                    continue
+                for p in cell.paragraphs:
+                    for r in p.runs:
+                        r.text = replace_in_run_text(r.text)
+
+    # Guardar en memoria
+    buf = io.BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+    return buf.getvalue()
 
 def _formatear_fecha_es(fecha):
     if not fecha:
@@ -1008,13 +1146,15 @@ def egresados(request, req_id=None):
     req_start = None
     req_end = None
     curp = rfc = job_title = industry = business_name = None
+    hours = None  # 🔹 NUEVO: intensidad por defecto
 
     if active_req:
         program = getattr(active_req, "program", None)
         program_name = getattr(program, "name", None)
 
-        # Preferimos las fechas que estén en Graduate
         grad = getattr(active_req, "graduate", None)
+
+        # Preferimos las fechas que estén en Graduate
         if grad and (getattr(grad, "validity_start", None) or getattr(grad, "validity_end", None)):
             req_start = getattr(grad, "validity_start", None)
             req_end = getattr(grad, "validity_end", None)
@@ -1022,6 +1162,10 @@ def egresados(request, req_id=None):
             # Compatibilidad con la Request original
             req_start = getattr(active_req, "start_date", None)
             req_end = getattr(active_req, "end_date", None)
+
+        # 🔹 NUEVO: intensidad desde Graduate (si existe)
+        if grad:
+            hours = getattr(grad, "hours", None)
 
         curp = getattr(active_req, "curp", None)
         rfc = getattr(active_req, "rfc", None)
@@ -1050,6 +1194,7 @@ def egresados(request, req_id=None):
         "job_title": job_title,
         "industry": industry,
         "business_name": business_name,
+        "hours": hours,  # 🔹 NUEVO: para usar en egresados.html
 
         # Info de tipo de constancia
         "is_dc3": is_dc3,
@@ -1223,6 +1368,24 @@ def egresado_update(request, req_id):
                     req_dirty = True
                 break
 
+    # --------- HOURS (intensidad) ---------
+    hours_raw = (request.POST.get("hours") or "").strip()
+    if hours_raw:
+        try:
+            new_hours = int(hours_raw)
+            if new_hours <= 0:
+                new_hours = None
+        except ValueError:
+            return HttpResponseBadRequest(f"Valor inválido para horas: {hours_raw}")
+    else:
+        new_hours = None
+
+    old_hours = getattr(grad, "hours", None)
+    if old_hours != new_hours:
+        grad.hours = new_hours
+        grad_dirty = True
+        changed["hours"] = f"{old_hours or '—'} → {new_hours or '—'}"
+
     # --------- Guardar si hubo cambios ---------
     if grad_dirty:
         grad.save()
@@ -1233,6 +1396,7 @@ def egresado_update(request, req_id):
         "ok": True,
         "changed": changed,
     })
+
 
 def egresados_req(request, req_id):
     active_req = get_object_or_404(Request, pk=req_id)
@@ -1786,55 +1950,70 @@ def doc_download(request, req_id: int):
         except Exception as e:
             raise RuntimeError(f"Error generando documento: {e}")
 
-    def _make_docx_bytes_generic(include_cproem_note: bool = False, signed=None) -> bytes:
-        try:
-            from docx import Document
-        except Exception as e:
-            raise RuntimeError(f"python-docx no está instalado: {e}")
+    def _make_docx_bytes_generic(include_cproem_note=False, signed=None):
+    """
+    Genera un DOCX para diploma / constancia.
 
-        doc = Document()
-        title = (
-            f"{tipo_real.upper()} - {program_name}"
-            if tipo_real != "cproem"
-            else f"CONSTANCIA CPROEM - {program_name}"
+    - Primero intenta usar una plantilla DocxTemplate (si hay).
+    - Si no hay plantilla, usa el DOCX genérico de texto simple.
+    """
+    # 1) Intentar plantilla DOCX
+    try:
+        # Para el DOCX no necesitamos token nuevo, pero si quieres,
+        # podemos generar también la URL de verificación aquí.
+        doc_token = _ensure_published_token(req, tipo_real)
+        verify_url = request.build_absolute_uri(
+            reverse("administracion:verificar_token", args=[doc_token.token])
         )
-        doc.add_heading(title, level=1)
-        doc.add_paragraph(f"Nombre: {full_name or '—'}")
-        doc.add_paragraph(f"Programa: {program_name}")
-        doc.add_paragraph(f"Inicio: {_fmt_date(start_date)}")
-        doc.add_paragraph(f"Fin: {_fmt_date(end_date)}")
 
-        curp = getattr(req, "curp", None)
-        rfc = getattr(req, "rfc", None)
-        job = getattr(req, "job_title", None)
-        giro = getattr(req, "industry", None)
-        biz = getattr(req, "business_name", None)
+        rendered = _render_docx_template_for_request(req, tipo_real, verify_url=verify_url)
+        if rendered:
+            return rendered
+    except Exception as e:
+        # Si falla la plantilla, logueamos y caemos al genérico
+        log.exception("Error usando plantilla DOCX para %s #%s: %s", tipo_real, req.id, e)
 
-        if curp:
-            doc.add_paragraph(f"CURP: {curp}")
-        if rfc:
-            doc.add_paragraph(f"RFC: {rfc}")
-        if job:
-            doc.add_paragraph(f"Puesto: {job}")
-        if giro:
-            doc.add_paragraph(f"Giro: {giro}")
-        if biz:
-            doc.add_paragraph(f"Razón social: {biz}")
+    # 2) Fallback: DOCX genérico como antes
+    try:
+        from docx import Document
+    except Exception as e:
+        raise RuntimeError(f"python-docx no está instalado: {e}")
 
-        if include_cproem_note:
-            doc.add_paragraph("")
-            if signed is False:
-                doc.add_paragraph("Versión sin firma (sin imagen de firma).")
-            else:
-                doc.add_paragraph("Versión con firma (contiene imagen de firma).")
+    doc = Document()
+    title = f"{tipo_real.upper()} - {program_name}" if tipo_real != "cproem" else f"CONSTANCIA CPROEM - {program_name}"
+    doc.add_heading(title, level=1)
+    doc.add_paragraph(f"Nombre: {full_name or '—'}")
+    doc.add_paragraph(f"Programa: {program_name}")
+    doc.add_paragraph(f"Inicio: {_fmt_date(start_date)}")
+    doc.add_paragraph(f"Fin: {_fmt_date(end_date)}")
 
+    curp = getattr(req, "curp", None)
+    rfc  = getattr(req, "rfc", None)
+    job  = getattr(req, "job_title", None)
+    giro = getattr(req, "industry", None)
+    biz  = getattr(req, "business_name", None)
+
+    if curp: doc.add_paragraph(f"CURP: {curp}")
+    if rfc:  doc.add_paragraph(f"RFC: {rfc}")
+    if job:  doc.add_paragraph(f"Puesto: {job}")
+    if giro: doc.add_paragraph(f"Giro: {giro}")
+    if biz:  doc.add_paragraph(f"Razón social: {biz}")
+
+    if include_cproem_note:
         doc.add_paragraph("")
-        doc.add_paragraph("Documento generado automáticamente por CES System.")
+        if signed is False:
+            doc.add_paragraph("Versión sin firma (sin imagen de firma).")
+        else:
+            doc.add_paragraph("Versión con firma (contiene imagen de firma).")
 
-        b = io.BytesIO()
-        doc.save(b)
-        b.seek(0)
-        return b.getvalue()
+    doc.add_paragraph("")
+    doc.add_paragraph("Documento generado automáticamente por CES System.")
+
+    b = io.BytesIO()
+    doc.save(b)
+    b.seek(0)
+    return b.getvalue()
+
 
     # --- 4) Ramas por formato solicitado ---
     # CPROEM
@@ -2252,6 +2431,9 @@ def _render_ctx_and_template(request, req, tipo_real: str, *, use_published_if_e
         inicio = getattr(req, 'start_date', None)
         fin = getattr(req, 'end_date', None)
 
+    # 🔹 HORAS: primero Graduate, si no hay dejamos None (el template puede usar default)
+    horas_val = getattr(grad, "hours", None) if grad else None
+
     # Token de verificación
     if use_published_if_exists:
         published = _get_existing_token(req, tipo_real)
@@ -2282,6 +2464,7 @@ def _render_ctx_and_template(request, req, tipo_real: str, *, use_published_if_e
             "qr_url": qr_url,
             "bg_url": bg_url,
             "show_program_text": show_program_text,
+            "horas": horas_val,  # 👈 NUEVO: intensidad para el diploma
         }
 
     # ======================================================
@@ -2312,7 +2495,7 @@ def _render_ctx_and_template(request, req, tipo_real: str, *, use_published_if_e
                 "puesto": getattr(req, "job_title", None),
                 "giro": getattr(req, "industry", None),
                 "razon_social": getattr(req, "business_name", None),
-                "horas": getattr(req, "hours", None),
+                "horas": horas_val,                   # 👈 si la quieres también en DC3
                 "qr_url": qr_url,
                 "dc3_front_url": dc3_front_url,
                 "dc3_back_url": dc3_back_url,
@@ -2331,11 +2514,12 @@ def _render_ctx_and_template(request, req, tipo_real: str, *, use_published_if_e
                 "puesto": getattr(req, "job_title", None),
                 "giro": getattr(req, "industry", None),
                 "razon_social": getattr(req, "business_name", None),
-                "horas": getattr(req, "hours", None),
+                "horas": horas_val,                   # 👈 igual aquí si algún día la usas
                 "qr_url": qr_url,
             }
 
     return tpl, ctx
+
 
 # ==================== Seguridad PDF ====================
 

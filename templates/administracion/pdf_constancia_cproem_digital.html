@@ -45,20 +45,19 @@
         color: #000;
       }
 
-.curp {
-  position: absolute;
-  top: 97.5mm;
-  left: 213mm;  /* antes 70mm → más a la derecha */
-  right: 20mm;
-  text-align: left;
-  font-size: 10pt;
-  font-style: italic;
-  font-weight: 600;
-  letter-spacing: 0.6pt;
-  color: #b00000;
-  white-space: nowrap;
-}
-
+      .curp {
+        position: absolute;
+        top: 97.5mm;
+        left: 213mm;
+        right: 20mm;
+        text-align: left;
+        font-size: 10pt;
+        font-style: italic;
+        font-weight: 600;
+        letter-spacing: 0.6pt;
+        color: #b00000;
+        white-space: nowrap;
+      }
 
       /* PROGRAMA */
       .programa {
@@ -72,11 +71,11 @@
         color: #000;
       }
 
-      /* FECHAS: inicio y fin por separado (el fondo ya trae "EN EL PERÍODO DEL    AL") */
+      /* FECHAS: inicio y fin por separado (el fondo ya trae el texto) */
       .periodo-inicio {
         position: absolute;
-        top: 128mm; /* ↓ bajamos 1mm */
-        left: 150mm; /* inicio sigue a la derecha */
+        top: 128mm;
+        left: 150mm;
         text-align: left;
         font-size: 11pt;
         color: #000;
@@ -85,8 +84,8 @@
 
       .periodo-fin {
         position: absolute;
-        top: 128mm; /* ↓ bajamos 1mm */
-        left: 183mm; /* término sigue a la izquierda */
+        top: 128mm;
+        left: 183mm;
         text-align: left;
         font-size: 11pt;
         color: #000;
@@ -121,15 +120,19 @@
       <!-- PROGRAMA -->
       <div class="programa">{{ programa }}</div>
 
-      <!-- FECHA DE INICIO (solo la fecha, sin texto) -->
-      {% if vigencia_inicio %}
-      <div class="periodo-inicio">{{ vigencia_inicio|date:"d/m/Y" }}</div>
-      {% endif %}
+      <!-- FECHA DE INICIO (en letra) -->
+      <div class="periodo-inicio">
+        {% if vigencia_inicio %}
+          {{ vigencia_inicio|date:"j" }} de {{ vigencia_inicio|date:"F" }} de {{ vigencia_inicio|date:"Y" }}
+        {% endif %}
+      </div>
 
-      <!-- FECHA DE TÉRMINO (solo la fecha, sin texto) -->
-      {% if vigencia_termino %}
-      <div class="periodo-fin">{{ vigencia_termino|date:"d/m/Y" }}</div>
-      {% endif %}
+      <!-- FECHA DE TÉRMINO (en letra) -->
+      <div class="periodo-fin">
+        {% if vigencia_termino %}
+          {{ vigencia_termino|date:"j" }} de {{ vigencia_termino|date:"F" }} de {{ vigencia_termino|date:"Y" }}
+        {% endif %}
+      </div>
 
       <!-- QR -->
       <div class="qr">

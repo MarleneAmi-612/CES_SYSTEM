@@ -77,7 +77,7 @@ class Graduate(models.Model):
         blank=True,
         related_name='graduate'
     )
-
+        
     name = models.CharField(max_length=100)
     lastname = models.CharField(max_length=100)
     email = models.EmailField(max_length=254, unique=True)
@@ -94,6 +94,14 @@ class Graduate(models.Model):
     qr_image = models.CharField(max_length=100, blank=True, null=True)
     sent_at = models.DateTimeField(blank=True, null=True)
     completion_date = models.DateField(blank=True, null=True)
+
+    # 🔹 NUEVO CAMPO: intensidad en horas
+    hours = models.PositiveIntegerField(
+        "Horas de intensidad",
+        null=True,
+        blank=True,
+        help_text="Intensidad del programa en horas (opcional).",
+    )
 
     def __str__(self):
         return f"{self.name} {self.lastname}"
@@ -393,3 +401,37 @@ class RejectedArchive(models.Model):
 
     def __str__(self):
         return f"{self.full_name} <{self.email}>"
+
+# === Plantillas DOCX por tipo de documento ===
+
+class DocxTemplate(models.Model):
+    TIPO_CHOICES = [
+        ("diploma", "Diploma"),
+        ("dc3", "Constancia DC-3"),
+        ("cproem", "Constancia CPROEM"),
+    ]
+
+    id = models.BigAutoField(primary_key=True)
+    name = models.CharField("Nombre descriptivo", max_length=150)
+    tipo = models.CharField("Tipo de documento", max_length=20, choices=TIPO_CHOICES)
+
+    # Suben un .docx con placeholders [NOMBRE_COMPLETO], [CURP], etc.
+    file = models.FileField(
+        "Archivo DOCX",
+        upload_to="docx_templates/",
+    )
+
+    is_active = models.BooleanField(
+        "Usar como plantilla principal",
+        default=True,
+        help_text="Si hay varias activas del mismo tipo, se usará la más reciente."
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Plantilla DOCX"
+        verbose_name_plural = "Plantillas DOCX"
+
+    def __str__(self):
+        return f"{self.name} ({self.tipo})"
