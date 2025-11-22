@@ -20,7 +20,10 @@
     });
     if (!res.ok) {
       let msg = `Error HTTP ${res.status}`;
-      try { const t = await res.text(); if (t) msg += `: ${t}`; } catch {}
+      try {
+        const t = await res.text();
+        if (t) msg += `: ${t}`;
+      } catch {}
       throw new Error(msg);
     }
     return res.json().catch(() => ({}));
@@ -78,7 +81,7 @@
     if (btn)   btn.classList.add('is-active');
     if (panel) panel.classList.add('is-active');
 
-    // 🔹 actualizar visibilidad de "con firma / sin firma"
+    // actualizar visibilidad de "con firma / sin firma"
     updateSigVisibility();
   }
 
@@ -210,28 +213,129 @@
     });
   }
 
-  // ---------- Enviar por correo (diploma) ----------
-  const sendDipl = document.getElementById('btnSendDiploma');
-  if (sendDipl) {
-    sendDipl.addEventListener('click', async () => {
-      if (!sendUrl) return;
-      sendDipl.disabled = true;
-      try {
-        const fd = new FormData();
-        fd.append('tipo', 'diploma');
-        const data = await postForm(sendUrl, fd);
+  // ---------- Modal "Mensaje extra" para correo de diploma ----------
+  const emailMsgModal   = document.getElementById('egEmailMsgModal');
+  const emailMsgText    = document.getElementById('egEmailExtraMsg');
+  const emailMsgCancel  = document.getElementById('egEmailMsgCancel');
+  const emailMsgSend    = document.getElementById('egEmailMsgSend');
+  const emailModeRadios = document.querySelectorAll('input[name="egEmailMode"]');
 
-        if (data && data.verify_url) {
-          openDiplomaAlert(data.verify_url);
+  // id de la solicitud actual (viene del data-request-id en <main id="egRoot">)
+  const requestId = root && root.dataset.requestId ? root.dataset.requestId : null;
+
+  function openEmailMsgModal() {
+    if (!emailMsgModal) return false;
+    emailMsgModal.hidden = false;
+    document.body.classList.add('no-scroll');
+    if (emailMsgText) {
+      emailMsgText.focus();
+    }
+    return true;
+  }
+
+  function closeEmailMsgModal() {
+    if (!emailMsgModal) return;
+    emailMsgModal.hidden = true;
+    document.body.classList.remove('no-scroll');
+  }
+
+  function getSelectedEmailMode() {
+    let mode = 'append';
+    if (!emailModeRadios) return mode;
+    emailModeRadios.forEach(r => {
+      if (r.checked) mode = r.value;
+    });
+    return mode;
+  }
+
+  if (emailMsgCancel) {
+    emailMsgCancel.addEventListener('click', () => {
+      closeEmailMsgModal();
+      if (emailMsgText) emailMsgText.value = '';
+    });
+  }
+
+  // Cuando cambia el modo (append / full) prellenamos o limpiamos el textarea
+  if (emailModeRadios && requestId) {
+    emailModeRadios.forEach(r => {
+      r.addEventListener('change', async () => {
+        const mode = r.value;
+
+        if (mode === 'full') {
+          // Pedimos al backend el mensaje estándar ya armado
+          try {
+            const res = await fetch(`/administracion/egresados/email-preview/${requestId}/`);
+            const data = await res.json();
+            if (data.ok && emailMsgText) {
+              emailMsgText.value = data.message;
+            }
+          } catch (e) {
+            console.error('Error cargando mensaje estándar:', e);
+          }
         } else {
-          openDiplomaAlert(null);
+          // Modo "append": textarea vacío
+          if (emailMsgText) emailMsgText.value = '';
         }
-      } catch (e) {
-        console.error(e);
-        alert('No se pudo enviar el diploma.\n' + e.message);
-      } finally {
-        sendDipl.disabled = false;
+      });
+    });
+  }
+
+  // ---------- Enviar por correo (diploma) con panel de mensaje ----------
+  const sendDipl = document.getElementById('btnSendDiploma');
+
+  // función que realmente hace el POST
+  async function doSendDiploma(extraMessage, extraMode) {
+    if (!sendUrl) return;
+    if (sendDipl) sendDipl.disabled = true;
+    if (emailMsgSend) emailMsgSend.disabled = true;
+
+    try {
+      const fd = new FormData();
+      fd.append('tipo', 'diploma');
+
+      if (extraMessage) {
+        fd.append('extra_message', extraMessage);
       }
+      if (extraMode) {
+        fd.append('extra_mode', extraMode);   // "append" | "full"
+      }
+
+      const data = await postForm(sendUrl, fd);
+
+      if (data && data.verify_url) {
+        openDiplomaAlert(data.verify_url);
+      } else {
+        openDiplomaAlert(null);
+      }
+    } catch (e) {
+      console.error(e);
+      alert('No se pudo enviar el diploma.\n' + e.message);
+    } finally {
+      if (sendDipl) sendDipl.disabled = false;
+      if (emailMsgSend) emailMsgSend.disabled = false;
+      closeEmailMsgModal();
+      if (emailMsgText) emailMsgText.value = '';
+    }
+  }
+
+  // click en el botón principal → abre el panel
+  if (sendDipl) {
+    sendDipl.addEventListener('click', (e) => {
+      e.preventDefault();
+      const opened = openEmailMsgModal();
+      if (!opened) {
+        // fallback por si no hay modal
+        doSendDiploma('', 'append');
+      }
+    });
+  }
+
+  // click en "Enviar diploma" dentro del panel
+  if (emailMsgSend) {
+    emailMsgSend.addEventListener('click', () => {
+      const extra = emailMsgText ? emailMsgText.value.trim() : '';
+      const mode  = getSelectedEmailMode();  // "append" o "full"
+      doSendDiploma(extra, mode);
     });
   }
 
@@ -305,7 +409,7 @@
     });
   }
 
-   // ---------- Modal Descarga ----------
+  // ---------- Modal Descarga ----------
   const dlModal  = document.getElementById('dlModal');
   const dlForm   = document.getElementById('dlForm');
   const dlCancel = document.getElementById('dlCancel');
@@ -331,9 +435,13 @@
   }
 
   if (dlCancel) dlCancel.addEventListener('click', closeDlModal);
-  if (dlModal) dlModal.addEventListener('click', (e) => { if (e.target === dlModal) closeDlModal(); });
+  if (dlModal) {
+    dlModal.addEventListener('click', (e) => {
+      if (e.target === dlModal) closeDlModal();
+    });
+  }
 
-  const downDipl = document.getElementById('btnDownDiploma');
+  const downDipl  = document.getElementById('btnDownDiploma');
   const downConst = document.getElementById('btnDownConst');
   if (downDipl)  downDipl.addEventListener('click', () => openDlModal());
   if (downConst) downConst.addEventListener('click', () => openDlModal());
@@ -361,12 +469,12 @@
   }
 
   // ---------- Mini dropdown Editar datos ----------
-  const mini = document.querySelector('.mini-dd');
-  const editBtn = document.getElementById('editToggle');
-  const editMenu = document.getElementById('editPanel');
+  const mini      = document.querySelector('.mini-dd');
+  const editBtn   = document.getElementById('editToggle');
+  const editMenu  = document.getElementById('editPanel');
   const editClose = document.getElementById('editCloseBtn');
-  const editSave = document.getElementById('editSaveBtn');
-  const editForm = document.getElementById('editForm');
+  const editSave  = document.getElementById('editSaveBtn');
+  const editForm  = document.getElementById('editForm');
 
   function ddOpen(open) {
     if (!mini || !editMenu) return;
@@ -374,27 +482,37 @@
     editMenu.setAttribute('aria-hidden', open ? 'false' : 'true');
   }
 
-  if (editBtn) editBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    ddOpen(!mini.classList.contains('is-open'));
+  if (editBtn) {
+    editBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      ddOpen(!mini.classList.contains('is-open'));
+    });
+  }
+  if (editClose) {
+    editClose.addEventListener('click', () => ddOpen(false));
+  }
+  document.addEventListener('click', (e) => {
+    if (mini && !mini.contains(e.target)) ddOpen(false);
   });
-  if (editClose) editClose.addEventListener('click', () => ddOpen(false));
-  document.addEventListener('click', (e) => { if (mini && !mini.contains(e.target)) ddOpen(false); });
 
   // ---------- Alerta (modal centrado) ----------
   const alertModal = document.getElementById('egAlert');
-  const alertOk = document.getElementById('egAlertOk');
-  const alertJson = document.getElementById('egAlertBody');
+  const alertOk    = document.getElementById('egAlertOk');
+  const alertJson  = document.getElementById('egAlertBody');
 
   function showAlert(changed) {
     if (!alertModal) return;
-    const lines = Object.entries(changed || {}).map(([k,v]) => `• ${k}: ${v || '—'}`);
+    const lines = Object.entries(changed || {}).map(
+      ([k, v]) => `• ${k}: ${v || '—'}`
+    );
     alertJson.textContent = lines.length ? lines.join('\n') : 'No hubo cambios.';
     alertModal.hidden = false;
     document.body.classList.add('no-scroll');
     setTimeout(() => { window.location.reload(); }, 1600);
   }
-  if (alertOk) alertOk.addEventListener('click', () => window.location.reload());
+  if (alertOk) {
+    alertOk.addEventListener('click', () => window.location.reload());
+  }
 
   // ---------- Guardar cambios (AJAX) ----------
   if (editSave && editForm && editUrl) {
@@ -416,7 +534,7 @@
 
   // ---- Snippet CSP-friendly: cerrar con botón alterno (sin inline) ----
   document.addEventListener('DOMContentLoaded', function () {
-    const alt = document.getElementById('editCloseBtnAlt');
+    const alt       = document.getElementById('editCloseBtnAlt');
     const mainClose = document.getElementById('editCloseBtn');
     if (alt && mainClose) {
       alt.addEventListener('click', () => mainClose.click());

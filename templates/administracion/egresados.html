@@ -1,562 +1,906 @@
 {% load static %}
-<link rel="icon" href="{% static 'favicon/favicon.ico' %}">
-<!doctype html>
+<link rel="icon" href="{% static 'favicon/favicon.ico' %}" />
+<!DOCTYPE html>
 <html lang="es">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Egresados | CES</title>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Egresados | CES</title>
 
-  <!-- CSRF para fetch -->
-  <meta name="csrf-token" content="{{ csrf_token }}"/>
+    <!-- CSRF para fetch -->
+    <meta name="csrf-token" content="{{ csrf_token }}" />
 
-  <!-- Fuentes + estilos -->
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{% static 'css/egresados.css' %}?v=20251022-5">
-</head>
-<body class="bg-orbs">
-  <div class="wrap">
-
-    <header class="page-head">
-      <div class="page-head__row">
-        <div>
-          <h1 class="title">Egresados</h1>
-          <p class="muted">Procesamiento de documentos por egresado.</p>
-        </div>
-        <a class="btn ml-auto" href="{% url 'administracion:home' %}">Panel</a>
-      </div>
-    </header>
-
-    <div class="grid">
-      <!-- ========== Sidebar combinado: EN PROCESO / FINALIZADOS ========== -->
-      <aside class="side side--requests" aria-label="Solicitudes">
-        <div class="side__head side__head--tabs">
-          <h2 class="side__title">Solicitudes</h2>
-
-          <div class="segmented side__segmented"
-               role="tablist"
-               aria-label="Estado de solicitud"
-               data-scope="side">
-            <button class="segmented__btn is-active"
-                    role="tab"
-                    aria-selected="true"
-                    data-target="#panelInProcess">
-              En proceso
-              <span class="badge">{{ generating_reqs|length }}</span>
-            </button>
-            <button class="segmented__btn"
-                    role="tab"
-                    aria-selected="false"
-                    data-target="#panelFinished">
-              Finalizados
-              <span class="badge">{{ finished_reqs|length|default:"0" }}</span>
-            </button>
+    <!-- Fuentes + estilos -->
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="{% static 'css/egresados.css' %}?v=20251022-5"
+    />
+  </head>
+  <body class="bg-orbs">
+    <div class="wrap">
+      <header class="page-head">
+        <div class="page-head__row">
+          <div>
+            <h1 class="title">Egresados</h1>
+            <p class="muted">Procesamiento de documentos por egresado.</p>
           </div>
+          <a class="btn ml-auto" href="{% url 'administracion:home' %}">Panel</a>
         </div>
+      </header>
 
-        <!-- Panel: EN PROCESO -->
-        <div id="panelInProcess" class="side__panel">
-          <ul class="list" id="inProcessList" data-page-size="6">
-            {% for r in generating_reqs %}
-              <li class="card {% if active_req and r.id == active_req.id %}is-active{% endif %}">
-                <a class="row" href="{% url 'administracion:egresados_req' r.id %}">
+      <div class="grid">
+        <!-- ========== Sidebar combinado: EN PROCESO / FINALIZADOS ========== -->
+        <aside class="side side--requests" aria-label="Solicitudes">
+          <div class="side__head side__head--tabs">
+            <h2 class="side__title">Solicitudes</h2>
+
+            <div
+              class="segmented side__segmented"
+              role="tablist"
+              aria-label="Estado de solicitud"
+              data-scope="side"
+            >
+              <button
+                class="segmented__btn is-active"
+                role="tab"
+                aria-selected="true"
+                data-target="#panelInProcess"
+              >
+                En proceso
+                <span class="badge">{{ generating_reqs|length }}</span>
+              </button>
+              <button
+                class="segmented__btn"
+                role="tab"
+                aria-selected="false"
+                data-target="#panelFinished"
+              >
+                Finalizados
+                <span class="badge"
+                  >{{ finished_reqs|length|default:"0" }}</span
+                >
+              </button>
+            </div>
+          </div>
+
+          <!-- Panel: EN PROCESO -->
+          <div id="panelInProcess" class="side__panel">
+            <ul class="list" id="inProcessList" data-page-size="6">
+              {% for r in generating_reqs %}
+              <li
+                class="card {% if active_req and r.id == active_req.id %}is-active{% endif %}"
+              >
+                <a
+                  class="row"
+                  href="{% url 'administracion:egresados_req' r.id %}"
+                >
                   <div class="row__main">
                     <div class="row__name">{{ r.name }} {{ r.lastname }}</div>
-                    <div class="row__sub">#{{ r.id }} · {{ r.program.name|default:"Sin programa" }}</div>
+                    <div class="row__sub">
+                      #{{ r.id }} · {{ r.program.name|default:"Sin programa" }}
+                    </div>
                   </div>
                   <span class="dot dot--warn" aria-hidden="true"></span>
                 </a>
               </li>
-            {% empty %}
+              {% empty %}
               <li class="empty">No hay documentos generándose.</li>
-            {% endfor %}
-          </ul>
+              {% endfor %}
+            </ul>
 
-          <div class="dots" id="inProcessDots" aria-label="Paginación"></div>
-        </div>
+            <div class="dots" id="inProcessDots" aria-label="Paginación"></div>
+          </div>
 
-        <!-- Panel: FINALIZADOS -->
-        <div id="panelFinished" class="side__panel is-hidden">
-          <ul class="list" id="finishedList" data-page-size="6">
-            {% for r in finished_reqs %}
-              <li class="card {% if active_req and r.id == active_req.id %}is-active{% endif %}">
-                <a class="row"
-                   href="{% url 'administracion:egresados_req' r.id %}"
-                   data-id="{{ r.id }}">
+          <!-- Panel: FINALIZADOS -->
+          <div id="panelFinished" class="side__panel is-hidden">
+            <ul class="list" id="finishedList" data-page-size="6">
+              {% for r in finished_reqs %}
+              <li
+                class="card {% if active_req and r.id == active_req.id %}is-active{% endif %}"
+              >
+                <a
+                  class="row"
+                  href="{% url 'administracion:egresados_req' r.id %}"
+                  data-id="{{ r.id }}"
+                >
                   <div class="row__main">
                     <div class="row__name">{{ r.name }} {{ r.lastname }}</div>
-                    <div class="row__sub">#{{ r.id }} · {{ r.program.name|default:"Sin programa" }}</div>
+                    <div class="row__sub">
+                      #{{ r.id }} · {{ r.program.name|default:"Sin programa" }}
+                    </div>
                   </div>
                   <span class="dot" aria-hidden="true"></span>
                 </a>
               </li>
-            {% empty %}
+              {% empty %}
               <li class="empty">No hay documentos finalizados.</li>
-            {% endfor %}
-          </ul>
+              {% endfor %}
+            </ul>
 
-          <div class="dots" id="finishedDots" aria-label="Paginación"></div>
-        </div>
-      </aside>
+            <div class="dots" id="finishedDots" aria-label="Paginación"></div>
+          </div>
+        </aside>
 
-      <!-- ========== Main ========== -->
-      <main class="main" id="egRoot"
-            {% if active_req %}
-              data-request-id="{{ active_req.id }}"
-              data-preview-url="{% url 'administracion:egresados_preview_pdf' active_req.id %}"
-              data-download-url="{% url 'administracion:doc_download' active_req.id %}"
-              data-send-url="{% url 'administracion:doc_send' active_req.id %}"
-              data-confirm-url="{% url 'administracion:doc_confirm' active_req.id %}"
-              data-edit-url="{% url 'administracion:egresado_update' active_req.id %}"
-              data-const-kind="{{ const_kind }}"
-            {% endif %}>
-
-        <header class="main__head">
+        <!-- ========== Main ========== -->
+        <main
+          class="main"
+          id="egRoot"
           {% if active_req %}
+            data-request-id="{{ active_req.id }}"
+            data-preview-url="{% url 'administracion:egresados_preview_pdf' active_req.id %}"
+            data-download-url="{% url 'administracion:doc_download' active_req.id %}"
+            data-send-url="{% url 'administracion:doc_send' active_req.id %}"
+            data-confirm-url="{% url 'administracion:doc_confirm' active_req.id %}"
+            data-edit-url="{% url 'administracion:egresado_update' active_req.id %}"
+            data-const-kind="{{ const_kind }}"
+          {% endif %}
+        >
+          <header class="main__head">
+            {% if active_req %}
             <div>
               <div class="main__title">
                 {{ active_req.name }} {{ active_req.lastname }}
                 {% if constancia_label %}
-                  <span class="pill pill--muted" title="Tipo de constancia detectado por el programa">
-                    {{ constancia_label }}
-                  </span>
+                <span
+                  class="pill pill--muted"
+                  title="Tipo de constancia detectado por el programa"
+                >
+                  {{ constancia_label }}
+                </span>
                 {% endif %}
               </div>
               <div class="muted">
                 Solicitud #{{ active_req.id }}
-                {% if active_req.program %} — {{ active_req.program.name }}{% endif %}
+                {% if active_req.program %}
+                  — {{ active_req.program.name }}
+                {% else %}
+                  — Sin programa
+                {% endif %}
+              </div>
+
+            </div>
+            {% else %}
+            <div class="main__title">Elige un alumno del panel izquierdo</div>
+            <div class="muted">
+              Luego selecciona el tipo de documento a procesar.
+            </div>
+            {% endif %}
+
+            {% if active_req %}
+            <!-- Mini menú: Editar datos -->
+            <div
+              class="mini-dd"
+              id="editMenu"
+              aria-haspopup="true"
+              aria-expanded="false"
+            >
+              <button
+                class="mini-dd__btn"
+                type="button"
+                id="editToggle"
+                aria-controls="editPanel"
+              >
+                <span class="mini-dd__icon">✎</span> Editar datos
+                <span class="mini-dd__caret">▾</span>
+              </button>
+
+              <div
+                class="mini-dd__menu"
+                id="editPanel"
+                role="dialog"
+                aria-modal="false"
+                aria-hidden="true"
+              >
+                <form id="editForm" class="edit-form" novalidate>
+                  <div class="grid2 grid2--compact">
+                    <div class="field">
+                      <label class="label" for="eg-name">Nombre</label>
+                      <input
+                        id="eg-name"
+                        class="input"
+                        name="name"
+                        value="{{ active_req.name|default_if_none:'' }}"
+                        autocomplete="given-name"
+                      />
+                    </div>
+
+                    <div class="field">
+                      <label class="label" for="eg-lastname">Apellidos</label>
+                      <input
+                        id="eg-lastname"
+                        class="input"
+                        name="lastname"
+                        value="{{ active_req.lastname|default_if_none:'' }}"
+                        autocomplete="family-name"
+                      />
+                    </div>
+
+                    <div class="field">
+                      <label class="label" for="eg-curp">CURP</label>
+                      <input
+                        id="eg-curp"
+                        class="input"
+                        name="curp"
+                        value="{{ curp|default_if_none:'' }}"
+                        autocomplete="off"
+                        inputmode="text"
+                      />
+                    </div>
+
+                    <!-- Campos DC3 -->
+                    {% if is_dc3 %}
+                    <div class="field">
+                      <label class="label" for="eg-rfc">RFC</label>
+                      <input
+                        id="eg-rfc"
+                        class="input"
+                        name="rfc"
+                        value="{{ rfc|default_if_none:'' }}"
+                        autocomplete="off"
+                        inputmode="text"
+                      />
+                    </div>
+
+                    <div class="field">
+                      <label class="label" for="eg-job">Puesto</label>
+                      <input
+                        id="eg-job"
+                        class="input"
+                        name="job_title"
+                        value="{{ job_title|default_if_none:'' }}"
+                        autocomplete="organization-title"
+                      />
+                    </div>
+
+                    <div class="field">
+                      <label class="label" for="eg-industry">Giro</label>
+                      <input
+                        id="eg-industry"
+                        class="input"
+                        name="industry"
+                        value="{{ industry|default_if_none:'' }}"
+                        autocomplete="organization"
+                      />
+                    </div>
+
+                    <div class="field">
+                      <label class="label" for="eg-biz">Razón social</label>
+                      <input
+                        id="eg-biz"
+                        class="input"
+                        name="business_name"
+                        value="{{ business_name|default_if_none:'' }}"
+                        autocomplete="organization"
+                      />
+                    </div>
+                    {% endif %}
+
+                    <div class="field">
+                      <label class="label" for="eg-start">Fecha inicio</label>
+                      <input
+                        id="eg-start"
+                        class="input"
+                        type="date"
+                        name="start_date"
+                        value="{% if req_start %}{{ req_start|date:'Y-m-d' }}{% endif %}"
+                        autocomplete="off"
+                      />
+                    </div>
+
+                    <div class="field">
+                      <label class="label" for="eg-end">Fecha fin</label>
+                      <input
+                        id="eg-end"
+                        class="input"
+                        type="date"
+                        name="end_date"
+                        value="{% if req_end %}{{ req_end|date:'Y-m-d' }}{% endif %}"
+                        autocomplete="off"
+                      />
+                    </div>
+                  </div>
+
+                  <div class="edit-actions">
+                    <button
+                      class="egbtn egbtn--primary"
+                      type="button"
+                      id="editSaveBtn"
+                    >
+                      Guardar cambios
+                    </button>
+                    <button
+                      class="egbtn egbtn--ghost"
+                      type="button"
+                      id="editCloseBtn"
+                    >
+                      Cerrar
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
-          {% else %}
-            <div class="main__title">Elige un alumno del panel izquierdo</div>
-            <div class="muted">Luego selecciona el tipo de documento a procesar.</div>
-          {% endif %}
+            {% endif %}
+          </header>
 
-          {% if active_req %}
-          <!-- Mini menú: Editar datos -->
-          <div class="mini-dd" id="editMenu" aria-haspopup="true" aria-expanded="false">
-            <button class="mini-dd__btn" type="button" id="editToggle" aria-controls="editPanel">
-              <span class="mini-dd__icon">✎</span> Editar datos <span class="mini-dd__caret">▾</span>
+          <!-- Tabs tipo de documento -->
+          <div
+            class="segmented"
+            role="tablist"
+            aria-label="Tipo de documento"
+            data-scope="doc"
+          >
+            <button
+              class="segmented__btn is-active"
+              role="tab"
+              aria-selected="true"
+              data-target="#tabDiploma"
+            >
+              Diploma
             </button>
+            <button
+              class="segmented__btn"
+              role="tab"
+              aria-selected="false"
+              data-target="#tabConstancia"
+            >
+              {{ constancia_label|default:"Constancia" }}
+            </button>
+          </div>
 
-            <div class="mini-dd__menu" id="editPanel" role="dialog" aria-modal="false" aria-hidden="true">
-              <form id="editForm" class="edit-form" novalidate>
-                <div class="grid2 grid2--compact">
-                  <div class="field">
-                    <label class="label" for="eg-name">Nombre</label>
-                    <input id="eg-name" class="input" name="name"
-                           value="{{ active_req.name|default_if_none:'' }}"
-                           autocomplete="given-name">
-                  </div>
+          <!-- ===== DIPLOMA ===== -->
+          <section
+            id="tabDiploma"
+            class="panel doc-tab is-active"
+            role="tabpanel"
+            aria-labelledby="tabDiploma"
+          >
+            <div class="doc">
+              <div class="doc__head">
+                <h3 class="doc__title">Diploma (Certificado)</h3>
+                <div class="doc__folio">
+                  <span>Folio:</span>
+                  <strong>{{ diploma.folio|default:"FOLIO-XXXX" }}</strong>
+                </div>
+              </div>
 
-                  <div class="field">
-                    <label class="label" for="eg-lastname">Apellidos</label>
-                    <input id="eg-lastname" class="input" name="lastname"
-                           value="{{ active_req.lastname|default_if_none:'' }}"
-                           autocomplete="family-name">
-                  </div>
-
-                  <div class="field">
-                    <label class="label" for="eg-curp">CURP</label>
-                    <input id="eg-curp" class="input" name="curp"
-                           value="{{ curp|default_if_none:'' }}"
-                           autocomplete="off" inputmode="text">
-                  </div>
-
-                  <!-- Campos DC3 -->
-                  {% if is_dc3 %}
-                  <div class="field">
-                    <label class="label" for="eg-rfc">RFC</label>
-                    <input id="eg-rfc" class="input" name="rfc"
-                           value="{{ rfc|default_if_none:'' }}"
-                           autocomplete="off" inputmode="text">
-                  </div>
-
-                  <div class="field">
-                    <label class="label" for="eg-job">Puesto</label>
-                    <input id="eg-job" class="input" name="job_title"
-                           value="{{ job_title|default_if_none:'' }}"
-                           autocomplete="organization-title">
-                  </div>
-
-                  <div class="field">
-                    <label class="label" for="eg-industry">Giro</label>
-                    <input id="eg-industry" class="input" name="industry"
-                           value="{{ industry|default_if_none:'' }}"
-                           autocomplete="organization">
-                  </div>
-
-                  <div class="field">
-                    <label class="label" for="eg-biz">Razón social</label>
-                    <input id="eg-biz" class="input" name="business_name"
-                           value="{{ business_name|default_if_none:'' }}"
-                           autocomplete="organization">
-                  </div>
-                  {% endif %}
-
-                  <div class="field">
-                    <label class="label" for="eg-start">Fecha inicio</label>
-                    <input id="eg-start" class="input" type="date" name="start_date"
-                           value="{% if req_start %}{{ req_start|date:'Y-m-d' }}{% endif %}"
-                           autocomplete="off">
-                  </div>
-
-                  <div class="field">
-                    <label class="label" for="eg-end">Fecha fin</label>
-                    <input id="eg-end" class="input" type="date" name="end_date"
-                           value="{% if req_end %}{{ req_end|date:'Y-m-d' }}{% endif %}"
-                           autocomplete="off">
+              <div class="doc__grid">
+                <div class="pair">
+                  <div class="k">Nombre</div>
+                  <div class="v">
+                    {% if active_req %}
+                      {{ diploma.nombre|default:active_req.name|add:" "|add:active_req.lastname }}
+                    {% else %}
+                      —
+                    {% endif %}
                   </div>
                 </div>
 
-                <div class="edit-actions">
-                  <button class="egbtn egbtn--primary" type="button" id="editSaveBtn">Guardar cambios</button>
-                  <button class="egbtn egbtn--ghost" type="button" id="editCloseBtn">Cerrar</button>
+                <div class="pair">
+                  <div class="k">Programa</div>
+                  <div class="v">
+                    {% if active_req %}
+                      {{ diploma.diplomado|default:program_name|default:"—" }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </div>
+                </div>
+
+                <!-- INICIO (DIPLOMA) -->
+                <div class="pair">
+                  <div class="k">Inicio</div>
+                  <div class="v">
+                    {% if active_req and active_req.graduate and active_req.graduate.validity_start %}
+                      {{ active_req.graduate.validity_start|date:"d/m/Y" }}
+                    {% elif diploma.fecha_inicio %}
+                      {{ diploma.fecha_inicio|date:"d/m/Y" }}
+                    {% elif req_start %}
+                      {{ req_start|date:"d/m/Y" }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </div>
+                </div>
+
+                <!-- FIN (DIPLOMA) -->
+                <div class="pair">
+                  <div class="k">Fin</div>
+                  <div class="v">
+                    {% if active_req and active_req.graduate and active_req.graduate.validity_end %}
+                      {{ active_req.graduate.validity_end|date:"d/m/Y" }}
+                    {% elif diploma.fecha_fin %}
+                      {{ diploma.fecha_fin|date:"d/m/Y" }}
+                    {% elif req_end %}
+                      {{ req_end|date:"d/m/Y" }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </div>
+                </div>
+
+                <div class="pair pair--qr">
+                  <div class="k">QR</div>
+                  <div class="v">
+                    {% if diploma.qr_url %}
+                    <img src="{{ diploma.qr_url }}" alt="QR" />
+                    {% else %}
+                    <div class="qr-ph">QR</div>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+
+              <div class="doc__actions">
+                {% if active_req %}
+                <a
+                  id="btnPrevDiploma"
+                  class="btn"
+                  href="{% url 'administracion:egresados_preview_pdf' active_req.id %}?tipo=diploma"
+                  target="_blank"
+                  rel="noopener"
+                  >Vista previa (PDF)</a
+                >
+                {% else %}
+                <a id="btnPrevDiploma" class="btn" aria-disabled="true"
+                  >Vista previa (PDF)</a
+                >
+                {% endif %}
+
+                <button
+                  class="btn"
+                  id="btnDownDiploma"
+                  {% if not active_req %}disabled{% endif %}
+                >
+                  Descargar archivo
+                </button>
+                <button
+                  class="btn btn-primary"
+                  id="btnSendDiploma"
+                  data-req="{{ active_req.id }}"
+                  {% if not active_req %}disabled{% endif %}
+                  >
+                  Enviar por correo
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <!-- ===== CONSTANCIA (DC3 o CPROEM) ===== -->
+          <section
+            id="tabConstancia"
+            class="panel doc-tab"
+            role="tabpanel"
+            aria-labelledby="tabConstancia"
+          >
+            <div class="doc">
+              <div class="doc__head">
+                <h3 class="doc__title">
+                  {{ constancia_label|default:"Constancia" }}
+                </h3>
+                <div class="doc__folio">
+                  <span>Folio:</span>
+                  <strong>{{ constancia.folio|default:"CON-XXXXXX" }}</strong>
+                </div>
+              </div>
+
+              <div class="doc__grid">
+                <div class="pair">
+                  <div class="k">Nombre</div>
+                  <div class="v">
+                    {% if active_req %}
+                      {{ constancia.nombre|default:active_req.name|add:" "|add:active_req.lastname }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </div>
+                </div>
+
+                <div class="pair">
+                  <div class="k">Programa</div>
+                  <div class="v">
+                    {% if active_req %}
+                      {{ constancia.diplomado|default:program_name|default:"—" }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </div>
+                </div>
+
+                <!-- INICIO (CONSTANCIA) -->
+                <div class="pair">
+                  <div class="k">Inicio</div>
+                  <div class="v">
+                    {% if active_req and active_req.graduate and active_req.graduate.validity_start %}
+                      {{ active_req.graduate.validity_start|date:"d/m/Y" }}
+                    {% elif constancia.fecha_inicio %}
+                      {{ constancia.fecha_inicio|date:"d/m/Y" }}
+                    {% elif req_start %}
+                      {{ req_start|date:"d/m/Y" }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </div>
+                </div>
+
+                <!-- FIN (CONSTANCIA) -->
+                <div class="pair">
+                  <div class="k">Fin</div>
+                  <div class="v">
+                    {% if active_req and active_req.graduate and active_req.graduate.validity_end %}
+                      {{ active_req.graduate.validity_end|date:"d/m/Y" }}
+                    {% elif constancia.fecha_fin %}
+                      {{ constancia.fecha_fin|date:"d/m/Y" }}
+                    {% elif req_end %}
+                      {{ req_end|date:"d/m/Y" }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </div>
+                </div>
+
+                <!-- Comunes -->
+                <div class="pair">
+                  <div class="k">CURP</div>
+                  <div class="v">
+                    {% if active_req %}
+                      {{ constancia.curp|default:curp|default:"—" }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </div>
+                </div>
+
+                <!-- Solo DC3 -->
+                {% if is_dc3 %}
+                <div class="pair">
+                  <div class="k">RFC</div>
+                  <div class="v">
+                    {% if active_req %}
+                      {{ constancia.rfc|default:rfc|default:"—" }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </div>
+                </div>
+
+                <div class="pair">
+                  <div class="k">Puesto</div>
+                  <div class="v">
+                    {{ constancia.puesto|default:job_title|default:"—" }}
+                  </div>
+                </div>
+
+                <div class="pair">
+                  <div class="k">Giro</div>
+                  <div class="v">
+                    {{ constancia.giro|default:industry|default:"—" }}
+                  </div>
+                </div>
+
+                <div class="pair">
+                  <div class="k">Razón social</div>
+                  <div class="v">
+                    {{ constancia.razon_social|default:business_name|default:"—" }}
+                  </div>
+                </div>
+                {% endif %}
+
+                <div class="pair pair--qr">
+                  <div class="k">QR</div>
+                  <div class="v">
+                    {% if constancia.qr_url %}
+                    <img src="{{ constancia.qr_url }}" alt="QR" />
+                    {% else %}
+                    <div class="qr-ph">QR</div>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Acciones constancia -->
+              <div class="doc__actions">
+                {% if active_req %}
+                  {% if const_kind == "cproem" and active_req.graduate %}
+                  <!-- CPROEM: preview con versión WEB -->
+                  <a
+                    id="btnPrevConst"
+                    class="btn"
+                    href="{% url 'administracion:pdf_cproem_digital' active_req.graduate.id %}"
+                    target="_blank"
+                    rel="noopener"
+                  >
+                    Vista previa (PDF)
+                  </a>
+                  {% else %}
+                  <!-- DC3 u otros: se queda igual -->
+                  <a
+                    id="btnPrevConst"
+                    class="btn"
+                    href="{% url 'administracion:egresados_preview_pdf' active_req.id %}?tipo=constancia"
+                    target="_blank"
+                    rel="noopener"
+                  >
+                    Vista previa (PDF)
+                  </a>
+                  {% endif %}
+                {% else %}
+                  <a id="btnPrevConst" class="btn" aria-disabled="true">
+                    Vista previa (PDF)
+                  </a>
+                {% endif %}
+
+                <!-- Este botón sigue usando doc_download (versión impresa) -->
+                <button
+                  class="btn"
+                  id="btnDownConst"
+                  {% if not active_req %}disabled{% endif %}
+                >
+                  Descargar archivo
+                </button>
+
+                <label class="chk">
+                  <input
+                    type="checkbox"
+                    id="chkConfirm"
+                    {% if not active_req %}disabled{% endif %}
+                  />
+                  <span>
+                    Confirmo que ya puede estar disponible para que el alumno
+                    lo descargue
+                  </span>
+                </label>
+                <button class="btn btn-primary" id="btnConfirm" disabled>
+                  Confirmar
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <!-- ===== Modal Descarga ===== -->
+          <div
+            id="dlModal"
+            class="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="dlTitle"
+            hidden
+          >
+            <div class="modal__card" role="document">
+              <h3 id="dlTitle" class="modal__title">Descargar archivo</h3>
+
+              <form id="dlForm" class="modal__body">
+                <fieldset class="segmented" aria-label="Formato de descarga">
+                  <input
+                    id="fmt-pdf"
+                    type="radio"
+                    name="fmt"
+                    value="pdf"
+                    checked
+                  />
+                  <label for="fmt-pdf"
+                    ><span class="dot"></span> PDF (seguro)</label
+                  >
+
+                  <input id="fmt-docx" type="radio" name="fmt" value="docx" />
+                  <label for="fmt-docx"
+                    ><span class="dot"></span> DOCX (editable)</label
+                  >
+
+                  <input id="fmt-zip" type="radio" name="fmt" value="zip" />
+                  <label for="fmt-zip"
+                    ><span class="dot"></span> Ambos (ZIP)</label
+                  >
+                </fieldset>
+
+                <!-- controles de firma (solo para CPROEM) -->
+                <fieldset
+                  id="sigFieldset"
+                  class="segmented is-hidden"
+                  aria-label="Firma (CPROEM)"
+                >
+                  <input
+                    id="sig-signed"
+                    type="radio"
+                    name="sig"
+                    value="signed"
+                    checked
+                  />
+                  <label for="sig-signed"
+                    ><span class="dot"></span> Con firma (firmado)</label
+                  >
+
+                  <input
+                    id="sig-unsigned"
+                    type="radio"
+                    name="sig"
+                    value="unsigned"
+                  />
+                  <label for="sig-unsigned"
+                    ><span class="dot"></span> Sin firma (editable)</label
+                  >
+                </fieldset>
+
+                <div class="modal__footer">
+                  <button type="button" class="btn btn--ghost" id="dlCancel">
+                    Cancelar
+                  </button>
+                  <button type="submit" class="btn btn--primary" id="dlSubmit">
+                    Descargar
+                  </button>
                 </div>
               </form>
             </div>
           </div>
-          {% endif %}
-        </header>
 
-        <!-- Tabs tipo de documento -->
-        <div class="segmented"
-             role="tablist"
-             aria-label="Tipo de documento"
-             data-scope="doc">
-          <button class="segmented__btn is-active"
-                  role="tab"
-                  aria-selected="true"
-                  data-target="#tabDiploma">Diploma</button>
-          <button class="segmented__btn"
-                  role="tab"
-                  aria-selected="false"
-                  data-target="#tabConstancia">{{ constancia_label|default:"Constancia" }}</button>
-        </div>
-
-        <!-- ===== DIPLOMA ===== -->
-        <section id="tabDiploma" class="panel doc-tab is-active" role="tabpanel" aria-labelledby="tabDiploma">
-          <div class="doc">
-            <div class="doc__head">
-              <h3 class="doc__title">Diploma (Certificado)</h3>
-              <div class="doc__folio"><span>Folio:</span> <strong>{{ diploma.folio|default:"FOLIO-XXXX" }}</strong></div>
-            </div>
-
-            <div class="doc__grid">
-              <div class="pair">
-                <div class="k">Nombre</div>
-                <div class="v">
-                  {% if active_req %}
-                    {{ diploma.nombre|default:active_req.name|add:" "|add:active_req.lastname }}
-                  {% else %}—{% endif %}
-                </div>
+          <!-- ===== ALERTA personalizada (guardar cambios) ===== -->
+          <div
+            id="egAlert"
+            class="eg-alert"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="egAlertTitle"
+            hidden
+          >
+            <div class="eg-alert__card">
+              <div class="eg-alert__icon">⚡</div>
+              <h3 id="egAlertTitle" class="eg-alert__title">
+                Cambios guardados
+              </h3>
+              <pre id="egAlertBody" class="eg-alert__pre">—</pre>
+              <div class="eg-alert__actions">
+                <button
+                  type="button"
+                  class="egbtn egbtn--primary"
+                  id="egAlertOk"
+                >
+                  Aceptar
+                </button>
               </div>
-
-              <div class="pair">
-                <div class="k">Programa</div>
-                <div class="v">
-                  {% if active_req %}
-                    {{ diploma.diplomado|default:program_name|default:"—" }}
-                  {% else %}—{% endif %}
-                </div>
-              </div>
-
-              <!-- INICIO (DIPLOMA) -->
-              <div class="pair">
-                <div class="k">Inicio</div>
-                <div class="v">
-                  {% if active_req and active_req.graduate and active_req.graduate.validity_start %}
-                    {{ active_req.graduate.validity_start|date:"d/m/Y" }}
-                  {% elif diploma.fecha_inicio %}
-                    {{ diploma.fecha_inicio|date:"d/m/Y" }}
-                  {% elif req_start %}
-                    {{ req_start|date:"d/m/Y" }}
-                  {% else %}
-                    —
-                  {% endif %}
-                </div>
-              </div>
-
-              <!-- FIN (DIPLOMA) -->
-              <div class="pair">
-                <div class="k">Fin</div>
-                <div class="v">
-                  {% if active_req and active_req.graduate and active_req.graduate.validity_end %}
-                    {{ active_req.graduate.validity_end|date:"d/m/Y" }}
-                  {% elif diploma.fecha_fin %}
-                    {{ diploma.fecha_fin|date:"d/m/Y" }}
-                  {% elif req_end %}
-                    {{ req_end|date:"d/m/Y" }}
-                  {% else %}
-                    —
-                  {% endif %}
-                </div>
-              </div>
-
-              <div class="pair pair--qr">
-                <div class="k">QR</div>
-                <div class="v">
-                  {% if diploma.qr_url %}
-                    <img src="{{ diploma.qr_url }}" alt="QR">
-                  {% else %}
-                    <div class="qr-ph">QR</div>
-                  {% endif %}
-                </div>
-              </div>
-            </div>
-
-            <div class="doc__actions">
-              {% if active_req %}
-                <a id="btnPrevDiploma" class="btn"
-                   href="{% url 'administracion:egresados_preview_pdf' active_req.id %}?tipo=diploma"
-                   target="_blank" rel="noopener">Vista previa (PDF)</a>
-              {% else %}
-                <a id="btnPrevDiploma" class="btn" aria-disabled="true">Vista previa (PDF)</a>
-              {% endif %}
-
-              <button class="btn" id="btnDownDiploma" {% if not active_req %}disabled{% endif %}>Descargar archivo</button>
-              <button class="btn btn-primary" id="btnSendDiploma" {% if not active_req %}disabled{% endif %}>Enviar por correo</button>
             </div>
           </div>
-        </section>
 
-        <!-- ===== CONSTANCIA (DC3 o CPROEM) ===== -->
-        <section id="tabConstancia" class="panel doc-tab" role="tabpanel" aria-labelledby="tabConstancia">
-          <div class="doc">
-            <div class="doc__head">
-              <h3 class="doc__title">{{ constancia_label|default:"Constancia" }}</h3>
-              <div class="doc__folio"><span>Folio:</span> <strong>{{ constancia.folio|default:"CON-XXXXXX" }}</strong></div>
-            </div>
+          <!-- ===== PANEL: Configurar mensaje de correo de diploma ===== -->
+          <div
+            id="egEmailMsgModal"
+            class="eg-alert"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="egEmailMsgTitle"
+            hidden
+          >
+            <div class="eg-alert__card">
+              <div class="eg-alert__icon">✉️</div>
+              <h3 id="egEmailMsgTitle" class="eg-alert__title">
+                Mensaje de correo del diploma
+              </h3>
 
-            <div class="doc__grid">
-              <div class="pair">
-                <div class="k">Nombre</div>
-                <div class="v">
-                  {% if active_req %}
-                    {{ constancia.nombre|default:active_req.name|add:" "|add:active_req.lastname }}
-                  {% else %}—{% endif %}
-                </div>
+              <p class="eg-alert__msg">
+                Elige si quieres <strong>agregar</strong> un mensaje al texto
+                estándar o <strong>reemplazar completamente</strong> el mensaje
+                del correo.
+              </p>
+
+              <div class="eg-email-mode-group">
+                <label class="eg-email-mode-option">
+                  <input
+                    type="radio"
+                    name="egEmailMode"
+                    value="append"
+                    checked
+                  />
+                  Agregar este texto al mensaje estándar
+                </label>
+                <label class="eg-email-mode-option">
+                  <input type="radio" name="egEmailMode" value="full" />
+                  Reemplazar completamente el mensaje del correo
+                </label>
               </div>
 
-              <div class="pair">
-                <div class="k">Programa</div>
-                <div class="v">
-                  {% if active_req %}
-                    {{ constancia.diplomado|default:program_name|default:"—" }}
-                  {% else %}—{% endif %}
-                </div>
+              <textarea
+                id="egEmailExtraMsg"
+                rows="4"
+                class="eg-email-extra-msg"
+                placeholder="Escribe aquí el mensaje que quieres usar..."
+              ></textarea>
+
+              <div class="eg-alert__actions">
+                <button type="button" class="egbtn" id="egEmailMsgCancel">
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  class="egbtn egbtn--primary"
+                  id="egEmailMsgSend"
+                >
+                  Enviar diploma
+                </button>
               </div>
-
-              <!-- INICIO (CONSTANCIA) -->
-              <div class="pair">
-                <div class="k">Inicio</div>
-                <div class="v">
-                  {% if active_req and active_req.graduate and active_req.graduate.validity_start %}
-                    {{ active_req.graduate.validity_start|date:"d/m/Y" }}
-                  {% elif constancia.fecha_inicio %}
-                    {{ constancia.fecha_inicio|date:"d/m/Y" }}
-                  {% elif req_start %}
-                    {{ req_start|date:"d/m/Y" }}
-                  {% else %}
-                    —
-                  {% endif %}
-                </div>
-              </div>
-
-              <!-- FIN (CONSTANCIA) -->
-              <div class="pair">
-                <div class="k">Fin</div>
-                <div class="v">
-                  {% if active_req and active_req.graduate and active_req.graduate.validity_end %}
-                    {{ active_req.graduate.validity_end|date:"d/m/Y" }}
-                  {% elif constancia.fecha_fin %}
-                    {{ constancia.fecha_fin|date:"d/m/Y" }}
-                  {% elif req_end %}
-                    {{ req_end|date:"d/m/Y" }}
-                  {% else %}
-                    —
-                  {% endif %}
-                </div>
-              </div>
-
-              <!-- Comunes -->
-              <div class="pair">
-                <div class="k">CURP</div>
-                <div class="v">
-                  {% if active_req %}{{ constancia.curp|default:curp|default:"—" }}{% else %}—{% endif %}
-                </div>
-              </div>
-
-              <!-- Solo DC3 -->
-              {% if is_dc3 %}
-              <div class="pair">
-                <div class="k">RFC</div>
-                <div class="v">
-                  {% if active_req %}{{ constancia.rfc|default:rfc|default:"—" }}{% else %}—{% endif %}
-                </div>
-              </div>
-
-              <div class="pair">
-                <div class="k">Puesto</div>
-                <div class="v">{{ constancia.puesto|default:job_title|default:"—" }}</div>
-              </div>
-
-              <div class="pair">
-                <div class="k">Giro</div>
-                <div class="v">{{ constancia.giro|default:industry|default:"—" }}</div>
-              </div>
-
-              <div class="pair">
-                <div class="k">Razón social</div>
-                <div class="v">{{ constancia.razon_social|default:business_name|default:"—" }}</div>
-              </div>
-              {% endif %}
-
-              <div class="pair pair--qr">
-                <div class="k">QR</div>
-                <div class="v">
-                  {% if constancia.qr_url %}
-                    <img src="{{ constancia.qr_url }}" alt="QR">
-                  {% else %}
-                    <div class="qr-ph">QR</div>
-                  {% endif %}
-                </div>
-              </div>
-            </div>
-
-            <!-- 🔹 AQUÍ ES DONDE CAMBIAMOS LA VISTA PREVIA PARA CPROEM -->
-            <div class="doc__actions">
-              {% if active_req %}
-                {% if const_kind == "cproem" and active_req.graduate %}
-                  <!-- CPROEM: preview con versión WEB -->
-                  <a id="btnPrevConst" class="btn"
-                     href="{% url 'administracion:pdf_cproem_digital' active_req.graduate.id %}"
-                     target="_blank" rel="noopener">
-                    Vista previa (PDF)
-                  </a>
-                {% else %}
-                  <!-- DC3 u otros: se queda igual -->
-                  <a id="btnPrevConst" class="btn"
-                     href="{% url 'administracion:egresados_preview_pdf' active_req.id %}?tipo=constancia"
-                     target="_blank" rel="noopener">
-                    Vista previa (PDF)
-                  </a>
-                {% endif %}
-              {% else %}
-                <a id="btnPrevConst" class="btn" aria-disabled="true">Vista previa (PDF)</a>
-              {% endif %}
-
-              <!-- Este botón sigue usando doc_download (versión impresa) -->
-              <button class="btn" id="btnDownConst" {% if not active_req %}disabled{% endif %}>Descargar archivo</button>
-
-              <label class="chk">
-                <input type="checkbox" id="chkConfirm" {% if not active_req %}disabled{% endif %}>
-                <span>Confirmo que ya puede estar disponible para que el alumno lo descargue</span>
-              </label>
-              <button class="btn btn-primary" id="btnConfirm" disabled>Confirmar</button>
             </div>
           </div>
-        </section>
 
-        <!-- ===== Modal Descarga ===== -->
-        <div id="dlModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="dlTitle" hidden>
-          <div class="modal__card" role="document">
-            <h3 id="dlTitle" class="modal__title">Descargar archivo</h3>
+          <!-- ===== ALERTA Diploma publicado ===== -->
+          <div
+            id="egDiplomaAlert"
+            class="eg-alert"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="egDiplomaAlertTitle"
+            hidden
+          >
+            <div class="eg-alert__card">
+              <div class="eg-alert__icon">🎓</div>
+              <h3 id="egDiplomaAlertTitle" class="eg-alert__title">
+                Diploma publicado
+              </h3>
 
-            <form id="dlForm" class="modal__body">
-              <fieldset class="segmented" aria-label="Formato de descarga">
-                <input id="fmt-pdf" type="radio" name="fmt" value="pdf" checked>
-                <label for="fmt-pdf"><span class="dot"></span> PDF (seguro)</label>
+              <p class="eg-alert__msg">
+                El diploma se ha publicado correctamente. Puedes verificarlo con
+                el botón de abajo.
+              </p>
 
-                <input id="fmt-docx" type="radio" name="fmt" value="docx">
-                <label for="fmt-docx"><span class="dot"></span> DOCX (editable)</label>
-
-                <input id="fmt-zip" type="radio" name="fmt" value="zip">
-                <label for="fmt-zip"><span class="dot"></span> Ambos (ZIP)</label>
-              </fieldset>
-
-                <!-- controles de firma (solo para CPROEM) -->
-              <fieldset id="sigFieldset" class="segmented is-hidden" aria-label="Firma (CPROEM)">
-                <input id="sig-signed" type="radio" name="sig" value="signed" checked>
-                <label for="sig-signed"><span class="dot"></span> Con firma (firmado)</label>
-
-                <input id="sig-unsigned" type="radio" name="sig" value="unsigned">
-                <label for="sig-unsigned"><span class="dot"></span> Sin firma (editable)</label>
-              </fieldset>
-
-
-              <div class="modal__footer">
-                <button type="button" class="btn btn--ghost" id="dlCancel">Cancelar</button>
-                <button type="submit" class="btn btn--primary" id="dlSubmit">Descargar</button>
+              <div class="eg-alert__actions">
+                <button type="button" class="egbtn" id="egDiplomaAlertClose">
+                  Cerrar
+                </button>
+                <a
+                  href="#"
+                  target="_blank"
+                  rel="noopener"
+                  class="btn btn--primary"
+                  id="egDiplomaAlertLink"
+                >
+                  Ir a verificación
+                </a>
               </div>
-            </form>
-          </div>
-        </div>
-
-        <!-- ===== ALERTA personalizada (guardar cambios) ===== -->
-        <div id="egAlert" class="eg-alert" role="dialog" aria-modal="true" aria-labelledby="egAlertTitle" hidden>
-          <div class="eg-alert__card">
-            <div class="eg-alert__icon">⚡</div>
-            <h3 id="egAlertTitle" class="eg-alert__title">Cambios guardados</h3>
-            <pre id="egAlertBody" class="eg-alert__pre">—</pre>
-            <div class="eg-alert__actions">
-              <button type="button" class="egbtn egbtn--primary" id="egAlertOk">Aceptar</button>
             </div>
           </div>
-        </div>
 
-        <!-- ===== ALERTA Diploma publicado ===== -->
-        <div id="egDiplomaAlert" class="eg-alert" role="dialog"
-             aria-modal="true" aria-labelledby="egDiplomaAlertTitle" hidden>
-          <div class="eg-alert__card">
-            <div class="eg-alert__icon">🎓</div>
-            <h3 id="egDiplomaAlertTitle" class="eg-alert__title">Diploma publicado</h3>
+          <!-- ===== ALERTA Constancia publicada ===== -->
+          <div
+            id="egConstAlert"
+            class="eg-alert"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="egConstAlertTitle"
+            hidden
+          >
+            <div class="eg-alert__card">
+              <div class="eg-alert__icon">📜</div>
+              <h3 id="egConstAlertTitle" class="eg-alert__title">
+                Constancia publicada
+              </h3>
 
-            <p class="eg-alert__msg">
-              El diploma se ha publicado correctamente.
-              Puedes verificarlo con el botón de abajo.
-            </p>
+              <p class="eg-alert__msg">
+                La constancia se ha publicado correctamente. Usa el botón de
+                abajo para abrir la verificación.
+              </p>
 
-            <div class="eg-alert__actions">
-              <button type="button" class="egbtn" id="egDiplomaAlertClose">
-                Cerrar
-              </button>
-              <a href="#" target="_blank" rel="noopener"
-                 class="btn btn--primary" id="egDiplomaAlertLink">
-                Ir a verificación
-              </a>
+              <div class="eg-alert__actions">
+                <button type="button" class="egbtn" id="egConstAlertClose">
+                  Cerrar
+                </button>
+                <a
+                  href="#"
+                  target="_blank"
+                  rel="noopener"
+                  class="btn btn--primary"
+                  id="egConstAlertLink"
+                >
+                  Abrir verificación
+                </a>
+              </div>
             </div>
           </div>
-        </div>
-      
-        <!-- ===== ALERTA Constancia publicada ===== -->
-<div id="egConstAlert" class="eg-alert" role="dialog"
-     aria-modal="true" aria-labelledby="egConstAlertTitle" hidden>
-  <div class="eg-alert__card">
-    <div class="eg-alert__icon">📜</div>
-    <h3 id="egConstAlertTitle" class="eg-alert__title">Constancia publicada</h3>
-
-    <p class="eg-alert__msg">
-      La constancia se ha publicado correctamente. Usa el botón de abajo para abrir la verificación.
-    </p>
-
-    <div class="eg-alert__actions">
-      <button type="button" class="egbtn" id="egConstAlertClose">Cerrar</button>
-      <a href="#" target="_blank" rel="noopener"
-         class="btn btn--primary" id="egConstAlertLink">
-        Abrir verificación
-      </a>
+        </main>
+      </div>
     </div>
-  </div>
-</div>
 
-        
-      </main>
-    </div>
-  </div>
-
-  <!-- JS de la página (externo, sin inline para cumplir CSP) -->
-  <script src="{% static 'js/egresados.js' %}?v=20251022-3" defer></script>
-</body>
+    <!-- JS de la página (externo, sin inline para cumplir CSP) -->
+    <script src="{% static 'js/egresados.js' %}?v=20251022-3" defer></script>
+  </body>
 </html>

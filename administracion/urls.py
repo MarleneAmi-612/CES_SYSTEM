@@ -106,6 +106,7 @@ urlpatterns = [
     path("egresados/<int:req_id>/guardar-inline/", egresado_update, name="egresado_update_inline"),
     path("egresados/<int:req_id>/update/", views.egresado_update, name="egresado_update"),
     path("egresados/inline/update/", views.egresado_update_inline, name="egresado_update_inline"),
+    path("egresados/email-preview/<int:req_id>/", views.doc_email_preview, name="doc_email_preview"),
 
     # Acciones documento
     path("egresados/<int:req_id>/preview/", doc_preview, name="doc_preview"),

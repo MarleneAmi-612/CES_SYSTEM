@@ -477,3 +477,45 @@ body{
 #egDiplomaAlertLink:hover{
   text-decoration:none;
 }
+.eg-email-extra-msg {
+  width: 100%;
+  margin: 8px 0 12px;
+  border-radius: 8px;
+  padding: 8px;
+  resize: vertical;
+}
+.eg-email-extra-msg {
+  width: 100%;
+  margin: 8px 0 12px;
+  border-radius: 8px;
+  padding: 8px;
+  resize: vertical;
+}
+
+.eg-email-mode-group {
+  margin: 8px 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.eg-email-mode-option input {
+  margin-right: 4px;
+}
+.eg-email-extra-msg {
+  width: 100%;
+  box-sizing: border-box;
+
+  /* tamaño visual */
+  min-height: 180px;        /* más alto */
+  margin: 10px 0 14px;
+  padding: 12px 14px;
+
+  /* tipografía */
+  font-size: 0.95rem;
+  line-height: 1.5;
+
+  /* bordes / forma */
+  border-radius: 12px;
+  resize: vertical;
+}

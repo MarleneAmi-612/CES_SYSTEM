@@ -18,6 +18,11 @@ from pathlib import Path
 from typing import Optional   
 from alumnos.models import Request
 from types import SimpleNamespace
+from urllib.request import Request as UrlReq, urlopen
+from django.contrib.staticfiles.finders import find as find_static
+from email.mime.image import MIMEImage
+from django.core.mail import EmailMultiAlternatives
+
 # ============================
 # Terceros (third-party)
 # ============================
@@ -55,7 +60,7 @@ from django.core.exceptions import PermissionDenied
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
-from django.core.mail import send_mail
+from django.core.mail import send_mail,EmailMessage, EmailMultiAlternatives
 from django.core.mail import EmailMessage
 from django.db import connections, transaction,IntegrityError
 from django.db.models import Q, Count, Max
@@ -144,20 +149,61 @@ MESES_ES = [
     "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
 ]
 
-
 def _formatear_fecha_es(fecha):
     if not fecha:
         return ""
     return f"{fecha.day} de {MESES_ES[fecha.month - 1]} de {fecha.year}"
 
 
-def _build_cproem_context(graduate, request):
+def _build_cproem_context(*args):
     """
-    Construye un contexto "gordo" con muchos alias de nombres de variables
-    para que coincida con lo que usa tu template CPROEM (digital e impreso).
-    """
+    Construye el contexto para plantillas CPROEM.
 
-    # Programa REAL: viene desde Request.program
+    Acepta dos formas de llamada por compatibilidad:
+      - _build_cproem_context(request, graduate)
+      - _build_cproem_context(graduate, request)
+
+    Devuelve un dict con muchas claves (incluye `qr_url`) que usa
+    tu template `pdf_constancia_cproem*.html`.
+    """
+    # ---- Normalizar argumentos ----
+    request = None
+    graduate = None
+
+    if len(args) == 2:
+        a0, a1 = args
+        # detectar si alguno parece un HttpRequest (tiene build_absolute_uri)
+        if hasattr(a0, "build_absolute_uri") and not hasattr(a1, "build_absolute_uri"):
+            request, graduate = a0, a1
+        elif hasattr(a1, "build_absolute_uri") and not hasattr(a0, "build_absolute_uri"):
+            request, graduate = a1, a0
+        else:
+            # ninguno tiene build_absolute_uri (o ambos lo tienen) -> intentar heurística
+            # asumimos (graduate, request) por compatibilidad con tu código previo
+            graduate, request = a0, a1
+    elif len(args) == 1:
+        # si solo pasaron uno, asumimos que es graduate (no hay request disponible)
+        graduate = args[0]
+        request = None
+    else:
+        raise TypeError("_build_cproem_context espera (request, graduate) o (graduate, request)")
+
+    # ---- Helpers / extracción de datos ----
+    def _get_program_from_graduate(g):
+        # intenta obtener program desde atributos comunes
+        try:
+            return getattr(getattr(g, "request", None), "program", None) or getattr(g, "program", None)
+        except Exception:
+            return None
+
+    def _formatear_fecha_es(d):
+        if not d:
+            return ""
+        try:
+            return d.strftime("%d/%m/%Y")
+        except Exception:
+            return str(d)
+
     program = _get_program_from_graduate(graduate)
 
     # ==== Nombre del alumno ====
@@ -168,7 +214,7 @@ def _build_cproem_context(graduate, request):
         or str(graduate)
     )
 
-    # ==== Fechas (usa primero validity_start / validity_end) ====
+    # ==== Fechas ====
     start = (
         getattr(graduate, "validity_start", None)
         or getattr(graduate, "start_date", None)
@@ -185,69 +231,75 @@ def _build_cproem_context(graduate, request):
     fecha_inicio_txt = _formatear_fecha_es(start)
     fecha_fin_txt = _formatear_fecha_es(end)
 
-    # ==== Horas ====
+    # ==== Horas / curp ====
     horas = (
         getattr(program, "hours", None)
         or getattr(graduate, "hours", None)
-        or 120  # fallback
+        or 120
     )
+    curp = getattr(graduate, "curp", "") or ""
 
-    # ==== CURP / identificación ====
-    curp = getattr(graduate, "curp", "")
-
-    # ==== URL de verificación para el QR ====
+    # ==== verificacion_url (preparar con request si está) ====
+    verificacion_url = None
     try:
-        verificacion_url = request.build_absolute_uri(
-            reverse("alumnos:verificar_documento", args=[graduate.pk])
-        )
+        if request is not None:
+            # intenta URL específica si existe la view
+            try:
+                verificacion_url = request.build_absolute_uri(
+                    reverse("alumnos:verificar_documento", args=[getattr(graduate, "pk", getattr(graduate, "id", ""))])
+                )
+            except Exception:
+                # fallback a seguimiento (como tenías antes)
+                verificacion_url = request.build_absolute_uri(f"/alumnos/seguimiento/{getattr(graduate, 'pk', getattr(graduate, 'id', ''))}/")
     except Exception:
-        # Fallback: seguimiento del alumno si no existe esa url aún
-        verificacion_url = request.build_absolute_uri(
-            f"/alumnos/seguimiento/{graduate.pk}/"
-        )
+        verificacion_url = None
 
-    # ==== Generar QR en base64 ====
-    qr = qrcode.QRCode(box_size=10, border=1)
-    qr.add_data(verificacion_url)
-    qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white")
+    # Si no hay request/URL, hacemos un valor relativo (útil para tests)
+    if not verificacion_url:
+        verificacion_url = f"/alumnos/seguimiento/{getattr(graduate, 'pk', getattr(graduate, 'id', ''))}/"
 
-    buffer = io.BytesIO()
-    img.save(buffer, format="PNG")
-    qr_data_uri = "data:image/png;base64," + b64encode(buffer.getvalue()).decode("utf-8")
+    # ==== Generar QR PNG en memoria y convertir a data URI ==== 
+    try:
+        qr = qrcode.QRCode(box_size=10, border=1)
+        qr.add_data(verificacion_url)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        buffer = io.BytesIO()
+        img.save(buffer, format="PNG")
+        buffer.seek(0)
+        qr_data_uri = "data:image/png;base64," + b64encode(buffer.getvalue()).decode("utf-8")
+    except Exception:
+        # Si falla la generación de QR, dejamos None (template puede mostrar fallback)
+        qr_data_uri = None
 
+    # ==== Contexto final (muchos alias para compatibilidad con templates) ====
     ctx = {
-        # objeto completo
         "graduate": graduate,
 
-        # nombre - varios alias
+        # nombres / alias
         "full_name": full_name,
         "nombre": full_name,
         "nombre_completo": full_name,
         "alumno_nombre": full_name,
         "student_name": full_name,
 
-        # programa (objeto y nombre)
+        # programa
         "program": program,
         "programa": program,
         "programa_nombre": getattr(program, "name", "") if program else "",
         "program_name": getattr(program, "name", "") if program else "",
 
-        # horas
+        # horas, curp
         "horas": horas,
         "hours": horas,
-
-        # curp / clave
         "curp": curp,
         "clave_curp": curp,
 
-        # fechas crudas
+        # fechas crudas y formateadas (varios alias)
         "start_date": start,
         "end_date": end,
-        "vigencia_inicio": start,      # 🔹 lo que pide tu template digital
-        "vigencia_termino": end,       # 🔹 lo que pide tu template digital
-
-        # fechas formateadas (por si algún otro template las usa)
+        "vigencia_inicio": start,
+        "vigencia_termino": end,
         "fecha_inicio": fecha_inicio_txt,
         "fecha_fin": fecha_fin_txt,
         "inicio": fecha_inicio_txt,
@@ -255,16 +307,14 @@ def _build_cproem_context(graduate, request):
         "fecha_inicio_txt": fecha_inicio_txt,
         "fecha_fin_txt": fecha_fin_txt,
 
-        # verificación
+        # verificación + QR (varios nombres para compatibilidad)
         "verificacion_url": verificacion_url,
         "verification_url": verificacion_url,
-
-        # QR con varios nombres posibles
         "qr_data_uri": qr_data_uri,
         "qr_image": qr_data_uri,
         "qr": qr_data_uri,
         "qr_src": qr_data_uri,
-        "qr_url": qr_data_uri,         # 🔹 EXACTO el nombre que usa pdf_constancia_cproem_digital.html
+        "qr_url": qr_data_uri,   # ← EXACTO: asegura que {{ qr_url }} en tu template funcione
     }
 
     return ctx
@@ -1287,14 +1337,19 @@ def doc_send(request, req_id):
         pk=req_id,
     )
 
-    # --- Tipo solicitado (query) y tipo real ---
+    # --- Tipo solicitado (query/POST) y tipo real ---
     tipo_query = _get_tipo_from_request(request, default="diploma")
     if tipo_query not in ("diploma", "constancia"):
         return JsonResponse({"ok": False, "error": "Tipo inválido."}, status=400)
 
     tipo_real = "diploma" if tipo_query == "diploma" else constancia_kind_for_request(req)
-
     log.info("[doc_send] tipo_query=%s → tipo_real=%s (req=%s)", tipo_query, tipo_real, req.id)
+
+    # Mensaje extra opcional y modo desde el frontend
+    extra_msg = (request.POST.get("extra_message") or "").strip()
+    extra_mode = (request.POST.get("extra_mode") or "append").strip().lower()
+    if extra_mode not in ("append", "full"):
+        extra_mode = "append"
 
     # --- Publicar token / URL de verificación ---
     doc = _ensure_published_token(req, tipo_real)
@@ -1302,23 +1357,21 @@ def doc_send(request, req_id):
         reverse("administracion:verificar_token", args=[doc.token])
     )
 
-    # --- Generar PDF del diploma/constancia (mismo motor que el preview) ---
+    # --- Generar PDF del diploma/constancia ---
     pdf_bytes = None
     try:
-        # Igual que egresados_preview_pdf / doc_download
         tpl, ctx = _render_ctx_and_template(
             request, req, tipo_real, use_published_if_exists=True
         )
-
         html = render_to_string(tpl, ctx, request=request)
-        # HTML → PDF
+
+        from weasyprint import HTML
         pdf_bytes = HTML(string=html, base_url=request.build_absolute_uri("/")).write_pdf()
 
-        # Endurecer / marca de agua como en doc_download
         pdf_bytes = _pdf_secure(
             pdf_bytes,
-            user_pwd="",                         # sin password para abrir
-            watermark_text="CES · Solo lectura", # marca de agua opcional
+            user_pwd="",
+            watermark_text="CES · Solo lectura",
         )
     except Exception as e:
         pdf_bytes = None
@@ -1329,35 +1382,128 @@ def doc_send(request, req_id):
     if req.email:
         try:
             kind_label = "diploma" if tipo_real == "diploma" else "constancia"
+            nombre = f"{getattr(req, 'name', '')} {getattr(req, 'lastname', '')}".strip() or "alumno"
 
-            subject = f"Tu {kind_label} – Centro de Estudios Superiores"
-            body = (
-                f"Hola {getattr(req, 'name', '')} {getattr(req, 'lastname', '')},\n\n"
+            subject = f"Tu {kind_label} – Centro de Estudios Superiores en Negocios y Humanidades"
+
+            # -------- Versión base (TEXTO PLANO) --------
+            base_body_text = (
+                f"Hola {nombre},\n\n"
                 f"Tu {kind_label} ha sido publicado.\n"
-                f"Puedes verlo y verificarlo en el siguiente enlace:\n{verify_url}\n\n"
-                "Centro de Estudios Superiores"
+                "Puedes verlo y verificarlo en el siguiente enlace:\n"
+                f"Verifica aquí: {verify_url}\n\n"
+                "Centro de Estudios Superiores en Negocios y Humanidades"
             )
 
-            # Remitente configurado en settings (ej: yadier472@gmail.com)
-            from_email = getattr(settings, "DEFAULT_FROM_EMAIL", None) or getattr(settings, "EMAIL_HOST_USER", None)
+            # -------- Versión base (HTML) --------
+            base_body_html = f"""
+<html>
+  <body style="font-family: Arial, sans-serif; line-height:1.6;">
+    <div style="text-align:center; margin-bottom:20px;">
+      <img src="cid:ceslogo" alt="CES"
+           style="max-width:180px; height:auto;">
+    </div>
+    <p>Hola {escape(nombre)},</p>
+    <p>Tu {escape(kind_label)} ha sido publicado.</p>
+    <p>Puedes verlo y verificarlo en el siguiente enlace:</p>
+    <p><a href="{verify_url}">Verifica aquí</a></p>
+    <p>Centro de Estudios Superiores en Negocios y Humanidades</p>
+  </body>
+</html>
+""".strip()
+
+            # Helper para convertir texto extra a HTML (modo append)
+            def extra_to_html(text):
+                if not text:
+                    return ""
+                safe = escape(text).replace("\n", "<br>")
+                return f"<p><strong>Mensaje adicional:</strong><br>{safe}</p>"
+
+            # ---------- Construir cuerpo según modo ----------
+            if extra_mode == "full" and extra_msg:
+                # 🟣 MODO FULL: el textarea sustituye TODO el mensaje principal
+                # Respetamos exactamente el texto del usuario y:
+                #  - en HTML: la primera ocurrencia de "Verifica aquí" se vuelve <a href="...">
+                #  - en texto plano: añadimos al final la URL para no perderla
+                text_body = extra_msg + "\n\nEnlace de verificación:\n" + verify_url
+
+                # HTML a partir del texto del usuario
+                rendered = escape(extra_msg).replace("\n", "<br>")
+
+                if "Verifica aquí" in extra_msg:
+                    # Solo la primera ocurrencia se vuelve enlace
+                    rendered = rendered.replace(
+                        "Verifica aquí",
+                        f'<a href="{verify_url}">Verifica aquí</a>',
+                        1,
+                    )
+                    html_inner = rendered
+                else:
+                    # Si no puso la frase, añadimos el enlace al final
+                    html_inner = rendered + f'<br><br><a href="{verify_url}">Verifica aquí</a>'
+
+                html_body = f"""
+<html>
+  <body style="font-family: Arial, sans-serif; line-height:1.6;">
+    <div style="text-align:center; margin-bottom:20px;">
+      <img src="cid:ceslogo" alt="CES"
+           style="max-width:180px; height:auto;">
+    </div>
+    <div>{html_inner}</div>
+  </body>
+</html>
+""".strip()
+
+            else:
+                # 🟢 MODO APPEND (o sin mensaje extra): mensaje estándar + "Mensaje adicional"
+                text_body = base_body_text
+                html_body = base_body_html
+
+                if extra_msg:
+                    text_body += "\n\nMensaje adicional:\n" + extra_msg
+                    html_body = base_body_html.replace(
+                        "</body>",
+                        extra_to_html(extra_msg) + "\n  </body>"
+                    )
+
+            # Remitente configurado en settings
+            from_email = getattr(settings, "DEFAULT_FROM_EMAIL", None) or getattr(
+                settings, "EMAIL_HOST_USER", None
+            )
 
             if not from_email:
-                log.warning("No DEFAULT_FROM_EMAIL/EMAIL_HOST_USER configurado; no se enviará correo.")
+                log.warning(
+                    "No DEFAULT_FROM_EMAIL/EMAIL_HOST_USER configurado; no se enviará correo."
+                )
             else:
-                # Creamos el mensaje para poder adjuntar el PDF
-                email = EmailMessage(
+                # Crear el email multi-parte (texto + HTML)
+                email = EmailMultiAlternatives(
                     subject=subject,
-                    body=body,
+                    body=text_body,
                     from_email=from_email,
                     to=[req.email],
                 )
+                email.attach_alternative(html_body, "text/html")
 
-                # Si pudimos generar el PDF, lo adjuntamos
+                # Adjuntar logo inline (cid:ceslogo) desde static/img/CES_Logo.png
+                try:
+                    logo_path = find_static("img/CES_Logo.png")
+                    if logo_path:
+                        with open(logo_path, "rb") as f:
+                            logo_data = f.read()
+                        image = MIMEImage(logo_data)
+                        image.add_header("Content-ID", "<ceslogo>")
+                        image.add_header("Content-Disposition", "inline", filename="CES_Logo.png")
+                        email.mixed_subtype = "related"
+                        email.attach(image)
+                except Exception as e:
+                    log.exception("No se pudo adjuntar el logo CES: %s", e)
+
+                # Adjuntar PDF si existe
                 if pdf_bytes:
                     filename = f"{tipo_real}-{req.id}.pdf"
                     email.attach(filename, pdf_bytes, "application/pdf")
 
-                # Enviar
                 email.send(fail_silently=False)
                 emailed = True
 
@@ -1367,12 +1513,10 @@ def doc_send(request, req_id):
     # --- Si se envió el correo, actualizar estado / tracking (quinto círculo) ---
     if emailed:
         try:
-            # 1) status principal
             if getattr(req, "status", None) != "emailed":
                 req.status = "emailed"
                 req.save(update_fields=["status"])
 
-            # 2) evento en la bitácora (RequestEvent)
             if not RequestEvent.objects.filter(request=req, status="emailed").exists():
                 RequestEvent.objects.create(
                     request=req,
@@ -1380,24 +1524,74 @@ def doc_send(request, req_id):
                     note="Documento enviado por correo desde administración.",
                 )
 
-            # 3) timestamp en Graduate.sent_at para el timeline
             grad = getattr(req, "graduate", None)
             if grad and not getattr(grad, "sent_at", None):
                 grad.sent_at = timezone.now()
                 grad.save(update_fields=["sent_at"])
         except Exception as exc:
-            log.exception("Error actualizando estado 'emailed' para Request %s: %s", req.id, exc)
+            log.exception(
+                "Error actualizando estado 'emailed' para Request %s: %s", req.id, exc
+            )
 
-    # Respuesta al frontend (tu JS usa verify_url; lo demás es informativo)
+    # === Solo para CPROEM: marcar como FINALIZADO (círculo 6) ===
+    is_cproem = (tipo_real == "cproem")
+    if is_cproem:
+        if req.status != "finalizado":
+            req.status = "finalizado"
+            req.save(update_fields=["status"])
+
+        if not RequestEvent.objects.filter(request=req, status="finalizado").exists():
+            RequestEvent.objects.create(
+                request=req,
+                status="finalizado",
+                note="Constancia CPROEM confirmada; disponible para descarga.",
+            )
+
+        grad = getattr(req, "graduate", None)
+        if grad and not getattr(grad, "download_date", None):
+            grad.download_date = timezone.localdate()
+            grad.save(update_fields=["download_date"])
+
     return JsonResponse(
         {
             "ok": True,
             "verify_url": verify_url,
             "tipo": tipo_real,
-            "emailed": emailed,
-            "pdf_attached": bool(pdf_bytes),
+            "finalizado": is_cproem,
         }
     )
+
+@require_GET
+def doc_email_preview(request, req_id):
+    """
+    Devuelve el mensaje estándar de correo para prellenar el textarea
+    cuando el usuario selecciona 'reemplazar'.
+    """
+    req = get_object_or_404(
+        Request.objects.select_related("program", "graduate"),
+        pk=req_id,
+    )
+
+    tipo_real = "diploma"
+
+    # Generar verify_url sin enviar correo todavía
+    doc = _ensure_published_token(req, tipo_real)
+    verify_url = request.build_absolute_uri(
+        reverse("administracion:verificar_token", args=[doc.token])
+    )
+
+    nombre = f"{req.name} {req.lastname}".strip()
+
+    # OJO: aquí ya NO metemos la URL larga, solo el texto
+    texto = (
+        f"Hola {nombre},\n\n"
+        "Tu diploma ha sido publicado.\n"
+        "Puedes verlo y verificarlo en el siguiente enlace:\n"
+        "Verifica aquí\n\n"
+        "Centro de Estudios Superiores en Negocios y Humanidades"
+    )
+
+    return JsonResponse({"ok": True, "message": texto})
 
 @require_POST
 def doc_confirm(request, req_id):
@@ -1493,7 +1687,8 @@ def doc_download(request, req_id: int):
         return JsonResponse({"ok": False, "error": "Parámetro 'sig' inválido."}, status=400)
     signed_flag = None
     if tipo_real == "cproem":
-        signed_flag = (sig_param != "unsigned")  # default: True (signed) si no se pasa nada
+        # default: True (signed) si no se pasa nada o se pasa 'signed'
+        signed_flag = (sig_param != "unsigned")
 
     # intentar publicar token (no crítico)
     try:
@@ -1514,7 +1709,7 @@ def doc_download(request, req_id: int):
             return str(d) if d else "—"
 
     # helper: render -> PDF y luego _pdf_secure
-    def _pdf_from_html_string(html_str):
+    def _pdf_from_html_string(html_str: str) -> bytes:
         if HTML is None:
             raise RuntimeError("WeasyPrint no está instalado.")
         base_url = request.build_absolute_uri("/")
@@ -1531,7 +1726,7 @@ def doc_download(request, req_id: int):
         nombre = (f"{req.name or ''} {req.lastname or ''}".strip()) or getattr(graduate, "nombre", "") or "—"
         programa = getattr(getattr(req, "program", None), "name", "") or "—"
 
-        # vigencias: preferir datos del graduate si existen (ajusta según tu modelo)
+        # vigencias: preferir datos del graduate si existen
         vigencia_inicio = getattr(graduate, "validity_start", None)
         vigencia_termino = getattr(graduate, "validity_end", None)
 
@@ -1539,16 +1734,14 @@ def doc_download(request, req_id: int):
         inicio = getattr(req, "start_date", None)
         fin = getattr(req, "end_date", None)
 
-        # QR: si el graduate tiene qr_url lo usamos; si no, intentamos formar una URL pública
-        qr_url = getattr(graduate, "qr_url", None) or ""
-        if not qr_url:
-            try:
-                if getattr(graduate, "id", None):
-                    # Ajusta la vista de verificación pública si tienes una distinta
-                    verify_url = request.build_absolute_uri(reverse("administracion:pdf_cproem_digital", args=[graduate.id]))
-                    qr_url = verify_url
-            except Exception:
-                qr_url = ""
+        # QR: usamos el token publicado si existe; si no, generamos uno nuevo
+        published = _get_existing_token(req, "cproem")
+        token = published.token if published else _random_hex_25()
+        verify_url = request.build_absolute_uri(
+            reverse("administracion:verificar_token", args=[token])
+        )
+        # PNG embebido, igual que en diplomas/DC3
+        qr_url = _qr_png_data_url(verify_url, box_size=12)
 
         # Firma: solo si include_signature -> construimos URL a static
         signature_url = ""
@@ -1572,7 +1765,7 @@ def doc_download(request, req_id: int):
         }
 
     # Generadores PDF/DOCX
-    def _make_pdf_bytes_for_cproem(graduate, signed: bool):
+    def _make_pdf_bytes_for_cproem(graduate, signed: bool) -> bytes:
         try:
             # Si signed -> plantilla digital (contiene la firma), si unsigned -> plantilla sin firma
             tpl_signed = "administracion/pdf_constancia_cproem_digital.html"
@@ -1585,7 +1778,7 @@ def doc_download(request, req_id: int):
         except Exception as e:
             raise RuntimeError(f"Error generando documento: {e}")
 
-    def _make_pdf_bytes_generic():
+    def _make_pdf_bytes_generic() -> bytes:
         try:
             tpl, ctx = _render_ctx_and_template(request, req, tipo_real, use_published_if_exists=True)
             html = render_to_string(tpl, ctx, request=request)
@@ -1593,14 +1786,18 @@ def doc_download(request, req_id: int):
         except Exception as e:
             raise RuntimeError(f"Error generando documento: {e}")
 
-    def _make_docx_bytes_generic(include_cproem_note=False, signed=None):
+    def _make_docx_bytes_generic(include_cproem_note: bool = False, signed=None) -> bytes:
         try:
             from docx import Document
         except Exception as e:
             raise RuntimeError(f"python-docx no está instalado: {e}")
 
         doc = Document()
-        title = f"{tipo_real.upper()} - {program_name}" if tipo_real != "cproem" else f"CONSTANCIA CPROEM - {program_name}"
+        title = (
+            f"{tipo_real.upper()} - {program_name}"
+            if tipo_real != "cproem"
+            else f"CONSTANCIA CPROEM - {program_name}"
+        )
         doc.add_heading(title, level=1)
         doc.add_paragraph(f"Nombre: {full_name or '—'}")
         doc.add_paragraph(f"Programa: {program_name}")
@@ -1608,16 +1805,21 @@ def doc_download(request, req_id: int):
         doc.add_paragraph(f"Fin: {_fmt_date(end_date)}")
 
         curp = getattr(req, "curp", None)
-        rfc  = getattr(req, "rfc", None)
-        job  = getattr(req, "job_title", None)
+        rfc = getattr(req, "rfc", None)
+        job = getattr(req, "job_title", None)
         giro = getattr(req, "industry", None)
-        biz  = getattr(req, "business_name", None)
+        biz = getattr(req, "business_name", None)
 
-        if curp: doc.add_paragraph(f"CURP: {curp}")
-        if rfc:  doc.add_paragraph(f"RFC: {rfc}")
-        if job:  doc.add_paragraph(f"Puesto: {job}")
-        if giro: doc.add_paragraph(f"Giro: {giro}")
-        if biz:  doc.add_paragraph(f"Razón social: {biz}")
+        if curp:
+            doc.add_paragraph(f"CURP: {curp}")
+        if rfc:
+            doc.add_paragraph(f"RFC: {rfc}")
+        if job:
+            doc.add_paragraph(f"Puesto: {job}")
+        if giro:
+            doc.add_paragraph(f"Giro: {giro}")
+        if biz:
+            doc.add_paragraph(f"Razón social: {biz}")
 
         if include_cproem_note:
             doc.add_paragraph("")
@@ -1637,33 +1839,64 @@ def doc_download(request, req_id: int):
     # --- 4) Ramas por formato solicitado ---
     # CPROEM
     if tipo_real == "cproem":
-        # localizar graduate
+        # localizar graduate existente
         grad = getattr(req, "graduate", None)
         if not grad:
             grad = Graduate.objects.filter(request=req).first()
+
+        # si no existe, lo creamos automáticamente con datos mínimos de la Request
         if not grad:
-            return JsonResponse({"ok": False, "error": "No existe Graduate para CPROEM."}, status=400)
+            grad, _ = Graduate.objects.get_or_create(
+                request=req,
+                defaults={
+                    "name": getattr(req, "name", "") or "",
+                    "lastname": getattr(req, "lastname", "") or "",
+                    "email": getattr(req, "email", "") or "",
+                    "curp": getattr(req, "curp", "") or "",
+                    "job_title": getattr(req, "job_title", "") or "",
+                    "industry": getattr(req, "industry", "") or "",
+                    "business_name": getattr(req, "business_name", "") or "",
+                    "url": getattr(req, "url", "") or "",
+                    "validity_start": getattr(req, "start_date", None),
+                    "validity_end": getattr(req, "end_date", None),
+                },
+            )
 
         # PDF
         if fmt == "pdf":
             try:
-                signed = (signed_flag if signed_flag is not None else True)
+                signed = signed_flag if signed_flag is not None else True
                 pdf_bytes = _make_pdf_bytes_for_cproem(grad, signed=signed)
-                return FileResponse(io.BytesIO(pdf_bytes), content_type="application/pdf", filename=f"{tipo_real}-{req.id}.pdf")
+                return FileResponse(
+                    io.BytesIO(pdf_bytes),
+                    content_type="application/pdf",
+                    filename=f"{tipo_real}-{req.id}.pdf",
+                )
             except Exception as e:
-                log.exception("Fallo generando documento para cproem #%s (fmt=pdf sig=%s)", req.id, signed_flag)
+                log.exception(
+                    "Fallo generando documento para cproem #%s (fmt=pdf sig=%s)",
+                    req.id,
+                    signed_flag,
+                )
                 return JsonResponse({"ok": False, "error": str(e)}, status=500)
 
         # DOCX
         if fmt == "docx":
             try:
-                docx_bytes = _make_docx_bytes_generic(include_cproem_note=True, signed=(signed_flag if signed_flag is not None else True))
-                return FileResponse(io.BytesIO(docx_bytes), content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", filename=f"{tipo_real}-{req.id}.docx")
+                docx_bytes = _make_docx_bytes_generic(
+                    include_cproem_note=True,
+                    signed=(signed_flag if signed_flag is not None else True),
+                )
+                return FileResponse(
+                    io.BytesIO(docx_bytes),
+                    content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    filename=f"{tipo_real}-{req.id}.docx",
+                )
             except Exception as e:
                 log.exception("Fallo generando DOCX CPROEM #%s", req.id)
                 return JsonResponse({"ok": False, "error": str(e)}, status=500)
 
-        # ZIP: ambos PDFs + docx
+        # ZIP: ambos PDFs + DOCX
         if fmt == "zip":
             mem = io.BytesIO()
             readme_lines = []
@@ -1671,65 +1904,125 @@ def doc_download(request, req_id: int):
                 with zipfile.ZipFile(mem, "w", zipfile.ZIP_DEFLATED) as zf:
                     # signed pdf
                     try:
-                        zf.writestr(f"{tipo_real}-{req.id}-signed.pdf", _make_pdf_bytes_for_cproem(grad, signed=True))
+                        zf.writestr(
+                            f"{tipo_real}-{req.id}-signed.pdf",
+                            _make_pdf_bytes_for_cproem(grad, signed=True),
+                        )
                     except Exception as e:
                         msg = f"[PDF signed] fallo: {e}"
-                        log.exception(msg); readme_lines.append(msg)
+                        log.exception(msg)
+                        readme_lines.append(msg)
                     # unsigned pdf
                     try:
-                        zf.writestr(f"{tipo_real}-{req.id}-unsigned.pdf", _make_pdf_bytes_for_cproem(grad, signed=False))
+                        zf.writestr(
+                            f"{tipo_real}-{req.id}-unsigned.pdf",
+                            _make_pdf_bytes_for_cproem(grad, signed=False),
+                        )
                     except Exception as e:
                         msg = f"[PDF unsigned] fallo: {e}"
-                        log.exception(msg); readme_lines.append(msg)
+                        log.exception(msg)
+                        readme_lines.append(msg)
                     # docx
                     try:
-                        zf.writestr(f"{tipo_real}-{req.id}.docx", _make_docx_bytes_generic(include_cproem_note=True, signed=True))
+                        zf.writestr(
+                            f"{tipo_real}-{req.id}.docx",
+                            _make_docx_bytes_generic(
+                                include_cproem_note=True, signed=True
+                            ),
+                        )
                     except Exception as e:
                         msg = f"[DOCX] fallo: {e}"
-                        log.exception(msg); readme_lines.append(msg)
+                        log.exception(msg)
+                        readme_lines.append(msg)
 
                     if readme_lines:
-                        zf.writestr("README.txt", "Algunos archivos no se pudieron generar:\n\n" + "\n".join(readme_lines))
+                        zf.writestr(
+                            "README.txt",
+                            "Algunos archivos no se pudieron generar:\n\n"
+                            + "\n".join(readme_lines),
+                        )
 
                 mem.seek(0)
-                return FileResponse(mem, content_type="application/zip", filename=f"{tipo_real}-{req.id}.zip")
+                return FileResponse(
+                    mem,
+                    content_type="application/zip",
+                    filename=f"{tipo_real}-{req.id}.zip",
+                )
             except Exception as e:
                 log.exception("Fallo generando ZIP CPROEM #%s", req.id)
-                return JsonResponse({"ok": False, "error": f"Error generando ZIP: {e}"}, status=500)
+                return JsonResponse(
+                    {"ok": False, "error": f"Error generando ZIP: {e}"},
+                    status=500,
+                )
 
     # no-CPROEM (diploma, dc3, etc.) — comportamiento previo
     if fmt == "pdf":
         try:
             pdf_bytes = _make_pdf_bytes_generic()
-            return FileResponse(io.BytesIO(pdf_bytes), content_type="application/pdf", filename=f"{tipo_real}-{req.id}.pdf")
+            return FileResponse(
+                io.BytesIO(pdf_bytes),
+                content_type="application/pdf",
+                filename=f"{tipo_real}-{req.id}.pdf",
+            )
         except Exception as e:
             log.exception("Fallo generando PDF")
-            return JsonResponse({"ok": False, "error": f"Error generando PDF: {e}"}, status=500)
+            return JsonResponse(
+                {"ok": False, "error": f"Error generando PDF: {e}"},
+                status=500,
+            )
 
-    elif fmt == "docx":
+    if fmt == "docx":
         try:
             docx_bytes = _make_docx_bytes_generic(include_cproem_note=False)
-            return FileResponse(io.BytesIO(docx_bytes), content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", filename=f"{tipo_real}-{req.id}.docx")
+            return FileResponse(
+                io.BytesIO(docx_bytes),
+                content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                filename=f"{tipo_real}-{req.id}.docx",
+            )
         except Exception as e:
             log.exception("Fallo generando DOCX")
-            return JsonResponse({"ok": False, "error": f"Error generando DOCX: {e}"}, status=500)
+            return JsonResponse(
+                {"ok": False, "error": f"Error generando DOCX: {e}"},
+                status=500,
+            )
 
-    else:  # zip
-        readme_lines = []
-        mem = io.BytesIO()
-        with zipfile.ZipFile(mem, "w", zipfile.ZIP_DEFLATED) as zf:
-            try:
-                zf.writestr(f"{tipo_real}-{req.id}.docx", _make_docx_bytes_generic(include_cproem_note=False))
-            except Exception as e:
-                msg = f"[DOCX] No se pudo generar: {e}"; log.exception(msg); readme_lines.append(msg)
-            try:
-                zf.writestr(f"{tipo_real}-{req.id}.pdf", _make_pdf_bytes_generic())
-            except Exception as e:
-                msg = f"[PDF] No se pudo generar: {e}"; log.exception(msg); readme_lines.append(msg)
-            if readme_lines:
-                zf.writestr("README.txt", "Algunos archivos no se pudieron generar:\n\n" + "\n".join(readme_lines))
-        mem.seek(0)
-        return FileResponse(mem, content_type="application/zip", filename=f"{tipo_real}-{req.id}.zip")
+    # zip genérico: PDF + DOCX
+    readme_lines = []
+    mem = io.BytesIO()
+    with zipfile.ZipFile(mem, "w", zipfile.ZIP_DEFLATED) as zf:
+        try:
+            zf.writestr(
+                f"{tipo_real}-{req.id}.docx",
+                _make_docx_bytes_generic(include_cproem_note=False),
+            )
+        except Exception as e:
+            msg = f"[DOCX] No se pudo generar: {e}"
+            log.exception(msg)
+            readme_lines.append(msg)
+        try:
+            zf.writestr(
+                f"{tipo_real}-{req.id}.pdf",
+                _make_pdf_bytes_generic(),
+            )
+        except Exception as e:
+            msg = f"[PDF] No se pudo generar: {e}"
+            log.exception(msg)
+            readme_lines.append(msg)
+
+        if readme_lines:
+            zf.writestr(
+                "README.txt",
+                "Algunos archivos no se pudieron generar:\n\n"
+                + "\n".join(readme_lines),
+            )
+
+    mem.seek(0)
+    return FileResponse(
+        mem,
+        content_type="application/zip",
+        filename=f"{tipo_real}-{req.id}.zip",
+    )
+
 
 # ========================= Verificación =========================
 
