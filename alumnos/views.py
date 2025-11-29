@@ -498,18 +498,15 @@ def tracking(request, request_id):
     # 🔵 AGREGADO: SOPORTE PARA RECHAZO PERMANENTE (ID = 0)
     # ============================================================
     if request_id == 0:
-        # Buscar datos guardados en sesión desde status()
         data = request.session.get("archived_reject")
 
         if data:
-            # tracking.html usará not_found=True y mostrará tu alerta bonita
             return render(request, "alumnos/tracking.html", {
                 "not_found": True,
                 "req": None,
                 "rejection_reason": data.get("reason", ""),
             })
 
-        # Si llega sin datos → volver a status
         return redirect("alumnos:status")
 
     # ============================================================
@@ -525,21 +522,20 @@ def tracking(request, request_id):
     # === Círculo activo (naranja) ===
     status = (req.status or "").lower()
     status_to_step = {
-        "pending":    1,  # Solicitud enviada
-        "review":     2,  # En revisión
-        "accepted":   3,  # Aprobada
-        "rejected":   3,  # Rechazada
-        "generating": 4,  # Generando
-        "generated":  4,  # Generado
-        "emailed":    5,  # Enviado por correo
-        "downloaded": 6,  # Descargado
-        "finalizado": 6,  # Finalizado (Círculo 6)
+        "pending":    1,
+        "review":     2,
+        "accepted":   3,
+        "rejected":   3,
+        "generating": 4,
+        "generated":  4,
+        "emailed":    5,
+        "downloaded": 6,
+        "finalizado": 6,
     }
     active_max = status_to_step.get(status, 1)
 
-    # === Línea de progreso con medios pasos ===
     TOTAL_STEPS = 6
-    total_segments = TOTAL_STEPS - 1  # 5 tramos
+    total_segments = TOTAL_STEPS - 1
 
     if status in ("downloaded", "finalizado"):
         units = total_segments
@@ -550,10 +546,8 @@ def tracking(request, request_id):
 
     progress_pct = int(round((units / total_segments) * 100))
 
-    # Eventos para el contador
     events_count = RequestEvent.objects.filter(request=req).count()
 
-    # ETA (10 días hábiles desde la fecha de envío)
     sent_local = timezone.localtime(req.sent_at).date() if req.sent_at else timezone.localdate()
     eta_date = _add_business_days(sent_local, 10)
 
@@ -585,8 +579,13 @@ def tracking(request, request_id):
 
     can_download_cproem = is_cproem and status in ("finalizado", "downloaded") and grad is not None
     cproem_download_url = None
+
     if can_download_cproem:
-        cproem_download_url = reverse("administracion:pdf_cproem_digital", args=[grad.id])
+        # Vista nueva → DOCX con variables si existe + PDF firmado
+        cproem_download_url = (
+            reverse("administracion:doc_download", args=[req.id])
+            + "?tipo=constancia&fmt=pdf&sig=signed"
+        )
 
     return render(request, "alumnos/tracking.html", {
         "req": req,

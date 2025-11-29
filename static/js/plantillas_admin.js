@@ -7,7 +7,6 @@ const $  = (s, c = document) => c.querySelector(s);
 const $$ = (s, c = document) => Array.from(c.querySelectorAll(s));
 
 /* ---------- Miniaturas desde json_active ---------- */
-/* ---------- Miniaturas desde json_active ---------- */
 function drawTemplate(canvas, data, title) {
   if (!canvas || !data) return;
   const ctx = canvas.getContext("2d");
@@ -21,14 +20,12 @@ function drawTemplate(canvas, data, title) {
 
   const container = canvas.parentElement;
   const targetW = Math.max(160, Math.min(200, (container?.clientWidth || 180)));
-  const W = canvas.width  = targetW;
-  const H = canvas.height = Math.round(targetW * (page.height / page.width));
+  const W = (canvas.width  = targetW);
+  const H = (canvas.height = Math.round(targetW * (page.height / page.width)));
 
-  // Fondo exterior (la tarjeta)
   ctx.fillStyle = "#020617";
   ctx.fillRect(0, 0, W, H);
 
-  // "Hoja" interna
   const margin = 10;
   const sheetX = margin;
   const sheetY = margin;
@@ -46,7 +43,6 @@ function drawTemplate(canvas, data, title) {
   const hasImageLayer = layers.some(l => l.type === "image" && l.url);
 
   if (hasImageLayer) {
-    // ==== CASO 1: HAY IMAGEN REAL EN LA PLANTILLA ====
     layers.slice(0, 120).forEach(l => {
       if (l.type === "rect") {
         ctx.fillStyle = l.fill || "#0f172a";
@@ -83,15 +79,11 @@ function drawTemplate(canvas, data, title) {
       }
     });
   } else {
-    // ==== CASO 2: NO HAY IMAGEN → PLACEHOLDER BONITO POR EXTENSIÓN ====
-
-    // Icono de documento centrado
     const iconW = sheetW * 0.55;
     const iconH = sheetH * 0.65;
     const iconX = sheetX + (sheetW - iconW) / 2;
     const iconY = sheetY + (sheetH - iconH) / 2 - 6;
 
-    // Cuerpo de la hoja
     ctx.fillStyle = "#0b1120";
     ctx.beginPath();
     ctx.moveTo(iconX, iconY);
@@ -101,7 +93,6 @@ function drawTemplate(canvas, data, title) {
     ctx.closePath();
     ctx.fill();
 
-    // Esquina doblada
     const foldSize = iconW * 0.22;
     ctx.fillStyle = "#111827";
     ctx.beginPath();
@@ -111,7 +102,6 @@ function drawTemplate(canvas, data, title) {
     ctx.closePath();
     ctx.fill();
 
-    // Líneas de "texto"
     const lineMarginX = iconW * 0.15;
     const lineStartX  = iconX + lineMarginX;
     const lineEndX    = iconX + iconW - lineMarginX;
@@ -128,7 +118,6 @@ function drawTemplate(canvas, data, title) {
       lineY += lineGap;
     }
 
-    // Extensión del archivo (PDF, DOCX, etc.)
     let ext = "";
     if (typeof title === "string") {
       const m = title.match(/\.([a-z0-9]+)$/i);
@@ -136,14 +125,13 @@ function drawTemplate(canvas, data, title) {
     }
     if (!ext) ext = "DOC";
 
-    ctx.fillStyle = "#f97316"; // naranja
+    ctx.fillStyle = "#f97316";
     ctx.font = `700 ${Math.max(14, sheetW * 0.13)}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(ext, iconX + iconW / 2, iconY + iconH * 0.78);
   }
 }
-
 
 function renderAllThumbnails() {
   $$(".card--tpl").forEach(card => {
@@ -155,9 +143,7 @@ function renderAllThumbnails() {
       const raw  = card.getAttribute("data-json") || "{}";
       const data = JSON.parse(raw);
       drawTemplate(canvas, data);
-    } catch (e) {
-      // si falla, simplemente no dibujamos
-    }
+    } catch (e) {}
   });
 }
 
@@ -177,14 +163,24 @@ function activeKind() {
 
 function applyFilter() {
   const q = ($("#tpl-search")?.value || "").trim().toLowerCase();
-  const k = activeKind();
+  const k = activeKind(); // "", "design", "cproem", "dc3"
 
-  $$(".card--tpl").forEach(card => {
-    const title = (card.getAttribute("data-title") || "").toLowerCase();
-    const kind  = (card.getAttribute("data-kind")  || "").toLowerCase();
+  $$(".card--tpl, .card--tpl-docx").forEach(card => {
+    const title   = (card.getAttribute("data-title") || "").toLowerCase();
+    const kindRaw = (card.getAttribute("data-kind")  || "").toLowerCase();
 
-    const okQ = !q || title.includes(q) || kind.includes(q);
-    const okK = !k || kind === k;
+    const okQ = !q || title.includes(q) || kindRaw.includes(q);
+
+    // ---- aquí está el truco del filtro de Diplomas ----
+    let okK = true;
+    if (k) {
+      if (k === "design") {
+        // Chip "Diplomas": mostrar tanto diseños como DOCX de tipo diploma
+        okK = (kindRaw === "design" || kindRaw === "diploma");
+      } else {
+        okK = (kindRaw === k);
+      }
+    }
 
     card.style.display = (okQ && okK) ? "" : "none";
   });
@@ -209,19 +205,79 @@ function initFilters() {
   });
 }
 
-/* ---------- Importar documentos (PDF/DOCX/PPTX/Imágenes) ---------- */
+/* ---------- Importar documentos + modal de modos ---------- */
 function initImport() {
-  const btn  = $("#btnImport");
-  const file = $("#importFile");
-  const form = $("#importForm");
-  if (!btn || !file || !form) return;
+  const btnImport   = $("#btnImport");
+  const fileDesign  = $("#importFile");
+  const formDesign  = $("#importForm");
+  const fileDocx    = $("#importDocxTplFile");
+  const formDocx    = $("#importDocxTplForm");
 
-  btn.addEventListener("click", () => file.click());
+  const modal       = $("#importModeModal");
+  const btnDesign   = $("#importModeDesign");
+  const btnDocxMode = $("#importModeDocxTpl");
+  const backdrop    = modal ? modal.querySelector(".c-modal__backdrop") : null;
+  const cancelBtn   = modal ? modal.querySelector("[data-import-cancel]") : null;
 
-  file.addEventListener("change", () => {
-    if (!file.files || !file.files.length) return;
-    form.submit(); // POST a plantilla_import
+  function openModal() {
+    if (!modal) return;
+    modal.classList.add("is-open");
+    modal.removeAttribute("aria-hidden");
+    modal.dataset.open = "1";
+    const firstBtn = modal.querySelector(".import-mode__option");
+    if (firstBtn) firstBtn.focus();
+  }
+
+  function closeModal() {
+    if (!modal) return;
+    if (btnImport) btnImport.focus(); // saca el focus antes de aria-hidden
+    modal.classList.remove("is-open");
+    modal.setAttribute("aria-hidden", "true");
+    delete modal.dataset.open;
+  }
+
+  if (btnImport && modal) {
+    btnImport.addEventListener("click", function (e) {
+      e.preventDefault();
+      openModal();
+    });
+  }
+
+  if (backdrop) {
+    backdrop.addEventListener("click", closeModal);
+  }
+  if (cancelBtn) {
+    cancelBtn.addEventListener("click", closeModal);
+  }
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && modal && modal.dataset.open === "1") {
+      closeModal();
+    }
   });
+
+  // Diseño / imagen de fondo
+  if (btnDesign && fileDesign && formDesign) {
+    btnDesign.addEventListener("click", function () {
+      closeModal();
+      fileDesign.click();
+    });
+    fileDesign.addEventListener("change", function () {
+      if (!fileDesign.files || !fileDesign.files.length) return;
+      formDesign.submit();
+    });
+  }
+
+  // Plantilla DOCX con variables
+  if (btnDocxMode && fileDocx && formDocx) {
+    btnDocxMode.addEventListener("click", function () {
+      closeModal();
+      fileDocx.click();
+    });
+    fileDocx.addEventListener("change", function () {
+      if (!fileDocx.files || !fileDocx.files.length) return;
+      formDocx.submit();
+    });
+  }
 }
 
 /* ---------- Confirmar eliminación con modal bonito ---------- */
@@ -232,15 +288,12 @@ function initConfirm() {
   const btnCancel= document.getElementById("confirmCancel");
   const backdrop = modal ? modal.querySelector(".c-modal__backdrop") : null;
 
-  // Si no existe el modal en el HTML, usamos window.confirm como fallback
   if (!modal || !btnOk || !btnCancel || !backdrop) {
     document.addEventListener("submit", function (ev) {
       const form = ev.target;
       if (!form || !form.classList || !form.classList.contains("js-confirm")) return;
       const msg = form.getAttribute("data-confirm") || "¿Confirmas la acción?";
-      if (!window.confirm(msg)) {
-        ev.preventDefault();
-      }
+      if (!window.confirm(msg)) ev.preventDefault();
     });
     return;
   }
@@ -249,14 +302,14 @@ function initConfirm() {
 
   function openModal(message, form) {
     pendingForm = form;
-    if (textEl) {
-      textEl.textContent = message;
-    }
+    if (textEl) textEl.textContent = message;
     modal.classList.add("is-open");
+    modal.removeAttribute("aria-hidden");
   }
 
   function closeModal() {
     modal.classList.remove("is-open");
+    modal.setAttribute("aria-hidden", "true");
     pendingForm = null;
   }
 
@@ -273,7 +326,7 @@ function initConfirm() {
       const f = pendingForm;
       pendingForm = null;
       closeModal();
-      f.submit(); // envío real del formulario
+      f.submit();
     } else {
       closeModal();
     }
@@ -289,8 +342,7 @@ function initConfirm() {
     const form = ev.target;
     if (!form || !form.classList || !form.classList.contains("js-confirm")) return;
 
-    ev.preventDefault(); // detenemos el envío original
-
+    ev.preventDefault();
     const msg = form.getAttribute("data-confirm") || "¿Confirmas la acción?";
     openModal(msg, form);
   });
@@ -305,27 +357,69 @@ document.addEventListener("DOMContentLoaded", () => {
   initImport();
   initConfirm();
 });
+
+// segunda versión de renderAllThumbnails (compatibilidad)
 function renderAllThumbnails() {
   $$(".card--tpl").forEach(card => {
     const img    = card.querySelector(".thumb__img");
     const canvas = card.querySelector("canvas.tpl");
-    if (img || !canvas) return;   // si ya tiene <img>, no hacemos nada
+    if (img || !canvas) return;
 
     const title = card.getAttribute("data-title") || "";
     let data    = {};
 
-    // Intentamos leer el JSON, pero si falla usamos {} para que
-    // al menos se pinte el placeholder (icono de documento).
     try {
       const raw = card.getAttribute("data-json");
       if (raw && raw.trim() !== "") {
         data = JSON.parse(raw);
       }
     } catch (e) {
-      data = {};  // JSON inválido → placeholder
+      data = {};
     }
 
     drawTemplate(canvas, data, title);
   });
 }
 
+/* ---------- Dropdown DOCX custom ---------- */
+document.addEventListener("DOMContentLoaded", function () {
+  const docxSelect = document.getElementById("docxSelect");
+  const hiddenTipo = document.getElementById("docxTplTipo");
+  const labelSpan = document.getElementById("docxSelectLabel");
+
+  if (!docxSelect || !hiddenTipo || !labelSpan) return;
+
+  const trigger = docxSelect.querySelector(".docx-select__trigger");
+  const options = Array.from(docxSelect.querySelectorAll(".docx-select__option"));
+
+  // abrir/cerrar menú
+  trigger.addEventListener("click", () => {
+    const isOpen = docxSelect.classList.toggle("is-open");
+    trigger.setAttribute("aria-expanded", isOpen ? "true" : "false");
+  });
+
+  // seleccionar opción
+  options.forEach((opt) => {
+    opt.addEventListener("click", () => {
+      const value = opt.dataset.value;
+      const text = opt.textContent.trim();
+
+      hiddenTipo.value = value;
+      labelSpan.textContent = text;
+
+      options.forEach(o => o.classList.remove("is-active"));
+      opt.classList.add("is-active");
+
+      docxSelect.classList.remove("is-open");
+      trigger.setAttribute("aria-expanded", "false");
+    });
+  });
+
+  // cerrar al hacer click fuera
+  document.addEventListener("click", (ev) => {
+    if (!docxSelect.contains(ev.target)) {
+      docxSelect.classList.remove("is-open");
+      trigger.setAttribute("aria-expanded", "false");
+    }
+  });
+});

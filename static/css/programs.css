@@ -1679,3 +1679,59 @@ body.no-scroll {
   background: #020617;
   color: #e5e7eb;
 }
+/* ==== Selects oscuros en el modal "Editar programa" ==== */
+#programEditModal select.field__input {
+  background-color: #050710;   /* fondo oscuro */
+  color: #f5f5f5;              /* texto claro */
+  border-color: #ff7a2f;       /* borde naranja como el input enfocado */
+}
+
+/* Opciones del desplegable */
+#programEditModal select.field__input option {
+  background-color: #050710;   /* sin franjas blancas */
+  color: #f5f5f5;
+}
+
+/* Opción seleccionada / hover (cuando el navegador lo permite) */
+#programEditModal select.field__input option:checked,
+#programEditModal select.field__input option:hover {
+  background-color: #ff7a2f;   /* naranja CES */
+  color: #ffffff;
+}
+/* Encabezados de grupo dentro del select del modal */
+#programEditModal select.field__input optgroup {
+  background-color: #ff7a2f;  /* naranja en lugar de blanco */
+  color: #111111;             /* texto oscuro para que se lea */
+  font-weight: 600;
+}
+
+/* Por si el navegador hereda mal, volvemos a fijar el fondo de sus opciones */
+#programEditModal select.field__input optgroup option {
+  background-color: #050710;  /* mismo fondo oscuro que el resto */
+  color: #f5f5f5;
+}
+.select-docx-dark {
+  background-color: #3a2b24;   /* fondo del select (marrón oscuro) */
+  color: #f5f5f5;              /* texto claro */
+  border: 1px solid #6a4b38;
+  border-radius: 0.75rem;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.95rem;
+
+  /* quita estilo feo por defecto en algunos navegadores */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+/* color del placeholder / opción deshabilitada */
+.select-docx-dark option:disabled {
+  color: #9b8a80;
+}
+
+/* intenta oscurecer el popup de opciones en navegadores que lo permiten */
+.select-docx-dark option {
+  background-color: #2b211c;
+  color: #f5f5f5;
+}
+

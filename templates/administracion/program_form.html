@@ -140,7 +140,7 @@
               <select
                 id="constancia_type"
                 name="constancia_type"
-                class="field__input"
+                class="field__input field__input--select-dark"
               >
                 <option
                   value="cproem"
@@ -161,57 +161,165 @@
               </p>
             </div>
 
-            <!-- Plantilla de diploma -->
+            <!-- Plantilla de diploma (combinada DISEÑO + DOCX) -->
             <div class="field">
-              <label for="plantilla_diploma" class="field__label">
+              <label for="tpl_diploma_combined" class="field__label">
                 Plantilla de diploma
               </label>
+
+              <!-- Select visible combinado -->
               <select
-                id="plantilla_diploma"
-                name="plantilla_diploma"
-                class="field__input"
+                id="tpl_diploma_combined"
+                class="field__input field__input--select-dark"
               >
                 <option value="">
                   — Sin plantilla asignada —
                 </option>
-                {% for tpl in plantillas %}
-                  <option
-                    value="{{ tpl.id }}"
-                    {% if item.plantilla_diploma_id == tpl.id %}selected{% endif %}
-                  >
-                    {{ tpl.title }}
-                  </option>
-                {% endfor %}
+
+                <optgroup label="Plantillas de diseño">
+                  {% for tpl in plantillas %}
+                    {% if tpl.kind == "design" or tpl.kind == "diploma" %}
+                      <option
+                        value="design:{{ tpl.id }}"
+                        data-src="design"
+                        data-id="{{ tpl.id }}"
+                      >
+                        {{ tpl.title }}
+                      </option>
+                    {% endif %}
+                  {% endfor %}
+                </optgroup>
+
+                <optgroup label="Plantillas DOCX con variables">
+                  {% for tpl in docx_diploma_templates %}
+                    <option
+                      value="docx:{{ tpl.id }}"
+                      data-src="docx"
+                      data-id="{{ tpl.id }}"
+                    >
+                      {{ tpl.name }}
+                    </option>
+                  {% endfor %}
+                </optgroup>
               </select>
+
+              <!-- Campos reales que el backend espera -->
+              <input
+                type="hidden"
+                name="plantilla_diploma"
+                id="plantilla_diploma"
+                value="{{ item.plantilla_diploma_id|default_if_none:'' }}"
+              >
+              <input
+                type="hidden"
+                name="docx_tpl_diploma"
+                id="docx_tpl_diploma"
+                value="{{ item.docx_tpl_diploma_id|default_if_none:'' }}"
+              >
+
               <p class="field__help">
-                Plantilla gráfica usada para generar el diploma del programa.
+                Puedes usar una plantilla gráfica o una plantilla DOCX con variables para el diploma.
               </p>
             </div>
 
-            <!-- Plantilla de constancia -->
+            <!-- Plantilla de constancia (combinada DISEÑO + DOCX) -->
             <div class="field">
-              <label for="plantilla_constancia" class="field__label">
+              <label for="tpl_constancia_combined" class="field__label">
                 Plantilla de constancia
               </label>
+
+              <!-- Select visible combinado -->
               <select
-                id="plantilla_constancia"
-                name="plantilla_constancia"
-                class="field__input"
+                id="tpl_constancia_combined"
+                class="field__input field__input--select-dark"
               >
                 <option value="">
                   — Sin plantilla asignada —
                 </option>
-                {% for tpl in plantillas %}
-                  <option
-                    value="{{ tpl.id }}"
-                    {% if item.plantilla_constancia_id == tpl.id %}selected{% endif %}
-                  >
-                    {{ tpl.title }}
-                  </option>
-                {% endfor %}
+
+                <!-- Diseño DC3 -->
+                <optgroup label="Plantillas DC3 (diseño)">
+                  {% for tpl in plantillas %}
+                    {% if tpl.kind == "dc3" %}
+                      <option
+                        value="design:{{ tpl.id }}"
+                        data-src="design"
+                        data-id="{{ tpl.id }}"
+                        data-kind="dc3"
+                      >
+                        {{ tpl.title }}
+                      </option>
+                    {% endif %}
+                  {% endfor %}
+                </optgroup>
+
+                <!-- Diseño CPROEM -->
+                <optgroup label="Plantillas CPROEM (diseño)">
+                  {% for tpl in plantillas %}
+                    {% if tpl.kind == "cproem" %}
+                      <option
+                        value="design:{{ tpl.id }}"
+                        data-src="design"
+                        data-id="{{ tpl.id }}"
+                        data-kind="cproem"
+                      >
+                        {{ tpl.title }}
+                      </option>
+                    {% endif %}
+                  {% endfor %}
+                </optgroup>
+
+                <!-- DOCX DC3 -->
+                <optgroup label="Plantillas DOCX DC3">
+                  {% for tpl in docx_dc3_templates %}
+                    <option
+                      value="docx_dc3:{{ tpl.id }}"
+                      data-src="docx_dc3"
+                      data-id="{{ tpl.id }}"
+                      data-kind="dc3"
+                    >
+                      {{ tpl.name }}
+                    </option>
+                  {% endfor %}
+                </optgroup>
+
+                <!-- DOCX CPROEM -->
+                <optgroup label="Plantillas DOCX CPROEM">
+                  {% for tpl in docx_cproem_templates %}
+                    <option
+                      value="docx_cproem:{{ tpl.id }}"
+                      data-src="docx_cproem"
+                      data-id="{{ tpl.id }}"
+                      data-kind="cproem"
+                    >
+                      {{ tpl.name }}
+                    </option>
+                  {% endfor %}
+                </optgroup>
               </select>
+
+              <!-- Campos reales que el backend espera -->
+              <input
+                type="hidden"
+                name="plantilla_constancia"
+                id="plantilla_constancia"
+                value="{{ item.plantilla_constancia_id|default_if_none:'' }}"
+              >
+              <input
+                type="hidden"
+                name="docx_tpl_dc3"
+                id="docx_tpl_dc3"
+                value="{{ item.docx_tpl_dc3_id|default_if_none:'' }}"
+              >
+              <input
+                type="hidden"
+                name="docx_tpl_cproem"
+                id="docx_tpl_cproem"
+                value="{{ item.docx_tpl_cproem_id|default_if_none:'' }}"
+              >
+
               <p class="field__help">
-                Plantilla usada para constancias (CPROEM o DC3) de este programa.
+                Dependiendo del tipo de constancia (DC3 / CPROEM) puedes usar diseño o DOCX con variables.
               </p>
             </div>
 
@@ -232,6 +340,8 @@
       </section>
     </div>
 
+    <!-- Scripts externos (sin inline, para no romper CSP) -->
     <script nonce="{{ csp_nonce }}" src="{% static 'js/program.js' %}" defer></script>
+    <script nonce="{{ csp_nonce }}" src="{% static 'js/program_form.js' %}" defer></script>
   </body>
 </html>

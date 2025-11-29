@@ -98,7 +98,14 @@ urlpatterns = [
     path("plantillas/admin/<int:tpl_id>/thumb/upload/", views.plantilla_upload_thumb, name="plantilla_upload_thumb"),
     path("plantillas/admin/<int:tpl_id>/thumb/regen/", views.plantilla_regen_thumb, name="plantilla_regen_thumb"),
     path("plantillas/import/convert/", views.import_office_to_image, name="plantilla_import_convert"),
-
+    # Importar plantilla DOCX con variables (para diplomas / DC3 / CPROEM)
+    path("plantillas/docx-import/",views.docx_template_import,name="docx_template_import",),
+    path("plantillas/docx/<int:pk>/delete/",views.docx_template_delete,name="docx_template_delete",),
+    path(
+    "plantillas/docx/<int:pk>/preview/",
+    views.docx_template_preview,
+    name="docx_template_preview",
+    ),
    # Egresados
     path("egresados/", egresados, name="egresados"),
     path("egresados/<int:req_id>/", egresados, name="egresados_req"),
@@ -133,7 +140,7 @@ urlpatterns = [
     path("plantillas/assets/delete/<int:pk>/", views.asset_delete, name="asset_delete"),  # <-- NUEVO
     path("assets/<int:asset_id>/convert-image/", views.asset_convert_to_image, name="asset_convert_to_image"),
     path("plantillas/import/convert/", views.plantilla_import_convert, name="plantilla_import_convert"),
-
+    
 
     # Programas
     path("programas/", views.program_list, name="program_list"),
@@ -154,5 +161,6 @@ urlpatterns = [
         views.pdf_cproem_impreso,
         name="pdf_cproem_impreso",
     ),
+    path("doc/<int:req_id>/download/", views.doc_download, name="doc_download")
 ]
 

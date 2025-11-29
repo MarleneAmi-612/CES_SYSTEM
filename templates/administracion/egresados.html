@@ -619,19 +619,7 @@
               <!-- Acciones constancia -->
               <div class="doc__actions">
                 {% if active_req %}
-                  {% if const_kind == "cproem" and active_req.graduate %}
-                  <!-- CPROEM: preview con versión WEB -->
-                  <a
-                    id="btnPrevConst"
-                    class="btn"
-                    href="{% url 'administracion:pdf_cproem_digital' active_req.graduate.id %}"
-                    target="_blank"
-                    rel="noopener"
-                  >
-                    Vista previa (PDF)
-                  </a>
-                  {% else %}
-                  <!-- DC3 u otros: se queda igual -->
+                  <!-- Vista previa SIEMPRE pasa por egresados_preview_pdf para usar DOCX con variables -->
                   <a
                     id="btnPrevConst"
                     class="btn"
@@ -641,7 +629,6 @@
                   >
                     Vista previa (PDF)
                   </a>
-                  {% endif %}
                 {% else %}
                   <a id="btnPrevConst" class="btn" aria-disabled="true">
                     Vista previa (PDF)

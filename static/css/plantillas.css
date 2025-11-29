@@ -718,7 +718,9 @@ canvas#stage{display:block; background:transparent}
 .ribbon .input{ height: 30px; font-size: 12px; }
 .ribbon label{ font-size: 12px; color: var(--muted); }
 
-/* utilidades usadas */
+.ribbon .input{ height: 30px; font-size: 12px; }
+.ribbon label{ font-size: 12px; color: var(--muted); }
+
 .w-140{ width:140px }
 .w-64{  width:64px  }
 /* ====== Layout Editor: ribbon fijo + workspace alto visible ====== */
@@ -770,7 +772,7 @@ canvas#stage{display:block; background:transparent}
   background: #0f172a; /* slate-900 aprox (oscuro) */
   border: 1px solid rgba(255,255,255,.08);
   color: #e5e7eb; /* gris claro */
-  box-shadow: 0 6px 18px rgba(0,0,0,.24) inset, 0 2px 8px rgba(0,0,0,.25);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.24) inset, 0 2px 8px rgba(0,0,0,0.25);
 }
 .alert__dot { width: 10px; height: 10px; border-radius: 999px; background: #94a3b8; }
 .alert--success { background: rgba(16,185,129,.12); border-color: rgba(16,185,129,.35); color: #d1fae5; }
@@ -808,386 +810,363 @@ canvas#stage{display:block; background:transparent}
   padding: 1rem 3rem;   /* más alto y ancho */
   font-size: 1.05rem;   /* un poco más grande */
 }
-/* ========== Modal genérico (confirmación eliminar plantilla) ========== */
-
-.modal {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem;
-  background: rgba(15, 23, 42, 0.30); /* fondo oscuro translúcido */
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(6px);
-  transition:
-    opacity 0.18s ease-out,
-    visibility 0.18s ease-out,
-    transform 0.18s ease-out;
-  z-index: 60;
+.field__input--select-dark {
+  background-color: #3b2a22;
+  color: #f5f5f5;
+  border-color: #f78a3b;
 }
 
-.modal.open {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
+.field__input--select-dark option {
+  background-color: #2a201b;
+  color: #f5f5f5;
 }
 
-.modal__overlay {
-  position: absolute;
-  inset: 0;
-}
-
-.modal__dialog {
+/* === Dropdown DOCX custom oscuro (nuevo) === */
+.docx-select {
   position: relative;
-  z-index: 1;
-  max-width: 420px;
+  min-width: 260px;
+  font-size: 13px;
+}
+
+.docx-select__trigger {
   width: 100%;
-  border-radius: 1.25rem;
-  padding: 1.75rem 1.75rem 1.5rem;
-  background: radial-gradient(circle at top left, #0f172a 0%, #020617 55%, #020617 100%);
-  box-shadow:
-    0 22px 45px rgba(15, 23, 42, 0.70),
-    0 0 0 1px rgba(148, 163, 184, 0.15);
-  color: #e5e7eb;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-/* Icono / badge arriba del título */
-.modal__badge {
-  width: 40px;
-  height: 40px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: radial-gradient(circle at 30% 0%, #fecaca 0%, #b91c1c 70%);
-  box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.6), 0 12px 24px rgba(127, 29, 29, 0.65);
-  margin-bottom: 0.15rem;
-}
-
-.modal__badge span {
-  font-size: 1.4rem;
-  line-height: 1;
-}
-
-.modal__title {
-  font-size: 1.1rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  margin: 0;
-  color: #f9fafb;
-}
-
-.modal__text {
-  font-size: 0.92rem;
-  line-height: 1.5;
-  margin: 0;
-  color: #cbd5f5;
-}
-
-.modal__text strong {
-  color: #fee2e2;
-  font-weight: 500;
-}
-
-/* Botones abajo */
-.modal__actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  margin-top: 0.75rem;
-}
-
-/* Ajustes para botones dentro del modal */
-.modal .btn {
-  min-width: 110px;
-  justify-content: center;
-  font-size: 0.9rem;
-  padding-inline: 1rem;
-}
-
-.modal .btn.btn--danger {
-  background: linear-gradient(to right, #ef4444, #b91c1c);
-  border-color: transparent;
-}
-
-.modal .btn.btn--danger:hover {
-  filter: brightness(1.05);
-  transform: translateY(-1px);
-}
-
-.modal .btn.btn--subtle {
-  background: transparent;
-  border-color: rgba(148, 163, 184, 0.5);
-  color: #e5e7eb;
-}
-
-.modal .btn.btn--subtle:hover {
-  background: rgba(15, 23, 42, 0.7);
-}
-
-/* En pantallas pequeñas que no se pegue a los bordes */
-@media (max-width: 480px) {
-  .modal__dialog {
-    padding: 1.5rem 1.25rem 1.25rem;
-    border-radius: 1rem;
-  }
-}
-/* ===========================
-   Modal confirmación Plantillas
-   =========================== */
-.tpl-confirm-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.70);
   display: flex;
   align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-
-.tpl-confirm-overlay[hidden] {
-  display: none;
-}
-
-.tpl-confirm-dialog {
-  background: #111827;              /* gris muy oscuro */
-  color: #e5e7eb;                   /* texto gris claro */
-  border-radius: 18px;
-  padding: 22px 26px;
-  max-width: 420px;
-  width: 92%;
-  box-shadow: 0 24px 40px rgba(0, 0, 0, 0.65);
-  border: 1px solid rgba(148, 163, 184, 0.4);
-}
-
-.tpl-confirm-title {
-  font-size: 1.05rem;
-  font-weight: 600;
-  margin-bottom: 8px;
-}
-
-.tpl-confirm-message {
-  font-size: 0.9rem;
-  line-height: 1.5;
-  color: #d1d5db;
-  margin: 0 0 18px 0;
-}
-
-.tpl-confirm-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-/* Botones */
-.tpl-confirm-btn {
-  border-radius: 999px;
-  padding: 7px 18px;
-  font-size: 0.88rem;
-  font-weight: 600;
-  border: none;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.18);
+  background: radial-gradient(circle at 0 0, rgba(255,255,255,.05), rgba(0,0,0,.6));
+  color: var(--text);
   cursor: pointer;
-  transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.08s ease;
+  box-shadow: var(--shadow);
 }
 
-.tpl-confirm-btn:focus {
-  outline: 2px solid #a855f7;
-  outline-offset: 2px;
+.docx-select__chevron {
+  font-size: 11px;
+  opacity: 0.8;
 }
 
-.tpl-confirm-btn-primary {
-  background: #8b5cf6;             /* morado */
-  color: #ffffff;
-  box-shadow: 0 8px 18px rgba(139, 92, 246, 0.45);
-}
-
-.tpl-confirm-btn-primary:hover {
-  filter: brightness(1.05);
-  transform: translateY(-1px);
-}
-
-.tpl-confirm-btn-secondary {
-  background: transparent;
-  color: #e5e7eb;
-  border: 1px solid #4b5563;
-}
-
-.tpl-confirm-btn-secondary:hover {
-  background: rgba(55, 65, 81, 0.7);
-}
-/* Modal genérico reutilizable (sin inline styles) */
-.modal {
-  position: fixed;
-  inset: 0;
-  display: none;              /* oculto por defecto */
-  align-items: center;
-  justify-content: center;
-  background: rgba(15, 23, 42, 0.65);
-  z-index: 40;
-}
-
-.modal.is-open {
-  display: flex;              /* se muestra cuando JS agrega esta clase */
-}
-
-.modal__overlay {
+/* menú */
+.docx-select__menu {
   position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.modal__dialog {
-  position: relative;
-  max-width: 420px;
-  width: 100%;
-  margin: 0 1.5rem;
-  padding: 1.75rem 1.75rem 1.5rem;
-  border-radius: 1.25rem;
-  background: #0f172a;
-  box-shadow:
-    0 20px 50px rgba(15, 23, 42, 0.75),
-    0 0 0 1px rgba(148, 163, 184, 0.25);
-  color: #e5e7eb;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.modal__badge {
-  width: 40px;
-  height: 40px;
-  border-radius: 999px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #f97316, #ef4444);
-  color: #fff;
-  font-size: 1.1rem;
-  margin-bottom: 0.5rem;
-}
-
-.modal__title {
-  font-size: 1.1rem;
-  font-weight: 700;
-  letter-spacing: 0.01em;
+  right: 0;
+  top: calc(100% + 4px);
+  min-width: 260px;
+  background: #0b1120;
+  border-radius: 12px;
+  border: 1px solid rgba(148,163,184,.45);
+  box-shadow: 0 18px 40px rgba(0,0,0,.7);
+  padding: 4px;
+  list-style: none;
   margin: 0;
+  display: none;
+  z-index: 30;
 }
 
-.modal__text {
-  font-size: 0.9rem;
-  color: #cbd5f5;
-  margin: 0;
+.docx-select.is-open .docx-select__menu {
+  display: block;
 }
 
-.modal__actions {
-  margin-top: 1.25rem;
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-}
-
-/* Botones coherentes con tu diseño */
-.btn--subtle {
-  background: transparent;
-  border: 1px solid rgba(148, 163, 184, 0.5);
+.docx-select__option {
+  padding: 7px 10px;
+  border-radius: 9px;
+  cursor: pointer;
+  font-size: 13px;
   color: #e5e7eb;
+  white-space: nowrap;
 }
 
-.btn--subtle:hover {
-  border-color: rgba(249, 115, 22, 0.8);
+.docx-select__option:hover {
+  background: rgba(148,163,184,.18);
 }
 
-.btn--danger {
-  background: linear-gradient(135deg, #f97316, #ef4444);
-  border: none;
-  color: #fff;
+.docx-select__option.is-active {
+  background: linear-gradient(135deg, #f97316, #fb923c);
+  color: #111827;
 }
-/* ===========================
-   Modal de confirmación
-   =========================== */
-
+/* ==== Modales (confirmar eliminación / modo de importación) ==== */
 .c-modal {
   position: fixed;
   inset: 0;
-  display: none;           /* se muestra con .is-open */
-  align-items: center;
-  justify-content: center;
-  background: rgba(15, 23, 42, 0.55); /* fondo oscuro translúcido */
-  z-index: 40;
+  z-index: 60;
 }
 
+/* oculto por defecto cuando aria-hidden="true" */
+.c-modal[aria-hidden="true"] {
+  display: none;
+}
+
+/* visible cuando el JS le pone .is-open */
 .c-modal.is-open {
-  display: flex;
+  display: block;
 }
 
 .c-modal__backdrop {
   position: absolute;
   inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
 }
 
 .c-modal__panel {
   position: relative;
-  max-width: 420px;
-  width: 90%;
-  padding: 1.5rem 1.75rem;
-  border-radius: 1rem;
-  background: #020617; /* muy oscuro, estilo CES */
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.85);
-  border: 1px solid rgba(148, 163, 184, 0.5);
+  margin: 8vh auto 0;
+  max-width: 480px;
+  background: #0b1220;
+  color: #e5e7eb;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+/* ===== Mejora visual: modal "¿Cómo quieres importar tu documento?" ===== */
+
+#importModeModal .c-modal__panel {
+  max-width: 640px;                 /* un poco más ancho */
+  padding: 24px 26px 20px;
+  border-radius: 22px;
+  background: radial-gradient(circle at 0 0, rgba(248,113,113,.03), transparent)
+              radial-gradient(circle at 100% 0, rgba(56,189,248,.03), transparent)
+              #020817;
+}
+
+#importModeModal .c-modal__title {
+  font-size: 26px;
+  letter-spacing: .02em;
+  margin-bottom: 6px;
+}
+
+#importModeModal .c-modal__text {
+  font-size: 14px;
+  color: #cbd5f5;
+}
+
+/* Contenedor de opciones */
+.import-mode__options {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+/* Tarjetas-opción */
+.import-mode__option {
+  width: 100%;
+  justify-content: flex-start;
+  align-items: flex-start;
+  text-align: left;
+  border-radius: 18px;
+  padding: 14px 18px;
+  border-width: 1px;
+  border-style: solid;
+  box-shadow: 0 14px 35px rgba(15,23,42,.65);
+  background: radial-gradient(circle at 0 0, rgba(248,250,252,.06), rgba(15,23,42,1));
+  gap: 4px;
+}
+
+/* Primera opción (diseño) con acento naranja suave */
+#importModeModal #importModeDesign.import-mode__option {
+  border-color: rgba(248,148,72,.9);
+  background: linear-gradient(120deg, rgba(248,148,72,.16), rgba(15,23,42,1));
+}
+
+/* Segunda opción (DOCX) más fría, pero aún destacada */
+#importModeModal #importModeDocxTpl.import-mode__option {
+  border-color: rgba(148,163,184,.6);
+  background: linear-gradient(120deg, rgba(59,130,246,.10), rgba(15,23,42,1));
+}
+
+/* Títulos y subtítulos dentro de cada opción */
+.import-mode__option strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.import-mode__option span {
+  display: block;
+  font-size: 13px;
+  color: #cbd5e1;
+  margin-top: 2px;
+}
+
+/* Hover y foco */
+.import-mode__option:hover,
+.import-mode__option:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 40px rgba(15,23,42,.9);
+}
+
+.import-mode__option:focus-visible {
+  outline: 2px solid rgba(248,148,72,.9);
+  outline-offset: 3px;
+}
+
+/* Botón "Cerrar" más discreto pero consistente */
+#importModeModal .c-modal__actions .btn.btn--subtle {
+  border-radius: 999px;
+  padding: 7px 16px;
+  border: 1px solid rgba(148,163,184,.45);
+  background: rgba(15,23,42,.6);
+}
+#importModeModal .c-modal__actions .btn.btn--subtle:hover {
+  background: rgba(30,64,175,.5);
+}
+/* ===================================================
+   MODALES BONITOS (Confirmar eliminación + Importar)
+   =================================================== */
+
+/* Base para ambos paneles */
+#confirmModal .c-modal__panel,
+#importModeModal .c-modal__panel {
+  border-radius: 26px;
+  border: 1px solid rgba(148,163,184,.45);
+  box-shadow:
+    0 28px 80px rgba(0,0,0,.85),
+    0 0 0 1px rgba(15,23,42,.9);
+}
+
+/* -------- Modal: ¿Cómo quieres importar tu documento? -------- */
+#importModeModal .c-modal__panel {
+  max-width: 780px;
+  padding: 26px 30px 22px;
+  background:
+    radial-gradient(circle at 0 0, rgba(248,113,113,.10), transparent 55%),
+    radial-gradient(circle at 100% 0, rgba(56,189,248,.09), transparent 55%),
+    #020617;
+}
+
+/* título grande, bien hero */
+#importModeModal .c-modal__title {
+  font-size: 28px;
+  margin: 0 0 6px;
+  letter-spacing: .02em;
+}
+
+/* texto descriptivo */
+#importModeModal .c-modal__text {
+  margin: 0 0 18px;
+  font-size: 14px;
+  color: #cbd5f5;
+}
+
+/* layout de opciones en columna */
+#importModeModal .import-mode__options {
+  margin-top: 6px;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 10px;
 }
 
-.c-modal__icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 999px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.4rem;
-  background: rgba(248, 113, 113, 0.08);
-  color: #f97373;
-  margin-bottom: 0.25rem;
+/* tarjetas-opción */
+#importModeModal .import-mode__option {
+  width: 100%;
+  justify-content: flex-start;
+  align-items: flex-start;
+  text-align: left;
+  border-radius: 18px;
+  padding: 14px 18px;
+  border-width: 1px;
+  border-style: solid;
+  gap: 3px;
+  box-shadow: 0 18px 40px rgba(15,23,42,.9);
+  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
 }
 
-.c-modal__title {
-  margin: 0;
-  font-size: 1.1rem;
-  font-weight: 600;
+/* primera opción: naranja cálido */
+#importModeModal #importModeDesign.import-mode__option {
+  border-color: rgba(248,148,72,.9);
+  background: linear-gradient(120deg, rgba(248,148,72,.20), rgba(15,23,42,1));
+}
+
+/* segunda opción: azul frío */
+#importModeModal #importModeDocxTpl.import-mode__option {
+  border-color: rgba(59,130,246,.85);
+  background: linear-gradient(120deg, rgba(59,130,246,.20), rgba(15,23,42,1));
+}
+
+/* tipografía dentro de las tarjetas */
+#importModeModal .import-mode__option strong {
+  display: block;
+  font-size: 15px;
+}
+
+#importModeModal .import-mode__option span {
+  display: block;
+  font-size: 13px;
   color: #e5e7eb;
+  opacity: .9;
 }
 
-.c-modal__text {
-  margin: 0;
-  font-size: 0.95rem;
-  line-height: 1.5;
-  color: #9ca3af;
+/* hover / focus */
+#importModeModal .import-mode__option:hover,
+#importModeModal .import-mode__option:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 24px 60px rgba(15,23,42,1);
 }
 
-.c-modal__actions {
-  margin-top: 1.25rem;
+#importModeModal .import-mode__option:focus-visible {
+  outline: 2px solid rgba(248,148,72,.9);
+  outline-offset: 3px;
+}
+
+/* botón Cerrar redondito */
+#importModeModal .c-modal__actions .btn.btn--subtle {
+  border-radius: 999px;
+  padding: 8px 18px;
+  border: 1px solid rgba(148,163,184,.55);
+  background: rgba(15,23,42,.9);
+}
+#importModeModal .c-modal__actions .btn.btn--subtle:hover {
+  background: rgba(30,64,175,.7);
+}
+
+/* -------- Modal: Confirmar eliminación -------- */
+#confirmModal .c-modal__panel {
+  max-width: 560px;
+  padding: 22px 26px 20px;
+  background:
+    radial-gradient(circle at 0 0, rgba(248,113,113,.08), transparent 55%),
+    #020617;
+}
+
+#confirmModal .c-modal__title {
+  font-size: 24px;
+  margin: 0 0 10px;
+}
+
+#confirmModal #confirmText {
+  font-size: 15px;
+  color: #e5e7eb;
+  margin-bottom: 18px;
+}
+
+/* botones centrados y equilibrados */
+#confirmModal .c-modal__actions {
   display: flex;
   justify-content: flex-end;
-  gap: 0.5rem;
+  gap: 10px;
 }
 
-.btn.btn--subtle {
-  background: transparent;
-  border: 1px solid rgba(148, 163, 184, 0.6);
-  color: #e5e7eb;
+#confirmModal .c-modal__actions .btn {
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-size: 14px;
 }
 
-.btn.btn--subtle:hover {
-  background: rgba(15, 23, 42, 0.9);
+/* Cancelar más suave */
+#confirmModal .c-modal__actions .btn.btn--subtle,
+#confirmModal .c-modal__actions #confirmCancel {
+  border: 1px solid rgba(148,163,184,.55);
+  background: rgba(15,23,42,.9);
+}
+
+/* Eliminar con acento rojo/naranja */
+#confirmModal .c-modal__actions #confirmOk {
+  border: 1px solid rgba(248,113,113,.9);
+  background: linear-gradient(135deg, rgba(248,113,113,.35), rgba(248,113,113,.10));
+}
+#confirmModal .c-modal__actions #confirmOk:hover {
+  filter: brightness(1.05);
 }

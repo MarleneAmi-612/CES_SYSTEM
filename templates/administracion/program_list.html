@@ -47,117 +47,124 @@
         </section>
       {% endif %}
 
-      <!-- BARRA SUPERIOR: BUSCADOR + BOTONES -->
-      <section class="card">
-        <header class="card__header">
-          <div class="card__header-left">
-            <form method="get" action="" class="search-form">
-              <input
-                id="q"
-                type="text"
-                name="q"
-                class="search-form__input"
-                placeholder="Buscar programa..."
-                value="{{ q|default:'' }}"
+      <!-- CONTENEDOR PRINCIPAL -->
+      <main class="page__content">
+        <section class="card">
+          <header class="card__header">
+            <div class="card__header-left">
+              <form method="get" action="" class="search-form">
+                <input
+                  id="q"
+                  type="text"
+                  name="q"
+                  class="search-form__input"
+                  placeholder="Buscar programa..."
+                  value="{{ q|default:'' }}"
+                >
+                <button type="submit" class="btn btn--primary btn-sm">
+                  Buscar
+                </button>
+              </form>
+            </div>
+
+            <div class="card__header-right">
+              <a
+                href="{% url 'administracion:program_create' %}"
+                class="btn btn--primary"
               >
-              <button type="submit" class="btn btn--primary btn-sm">
-                Buscar
-              </button>
-            </form>
-          </div>
+                + Nuevo programa
+              </a>
+            </div>
 
-          <div class="card__header-right">
-            <!-- NUEVO PROGRAMA -->
-            <a href="{% url 'administracion:program_create' %}" class="btn btn--primary">
-              + Nuevo programa
-            </a>
-
-            <!-- VOLVER A PLANTILLAS ADMIN -->
-            <a href="{% url 'administracion:plantillas' %}" class="btn btn--ghost">
+              <!-- VOLVER A PLANTILLAS ADMIN -->
+            <a
+              href="{% url 'administracion:plantillas' %}"
+              class="btn btn--ghost"
+            >
               ← Volver a plantillas admin
             </a>
-          </div>
-        </header>
-      </section>
+            </div>
+          </header>
 
-      <!-- TABLA: PROGRAMAS DE SIMULACIÓN (ces_simulacion.diplomado) -->
-      <section class="card card--secondary">
-        <header class="card__header card__header--small">
-          <h2 class="card__title">Programas</h2>
-        </header>
 
-        <div class="card__body">
-          <div class="table-wrapper">
-            <table class="table table--programs">
-              <thead class="table__head">
-                <tr>
-                  <th class="table__cell">ID</th>
-                  <th class="table__cell">Programa</th>
-                  <th class="table__cell">Nombre completo</th>
-                  <th class="table__cell">Constancia</th>
-                  <th class="table__cell">Acciones</th>
-                </tr>
-              </thead>
-              <tbody class="table__body">
-                {% for d in sim_programs %}
-                  <tr data-id="{{ d.id }}">
-                    <td class="table__cell js-col-id">{{ d.id }}</td>
-                    <td class="table__cell js-col-code">{{ d.programa }}</td>
-                    <td class="table__cell js-col-name">{{ d.programa_full }}</td>
-                    <td class="table__cell js-col-constancia">{{ d.constancia }}</td>
-                    <td class="table__cell table__cell--actions">
+          <div class="card__body">
+            <div class="table-wrapper">
+              <table class="table table--programs">
+                <thead class="table__head">
+                  <tr>
+                    <th class="table__cell">ID</th>
+                    <th class="table__cell">Programa</th>
+                    <th class="table__cell">Nombre completo</th>
+                    <th class="table__cell">Constancia</th>
+                    <th class="table__cell">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody class="table__body">
+                  {% for d in sim_programs %}
+                    <tr data-id="{{ d.id }}">
+                      <td class="table__cell js-col-id">{{ d.id }}</td>
+                      <td class="table__cell js-col-code">{{ d.programa }}</td>
+                      <td class="table__cell js-col-name">{{ d.programa_full }}</td>
+                      <td class="table__cell js-col-constancia">{{ d.constancia }}</td>
+                      <td class="table__cell table__cell--actions">
 
-                      <!-- EDITAR (abre modal AJAX) -->
-                      <button
-                        type="button"
-                        class="btn btn--ghost btn-sm js-program-edit"
-                        data-id="{{ d.id }}"
-                        data-code="{{ d.programa }}"
-                        data-name="{{ d.programa_full }}"
-                        data-constancia="{{ d.constancia }}"
-                        data-diploma-tpl="{{ d.tpl_diploma_id|default_if_none:'' }}"
-                        data-dc3-front="{{ d.tpl_dc3_front_id|default_if_none:'' }}"
-                        data-dc3-back="{{ d.tpl_dc3_back_id|default_if_none:'' }}"
-                        data-cproem-tpl="{{ d.tpl_cproem_id|default_if_none:'' }}"
-                        data-url="{% url 'administracion:program_edit' d.program_admin_id %}"
-                      >
-                        Editar
-                      </button>
-
-                      <!-- BORRAR: abre modal y luego envía formulario -->
-                      <form id="del-{{ d.id }}"
-                            method="post"
-                            action="{% url 'administracion:program_delete' d.id %}"
-                            class="inline">
-                        {% csrf_token %}
+                        <!-- EDITAR (abre modal AJAX) -->
                         <button
                           type="button"
-                          class="btn btn--danger btn-sm js-del"
-                          data-form-id="del-{{ d.id }}"
-                          data-program="{{ d.programa }}"
-                          data-code="{{ d.id }}"
+                          class="btn btn--ghost btn-sm js-program-edit"
+                          data-id="{{ d.id }}"
+                          data-code="{{ d.programa }}"
+                          data-name="{{ d.programa_full }}"
+                          data-constancia="{{ d.constancia }}"
+                          data-diploma-tpl="{{ d.tpl_diploma_id|default_if_none:'' }}"
+                          data-dc3-front="{{ d.tpl_dc3_front_id|default_if_none:'' }}"
+                          data-dc3-back="{{ d.tpl_dc3_back_id|default_if_none:'' }}"
+                          data-cproem-tpl="{{ d.tpl_cproem_id|default_if_none:'' }}"
+                          data-url="{% url 'administracion:program_edit' d.program_admin_id %}"
                         >
-                          Borrar
+                          Editar
                         </button>
-                      </form>
-                    </td>
-                  </tr>
-                {% empty %}
-                  <tr>
-                    <td class="table__cell table__cell--empty" colspan="5">
-                      No hay programas en ces_simulacion.
-                    </td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
+
+                        <!-- BORRAR: abre modal y luego envía formulario -->
+                        <form
+                          id="del-{{ d.id }}"
+                          method="post"
+                          action="{% url 'administracion:program_delete' d.id %}"
+                          class="inline"
+                        >
+                          {% csrf_token %}
+                          <button
+                            type="button"
+                            class="btn btn--danger btn-sm js-del"
+                            data-form-id="del-{{ d.id }}"
+                            data-program="{{ d.programa }}"
+                            data-code="{{ d.id }}"
+                          >
+                            Borrar
+                          </button>
+                        </form>
+                      </td>
+                    </tr>
+                  {% empty %}
+                    <tr>
+                      <td class="table__cell table__cell--empty" colspan="5">
+                        No hay programas en ces_simulacion.
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Paginador (llenado por program.js) -->
+            <div
+              id="programPager"
+              class="pager"
+              aria-label="Páginas de programas"
+            ></div>
           </div>
-
-          <!-- Paginador (llenado por program.js) -->
-          <div id="programPager" class="pager" aria-label="Páginas de programas"></div>
-        </div>
-      </section>
-
+        </section>
+      </main>
     </div>
 
     <!-- MODAL DE CONFIRMACIÓN (BORRAR) -->
@@ -202,8 +209,12 @@
       </div>
     </div>
 
-    <!-- MODAL DE EDICIÓN (AJAX) -->
-    <div id="programEditModal" class="confirm-modal is-hidden" aria-hidden="true">
+        <!-- MODAL DE EDICIÓN (AJAX) -->
+    <div
+      id="programEditModal"
+      class="confirm-modal is-hidden"
+      aria-hidden="true"
+    >
       <div class="modal__overlay" data-modal-close></div>
 
       <div class="modal__dialog confirm-modal__box">
@@ -237,63 +248,93 @@
               </div>
             </div>
 
-            <!-- NUEVO: PLANTILLA DE DIPLOMA -->
+            <!-- PLANTILLA DE DIPLOMA (HTML estático + DOCX con variables) -->
             <div class="field" id="fieldTplDiploma">
               <label for="editTplDiploma" class="field__label">Plantilla de diploma</label>
               <select id="editTplDiploma" class="field__input">
                 <option value="">Selecciona una plantilla…</option>
-                {% for tpl in diploma_templates %}
-                  <option value="{{ tpl.id }}">{{ tpl.title }}</option>
-                {% endfor %}
+
+                {% if diploma_templates %}
+                  <optgroup label="Diplomas (HTML / imagen estática)">
+                    {% for tpl in diploma_templates %}
+                      <option value="design:{{ tpl.id }}">{{ tpl.title }}</option>
+                    {% endfor %}
+                  </optgroup>
+                {% endif %}
+
+                {% if docx_diploma_templates %}
+                  <optgroup label="Diplomas DOCX con variables">
+                    {% for tpl in docx_diploma_templates %}
+                      <option value="docx:{{ tpl.id }}">{{ tpl.name }}</option>
+                    {% endfor %}
+                  </optgroup>
+                {% endif %}
               </select>
-              <p id="editTplDiplomaCurrent" class="field__help"></p>
             </div>
 
-            <!-- BLOQUE: PLANTILLAS PARA DC3 (FRONTAL / REVERSO) -->
-            <div class="field" id="fieldTplDc3">
-              <span class="field__label">Plantillas DC3</span>
-
-              <div class="field__inline field__inline--stack">
-                <div class="field">
-                  <label for="editTplDc3Front" class="field__label field__label--small">
-                    Frontal (_F)
-                  </label>
-                  <select id="editTplDc3Front" class="field__input">
-                    <option value="">Selecciona frontal…</option>
-                    {% for tpl in dc3_templates %}
-                      <option value="{{ tpl.id }}">{{ tpl.title }}</option>
-                    {% endfor %}
-                  </select>
-                </div>
-
-                <div class="field">
-                  <label for="editTplDc3Back" class="field__label field__label--small">
-                    Reverso (_R)
-                  </label>
-                  <select id="editTplDc3Back" class="field__input">
-                    <option value="">Selecciona reverso…</option>
-                    {% for tpl in dc3_templates %}
-                      <option value="{{ tpl.id }}">{{ tpl.title }}</option>
-                    {% endfor %}
-                  </select>
-                </div>
-              </div>
-
-              <p id="editTplDc3Current" class="field__help"></p>
-            </div>
-
-            <!-- BLOQUE: PLANTILLA PARA CPROEM (SOLO UNA) -->
-            <div class="field" id="fieldTplCproem">
-              <label for="editTplCproem" class="field__label">Plantilla CPROEM</label>
-              <select id="editTplCproem" class="field__input">
+            <!-- PLANTILLA DE CONSTANCIA (UN SOLO SELECT) -->
+            <div class="field" id="fieldTplConstancia">
+              <label for="editTplConstancia" class="field__label">Plantilla de constancia</label>
+              <select id="editTplConstancia" class="field__input">
                 <option value="">Selecciona una plantilla…</option>
-                {% for tpl in cproem_templates %}
-                  <option value="{{ tpl.id }}">{{ tpl.title }}</option>
-                {% endfor %}
-              </select>
-              <p id="editTplCproemCurrent" class="field__help"></p>
-            </div>
 
+                {% if dc3_templates %}
+                  <optgroup label="DC3 (HTML / imagen estática)">
+                    {% for tpl in dc3_templates %}
+                      <option
+                        value="dc3:design:{{ tpl.id }}"
+                        data-kind="dc3"
+                        data-source="design"
+                      >
+                        {{ tpl.title }}
+                      </option>
+                    {% endfor %}
+                  </optgroup>
+                {% endif %}
+
+                {% if docx_dc3_templates %}
+                  <optgroup label="DC3 DOCX con variables">
+                    {% for tpl in docx_dc3_templates %}
+                      <option
+                        value="dc3:docx:{{ tpl.id }}"
+                        data-kind="dc3"
+                        data-source="docx"
+                      >
+                        {{ tpl.name }}
+                      </option>
+                    {% endfor %}
+                  </optgroup>
+                {% endif %}
+
+                {% if cproem_templates %}
+                  <optgroup label="CPROEM (HTML / imagen estática)">
+                    {% for tpl in cproem_templates %}
+                      <option
+                        value="cproem:design:{{ tpl.id }}"
+                        data-kind="cproem"
+                        data-source="design"
+                      >
+                        {{ tpl.title }}
+                      </option>
+                    {% endfor %}
+                  </optgroup>
+                {% endif %}
+
+                {% if docx_cproem_templates %}
+                  <optgroup label="CPROEM DOCX con variables">
+                    {% for tpl in docx_cproem_templates %}
+                      <option
+                        value="cproem:docx:{{ tpl.id }}"
+                        data-kind="cproem"
+                        data-source="docx"
+                      >
+                        {{ tpl.name }}
+                      </option>
+                    {% endfor %}
+                  </optgroup>
+                {% endif %}
+              </select>
+            </div>
           </form>
         </div>
 
@@ -315,5 +356,3 @@
         </footer>
       </div>
     </div>
-  </body>
-</html>

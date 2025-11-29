@@ -292,6 +292,29 @@ class Program(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    # 👇 NUEVO: plantillas DOCX con variables por tipo
+    docx_tpl_diploma = models.ForeignKey(
+        "administracion.DocxTemplate",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="programs_docx_diploma",
+    )
+    docx_tpl_dc3 = models.ForeignKey(
+        "administracion.DocxTemplate",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="programs_docx_dc3",
+    )
+    docx_tpl_cproem = models.ForeignKey(
+        "administracion.DocxTemplate",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="programs_docx_cproem",
+    )
+
     def __str__(self): return f"{self.code} — {self.name}"
 class Organization(models.Model):
     name = models.CharField(max_length=120, unique=True)
@@ -334,7 +357,7 @@ class ProgramSim(models.Model):
     )
 
     # ESTA ES LA ÚNICA FECHA QUE EXISTE EN LA TABLA REAL
-    updated_at = models.DateTimeField(db_column="update_at", null=True, blank=True)
+    updated_at = models.DateTimeField(db_column="updated_at", null=True, blank=True)
 
     class Meta:
         managed = False

@@ -12,6 +12,9 @@ import inspect
 import tempfile
 import subprocess
 import unicodedata
+import requests
+from io import BytesIO
+from docx import Document
 from base64 import b64encode
 from datetime import timedelta,datetime,date
 from pathlib import Path
@@ -23,6 +26,7 @@ from django.contrib.staticfiles.finders import find as find_static
 from email.mime.image import MIMEImage
 from django.core.mail import EmailMultiAlternatives
 from django.utils.timezone import localdate
+from docxtpl import DocxTemplate
 
 # ============================
 # Terceros (third-party)
@@ -74,7 +78,8 @@ from django.http import (
     HttpResponseBadRequest,
     HttpResponseNotAllowed,
     HttpResponseForbidden,
-    HttpResponseRedirect
+    HttpResponseRedirect,
+    HttpResponseNotFound,
 )
 from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404, redirect, render
@@ -97,7 +102,7 @@ from django.views.generic import TemplateView, FormView
 # Apps locales
 # ============================
 from alumnos.models import Request  # u otros modelos que sí existan
-from administracion.models import Graduate,DocToken,DiplomaBackground,RejectedArchive
+from administracion.models import Graduate,DocToken,DiplomaBackground,RejectedArchive,Program,ProgramSim,DesignTemplate,ConstanciaType,DocxTemplate
 egresados = Graduate.objects.all()
 
 # App "alumnos"
@@ -118,16 +123,17 @@ from .models import (
     TemplateAsset,
     ProgramSim,
     CertificateType,
-    Program,               # modelo base
-    Program as ProgramAdmin,  # alias usado en vistas
+    Program,              
+    Program as ProgramAdmin,  
     ConstanciaType,
+    DocxTemplate,          
 )
 from .security import failed_attempts_count
 from .thumbs import save_thumb
 from .models import Program as ProgramAdmin, ConstanciaType
 from django.templatetags.static import static
 from django.contrib.staticfiles import finders
-
+from docx import Document  
 # ============================
 # Config / helpers globales
 # ============================
@@ -149,18 +155,135 @@ MESES_ES = [
     "enero", "febrero", "marzo", "abril", "mayo", "junio",
     "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
 ]
+# =========================
+#  CONTEXTO PARA PLANTILLAS DOCX
+# =========================
+
+def _fecha_es_letra(fecha):
+    """
+    Convierte una fecha date a '11 de noviembre de 2025'.
+    Si viene None, regresa cadena vacía.
+    """
+    if not fecha:
+        return ""
+    meses = [
+        "enero", "febrero", "marzo", "abril", "mayo", "junio",
+        "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+    ]
+    return f"{fecha.day} de {meses[fecha.month - 1]} de {fecha.year}"
+
+
+def _docx_context_for_request(req, tipo_real: str, *, token: str = "", verify_url: str = ""):
+    """
+    Construye el diccionario de variables que van a usar las plantillas DOCX.
+
+    Se usa tanto para diplomas como para constancias (dc3 / cproem).
+    Aquí NO se hace nada de DOCX todavía, solo preparamos datos.
+    """
+
+    # Nombre separado
+    nombre = (getattr(req, "name", "") or "").strip()
+    apellido = (getattr(req, "lastname", "") or "").strip()
+    full_name = f"{nombre} {apellido}".strip()
+
+    # Programa
+    program_obj = getattr(req, "program", None)
+    programa = getattr(program_obj, "name", "") or ""
+
+    # Graduate (si existe)
+    grad = getattr(req, "graduate", None)
+
+    # Fechas de validez / curso
+    if grad and (getattr(grad, "validity_start", None) or getattr(grad, "validity_end", None)):
+        inicio = getattr(grad, "validity_start", None)
+        fin = getattr(grad, "validity_end", None)
+    else:
+        inicio = getattr(req, "start_date", None)
+        fin = getattr(req, "end_date", None)
+
+    # Horas (intensidad)
+    # Prioridad: Graduate.hours -> Request.hours -> None
+    horas = None
+    if grad and hasattr(grad, "hours") and grad.hours is not None:
+        horas = grad.hours
+    elif hasattr(req, "hours") and req.hours is not None:
+        horas = req.hours
+
+    # CURP / RFC / etc.
+    curp = getattr(req, "curp", "") or ""
+    rfc = getattr(req, "rfc", "") or ""
+    puesto = getattr(req, "job_title", "") or ""
+    giro = getattr(req, "industry", "") or ""
+    razon_social = getattr(req, "business_name", "") or ""
+
+    # Folio
+    if tipo_real == "diploma":
+        folio = f"DIP-{req.id:06d}"
+    else:
+        folio = f"CON-{req.id:06d}"
+
+    # Fechas numéricas dd/mm/aaaa
+    def fmt_fecha_num(fecha):
+        return fecha.strftime("%d/%m/%Y") if fecha else ""
+
+    ctx = {
+        # Identificación básica
+        "folio": folio,
+        "id": req.id,
+
+        # Nombre / programa
+        "nombre": nombre,          # 👈 para usar [nombre]
+        "apellido": apellido,      # 👈 para usar [apellido]
+        # Si algún día quieres el completo en el DOCX, se podría agregar otra key,
+        # pero por ahora NO exponemos [nombre_completo] como pediste.
+        "programa": programa,
+
+        # Horas
+        "horas": horas or "",
+
+        # Fechas numéricas (para DC3 también)
+        "vigencia_inicio": fmt_fecha_num(inicio),
+        "vigencia_termino": fmt_fecha_num(fin),
+        "fecha_inicio": fmt_fecha_num(inicio),
+        "fecha_fin": fmt_fecha_num(fin),
+
+        # Fechas en letra
+        "vigencia_inicio_letra": _fecha_es_letra(inicio),
+        "vigencia_termino_letra": _fecha_es_letra(fin),
+        "fecha_inicio_letra": _fecha_es_letra(inicio),
+        "fecha_fin_letra": _fecha_es_letra(fin),
+
+        # Partes numéricas separadas (por si las quieres usar en DC3)
+        "inicio_dia": inicio.day if inicio else "",
+        "inicio_mes": inicio.month if inicio else "",
+        "inicio_anio": inicio.year if inicio else "",
+
+        "fin_dia": fin.day if fin else "",
+        "fin_mes": fin.month if fin else "",
+        "fin_anio": fin.year if fin else "",
+
+        # Datos laborales / empresa (para DC3 / CPROEM)
+        "curp": curp,
+        "rfc": rfc,
+        "puesto": puesto,
+        "giro": giro,
+        "razon_social": razon_social,
+
+        # Verificación
+        "token": token or "",
+        "verify_url": verify_url or "",
+    }
+
+    return ctx
 
 def _fecha_es_larga(fecha):
-    """
-    Devuelve '11 de noviembre de 2025' a partir de un date/datetime.
-    Si viene None → '—'.
-    """
     if not fecha:
         return "—"
 
-    if isinstance(fecha, datetime.datetime):
+    # datetime -> date
+    if isinstance(fecha, datetime):
         fecha = fecha.date()
-    if not isinstance(fecha, datetime.date):
+    if not isinstance(fecha, date):
         try:
             fecha = localdate(fecha)
         except Exception:
@@ -171,25 +294,42 @@ def _fecha_es_larga(fecha):
     anio = fecha.year
     return f"{dia} de {mes} de {anio}"
 
+# En views.py (donde ya tienes MESES_ES y _fecha_es_larga)
+
 def _docx_placeholders_for_request(req, tipo_real: str, verify_url: str | None = None):
     """
     Construye un diccionario de placeholders para plantillas DOCX.
 
-    Ejemplo de claves que podrás usar en el DOCX:
-      [NOMBRE_COMPLETO]
-      [CURP]
-      [RFC]
-      [PROGRAMA]
-      [HORAS]
-      [FECHA_INICIO]
-      [FECHA_FIN]
-      [FECHA_INICIO_LETRA]
-      [FECHA_FIN_LETRA]
-      [FOLIO]
-      [VERIFICACION_URL]
+    Puedes usar estos placeholders en el DOCX (entre corchetes):
+
+      [nombre] [apellido]
+      [nombre_completo]
+      [curp]
+      [rfc]
+      [puesto]
+      [giro]
+      [razon_social]
+      [email]
+      [programa]
+      [horas]
+
+      [fecha_inicio]        -> 11/11/2025
+      [fecha_fin]           -> 15/11/2025
+      [fecha_inicio_letra]  -> 11 de noviembre de 2025
+      [fecha_fin_letra]     -> 15 de noviembre de 2025
+
+      [inicio_dia] / [inicio_mes] / [inicio_anio]
+      [fin_dia]    / [fin_mes]    / [fin_anio]
+
+      [folio]
+      [verificacion_url]
     """
-    # Nombre completo
-    nombre = f"{getattr(req, 'name', '')} {getattr(req, 'lastname', '')}".strip()
+
+    # Nombre y programa
+    nombre = (getattr(req, "name", "") or "").strip()
+    apellidos = (getattr(req, "lastname", "") or "").strip()
+    nombre_completo = f"{nombre} {apellidos}".strip()
+
     program_obj = getattr(req, "program", None)
     programa = getattr(program_obj, "name", "") or ""
 
@@ -202,8 +342,15 @@ def _docx_placeholders_for_request(req, tipo_real: str, verify_url: str | None =
         inicio = getattr(req, "start_date", None)
         fin    = getattr(req, "end_date", None)
 
-    # Horas: usamos el campo 'hours' de Request (lo que ya añadimos)
-    horas = getattr(req, "hours", None)
+    # Horas (intensidad)
+    # Prioridad: Graduate.hours -> Request.hours -> Program.hours -> None
+    horas = None
+    if grad and hasattr(grad, "hours") and grad.hours is not None:
+        horas = grad.hours
+    elif hasattr(req, "hours") and req.hours is not None:
+        horas = req.hours
+    elif program_obj is not None and hasattr(program_obj, "hours") and program_obj.hours is not None:
+        horas = program_obj.hours
 
     # Folio según tipo
     if tipo_real == "diploma":
@@ -211,86 +358,356 @@ def _docx_placeholders_for_request(req, tipo_real: str, verify_url: str | None =
     else:
         folio = f"CON-{req.id:06d}"
 
-    return {
-        "NOMBRE_COMPLETO": nombre or "",
-        "NOMBRE": getattr(req, "name", "") or "",
-        "APELLIDOS": getattr(req, "lastname", "") or "",
-        "CURP": getattr(req, "curp", "") or "",
-        "RFC": getattr(req, "rfc", "") or "",
-        "PUESTO": getattr(req, "job_title", "") or "",
-        "GIRO": getattr(req, "industry", "") or "",
-        "RAZON_SOCIAL": getattr(req, "business_name", "") or "",
-        "EMAIL": getattr(req, "email", "") or "",
-        "PROGRAMA": programa,
-        "HORAS": str(horas) if horas is not None else "",
-        "FECHA_INICIO": inicio.strftime("%d/%m/%Y") if inicio else "",
-        "FECHA_FIN":    fin.strftime("%d/%m/%Y") if fin else "",
-        "FECHA_INICIO_LETRA": _fecha_es_larga(inicio),
-        "FECHA_FIN_LETRA":    _fecha_es_larga(fin),
-        "FOLIO": folio,
-        "VERIFICACION_URL": verify_url or "",
+    # Fechas en partes (para DC3 por número)
+    def _parts(d):
+        if not d:
+            return ("", "", "")
+        try:
+            return (f"{d.day:02d}", f"{d.month:02d}", str(d.year))
+        except Exception:
+            return ("", "", "")
+
+    inicio_dia, inicio_mes, inicio_anio = _parts(inicio)
+    fin_dia, fin_mes, fin_anio = _parts(fin)
+
+    # Base en minúsculas (las que tú vas a usar en el DOCX)
+    ctx = {
+        "nombre": nombre,
+        "apellido": apellidos,
+        "nombre_completo": nombre_completo,
+
+        "curp": getattr(req, "curp", "") or "",
+        "rfc": getattr(req, "rfc", "") or "",
+        "puesto": getattr(req, "job_title", "") or "",
+        "giro": getattr(req, "industry", "") or "",
+        "razon_social": getattr(req, "business_name", "") or "",
+        "email": getattr(req, "email", "") or "",
+
+        "programa": programa,
+        "horas": str(horas) if horas is not None else "",
+
+        "fecha_inicio": inicio.strftime("%d/%m/%Y") if inicio else "",
+        "fecha_fin":    fin.strftime("%d/%m/%Y")   if fin   else "",
+        "fecha_inicio_letra": _fecha_es_larga(inicio),
+        "fecha_fin_letra":    _fecha_es_larga(fin),
+
+        "inicio_dia": inicio_dia,
+        "inicio_mes": inicio_mes,
+        "inicio_anio": inicio_anio,
+        "fin_dia": fin_dia,
+        "fin_mes": fin_mes,
+        "fin_anio": fin_anio,
+
+        "folio": folio,
+        "verificacion_url": verify_url or "",
     }
 
-def _render_docx_template_for_request(req, tipo_real: str, verify_url: str | None = None) -> bytes | None:
-    """
-    Busca una DocxTemplate activa para tipo_real y la rellena
-    reemplazando [VARIABLES] con datos de la Request.
+    # Alias en MAYÚSCULAS (por si algún DOCX viejo los usa)
+    upper_aliases = {
+        "NOMBRE": "nombre",
+        "APELLIDOS": "apellido",
+        "NOMBRE_COMPLETO": "nombre_completo",
+        "CURP": "curp",
+        "RFC": "rfc",
+        "PUESTO": "puesto",
+        "GIRO": "giro",
+        "RAZON_SOCIAL": "razon_social",
+        "EMAIL": "email",
+        "PROGRAMA": "programa",
+        "HORAS": "horas",
+        "FECHA_INICIO": "fecha_inicio",
+        "FECHA_FIN": "fecha_fin",
+        "FECHA_INICIO_LETRA": "fecha_inicio_letra",
+        "FECHA_FIN_LETRA": "fecha_fin_letra",
+        "FOLIO": "folio",
+        "VERIFICACION_URL": "verificacion_url",
+    }
 
-    Devuelve bytes del archivo DOCX generado, o None si no hay plantilla.
+    for upper_key, lower_key in upper_aliases.items():
+        ctx[upper_key] = ctx.get(lower_key, "")
+
+    return ctx
+
+
+def _render_docx_template_for_request(req, tipo_real: str, verify_url: str | None = None):
     """
-    # Buscar la plantilla más reciente activa para este tipo
-    tpl = (
-        DocxTemplate.objects
-        .filter(tipo=tipo_real, is_active=True)
-        .order_by("-created_at")
-        .first()
-    )
-    if not tpl or not tpl.file:
+    Rellena la plantilla DOCX del programa asociada a esta Request
+    (diploma / dc3 / cproem) usando los datos del egresado y devuelve
+    los bytes del DOCX resultante.
+
+    Si no hay plantilla configurada, devuelve None.
+    """
+    import io
+    import re
+    try:
+        from docx import Document
+        from docx.text.paragraph import Paragraph
+        from docx.oxml.text.paragraph import CT_P
+        from docx.shared import Mm
+    except Exception as e:
+        raise RuntimeError(f"python-docx no está instalado o falló al importarse: {e}")
+
+    try:
+        import qrcode
+    except Exception:
+        qrcode = None
+
+    # Localizamos el TemplateAsset correcto (según programa + tipo)
+    tpl = _get_docx_template_for_request(req, tipo_real)
+    if not tpl or not getattr(tpl, "file", None):
+        # No hay plantilla DOCX configurada para este programa/tipo
         return None
 
-    # Abrimos el DOCX
+    # Cargamos el DOCX
     doc = Document(tpl.file)
 
-    # Mapeo de placeholders
+    # Mapeo de placeholders -> valores (usa datos de Request/Graduate/Programa)
     mapping = _docx_placeholders_for_request(req, tipo_real, verify_url=verify_url)
 
-    def replace_in_run_text(text):
-        if not text:
-            return text
-        new_text = text
-        for key, val in mapping.items():
-            placeholder = f"[{key}]"
-            if placeholder in new_text:
-                new_text = new_text.replace(placeholder, val or "")
-        return new_text
+    # Generamos bytes del QR si hay verify_url y librería disponible
+    qr_bytes = None
+    if verify_url and qrcode is not None:
+        try:
+            qr = qrcode.QRCode(version=None, box_size=10, border=1)
+            qr.add_data(verify_url)
+            qr.make(fit=True)
+            img = qr.make_image(fill_color="black", back_color="white")
+            buff = io.BytesIO()
+            img.save(buff, format="PNG")
+            qr_bytes = buff.getvalue()
+        except Exception:
+            qr_bytes = None
 
-    # Reemplazar en párrafos
-    for p in doc.paragraphs:
-        if "[" not in p.text:
-            continue
-        for r in p.runs:
-            r.text = replace_in_run_text(r.text)
+    def _get_qr_size_from_paragraph(paragraph):
+        """
+        Intenta deducir el tamaño del cuadro de texto / shape que
+        contiene este párrafo, a partir del XML (VML o DrawingML).
 
-    # Reemplazar en tablas
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                if "[" not in cell.text:
+        Devuelve (width_mm, height_mm) o None si no se puede deducir.
+        """
+        el = getattr(paragraph, "_element", None) or getattr(paragraph, "_p", None)
+        if el is None:
+            return None
+
+        # Subimos por los padres buscando v:shape o wp:inline/wp:anchor
+        current = el
+        width_mm = height_mm = None
+        while current is not None:
+            tag = current.tag
+
+            # Caso 1: VML <v:shape style="... width:84pt;height:67.5pt; ...">
+            if tag.endswith("}shape") and "urn:schemas-microsoft-com:vml" in tag:
+                style = current.get("style") or ""
+                m_w = re.search(r"width:([0-9.]+)pt", style)
+                m_h = re.search(r"height:([0-9.]+)pt", style)
+                if m_w and m_h:
+                    try:
+                        w_pt = float(m_w.group(1))
+                        h_pt = float(m_h.group(1))
+                        # pt -> mm (1 in = 72 pt; 1 in = 25.4 mm)
+                        width_mm = w_pt * 25.4 / 72.0
+                        height_mm = h_pt * 25.4 / 72.0
+                        break
+                    except Exception:
+                        pass
+
+            # Caso 2: DrawingML <wp:inline>/<wp:anchor> con <wp:extent cx= cy=>
+            if tag.endswith("}inline") or tag.endswith("}anchor"):
+                # Buscamos cualquier hijo <wp:extent> o <a:ext>
+                extent = None
+                for child in current.iter():
+                    if child.tag.endswith("}extent") or child.tag.endswith("}ext"):
+                        extent = child
+                        break
+                if extent is not None:
+                    cx = extent.get("cx") or extent.get("cx", None)
+                    cy = extent.get("cy") or extent.get("cy", None)
+                    try:
+                        if cx is not None and cy is not None:
+                            cx_val = float(cx)
+                            cy_val = float(cy)
+                            # EMU -> mm (1 in = 914400 EMUs)
+                            width_mm = cx_val / 914400.0 * 25.4
+                            height_mm = cy_val / 914400.0 * 25.4
+                            break
+                    except Exception:
+                        pass
+
+            parent = getattr(current, "getparent", None)
+            current = parent() if callable(parent) else None
+
+        if width_mm and height_mm:
+            # Para evitar recortes usamos un 90% del tamaño disponible
+            side = min(width_mm, height_mm) * 0.9
+            return (side, side)
+
+        return None
+
+    def apply_mapping_to_paragraphs(paragraphs):
+        """
+        Word suele partir el texto en varios runs, por eso trabajamos
+        a nivel de párrafo. Juntamos el texto, reemplazamos, y luego
+        lo escribimos de vuelta en el primer run.
+
+        Además, si el párrafo es solo "[qr]" o "[QR]", insertamos el
+        código QR como imagen, intentando usar el tamaño del cuadro.
+        """
+        for p in paragraphs:
+            if not getattr(p, "runs", None):
+                continue
+
+            original = "".join(run.text or "" for run in p.runs)
+            stripped = original.strip()
+
+            # Caso especial: párrafo que SOLO contiene [qr]
+            if stripped in ("[qr]", "[QR]"):
+                # Borramos el texto
+                for run in p.runs:
+                    run.text = ""
+
+                if qr_bytes:
+                    # Calculamos tamaño según el cuadro de texto / shape
+                    size = _get_qr_size_from_paragraph(p)
+                    try:
+                        run = p.runs[0] if p.runs else p.add_run()
+                        img_stream = io.BytesIO(qr_bytes)
+                        if size:
+                            w_mm, h_mm = size
+                            run.add_picture(img_stream, width=Mm(w_mm), height=Mm(h_mm))
+                        else:
+                            # Tamaño por defecto razonable
+                            run.add_picture(img_stream, width=Mm(22), height=Mm(22))
+                    except Exception:
+                        # Si algo falla al insertar la imagen, simplemente lo dejamos vacío
+                        pass
+
+                # Pasamos al siguiente párrafo
+                continue
+
+            # Reemplazos normales de texto
+            new_text = original
+            for key, value in mapping.items():
+                placeholder = f"[{key}]"
+                val = "" if value is None else str(value)
+                if placeholder in new_text:
+                    new_text = new_text.replace(placeholder, val)
+
+            if new_text == original:
+                continue
+
+            first = True
+            for run in p.runs:
+                if first:
+                    run.text = new_text
+                    first = False
+                else:
+                    run.text = ""
+
+    def iter_all_paragraphs(document):
+        """
+        Itera TODOS los <w:p> del documento:
+          - cuerpo principal
+          - tablas
+          - cuadros de texto / shapes (w:txbxContent, VML)
+          - encabezados y pies (incluyendo sus text boxes)
+        """
+        # Body (incluye párrafos dentro de text boxes anclados al body)
+        for el in document.element.body.iter():
+            if isinstance(el, CT_P):
+                yield Paragraph(el, document)
+
+        # Headers y footers completos
+        for section in document.sections:
+            for container in (section.header, section.footer):
+                try:
+                    if container is None:
+                        continue
+                    for el in container._element.iter():
+                        if isinstance(el, CT_P):
+                            yield Paragraph(el, document)
+                except Exception:
                     continue
-                for p in cell.paragraphs:
-                    for r in p.runs:
-                        r.text = replace_in_run_text(r.text)
 
-    # Guardar en memoria
-    buf = io.BytesIO()
-    doc.save(buf)
-    buf.seek(0)
-    return buf.getvalue()
+    # Aplicamos reemplazos a todos los párrafos del documento
+    try:
+        all_paragraphs = list(iter_all_paragraphs(doc))
+        apply_mapping_to_paragraphs(all_paragraphs)
+    except Exception:
+        # Si algo falla, no rompemos todo el render
+        pass
 
-def _formatear_fecha_es(fecha):
-    if not fecha:
-        return ""
-    return f"{fecha.day} de {MESES_ES[fecha.month - 1]} de {fecha.year}"
+    # Devolvemos bytes del DOCX generado
+    out = io.BytesIO()
+    doc.save(out)
+    out.seek(0)
+    return out.getvalue()
+
+
+# ============================================================
+# Selección automática de plantilla DOCX
+# ============================================================
+
+def _get_docx_template_for_request(req, tipo_real: str):
+    """
+    Devuelve la DocxTemplate correcta para este Request+tipo.
+
+    Ahora usa los FKs de Program:
+      - program.docx_tpl_diploma
+      - program.docx_tpl_dc3
+      - program.docx_tpl_cproem
+
+    y ya NO intenta adivinar por nombre de archivo ni por FileField.
+
+    Lógica:
+      1) Si el Program tiene plantilla específica para ese tipo, se usa esa.
+      2) Si no, se intenta una plantilla global activa (DocxTemplate.tipo = tipo, is_active = True).
+      3) Si no hay ninguna, se devuelve None y se usará el fallback HTML.
+    """
+    program = getattr(req, "program", None)
+    if not program:
+        # Esto sí es un error de programación: el Request debería tener program
+        raise Exception("El Request no tiene programa asociado.")
+
+    # Normalizar el tipo que llega
+    tipo = (tipo_real or "").strip().lower()
+
+    # Si viene algo genérico como "constancia", decidimos según el Program.constancia_type
+    if tipo in ("constancia", "const"):
+        if getattr(program, "constancia_type", None) == ConstanciaType.DC3:
+            tipo = "dc3"
+        else:
+            # Por defecto tratamos como CPROEM
+            tipo = "cproem"
+
+    # ------- DIPLOMA -------
+    if tipo == "diploma":
+        # 1) Plantilla específica del programa (si existe)
+        tpl = getattr(program, "docx_tpl_diploma", None)
+        if tpl:
+            return tpl  # DocxTemplate
+
+    # ------- DC3 -------
+    if tipo == "dc3":
+        # 1) Plantilla específica del programa (si existe)
+        tpl = getattr(program, "docx_tpl_dc3", None)
+        if tpl:
+            return tpl  # DocxTemplate
+
+    # ------- CPROEM -------
+    if tipo == "cproem":
+        # 1) Plantilla específica del programa (si existe)
+        tpl = getattr(program, "docx_tpl_cproem", None)
+        if tpl:
+            return tpl  # DocxTemplate
+
+    # 2) Fallback opcional: buscar una plantilla DOCX global activa de ese tipo
+    tpl = DocxTemplate.objects.filter(tipo=tipo, is_active=True).first()
+    if tpl:
+        return tpl
+
+    # 3) Si no hay nada (ni específica ni global), devolvemos None
+    #    y el flujo usará la plantilla HTML (WeasyPrint) sin lanzar excepción.
+    return None
 
 
 def _build_cproem_context(*args):
@@ -1218,53 +1635,121 @@ def egresados(request, req_id=None):
 })
 @require_GET
 def egresados_preview_pdf(request, req_id: int):
+    """
+    Genera un PDF de vista previa (seguro) del diploma/constancia de la Request.
+
+    - ?tipo=diploma|constancia
+    - Usa primero la plantilla DOCX con variables (si existe).
+    - Si no hay DOCX o falla, hace fallback a la plantilla HTML (WeasyPrint).
+    """
+    try:
+        from weasyprint import HTML
+    except Exception:
+        HTML = None
+
     req = get_object_or_404(Request.objects.select_related("program"), pk=req_id)
 
-    # 1) Determinar tipo real
-    tipo_query = _get_tipo_from_request(request, default="diploma")
-    if tipo_query not in ("diploma", "constancia"):
-        raise Http404()
+    tipo = (request.GET.get("tipo") or "diploma").lower()
+    if tipo not in ("diploma", "constancia"):
+        return JsonResponse({"ok": False, "error": "Tipo inválido."}, status=400)
 
-    tipo_real = "diploma" if tipo_query == "diploma" else constancia_kind_for_request(req)
+    # diploma | dc3 | cproem
+    tipo_real = "diploma" if tipo == "diploma" else constancia_kind_for_request(req)
 
-    # (opcional) logging para depurar
+    # --- 1) Intentar DOCX con variables -> PDF ---
+    pdf_bytes = None
+    docx_bytes = None
     try:
-        log.info(
-            "Preview ↦ tipo=%s (req=%s, prog=%s)",
-            tipo_real, req.id, getattr(getattr(req, "program", None), "name", None)
-        )
-    except Exception:
-        pass
-
-    # 2) Resolver plantilla + contexto
-    tpl, ctx = _render_ctx_and_template(
-        request, req, tipo_real, use_published_if_exists=True
-    )
-
-    try:
-        # 3) Render HTML → PDF (WeasyPrint)  ⬅️ AQUÍ VA EL SNIPPET
-        from weasyprint import HTML
-        html = render_to_string(tpl, ctx, request=request)
-        pdf_bytes = HTML(string=html, base_url=request.build_absolute_uri("/")).write_pdf()
-
-        # 4) Endurecer + marca de agua (opcional)
-        pdf_bytes = _pdf_secure(
-            pdf_bytes,
-            user_pwd="",                         # sin pass para abrir en visor
-            watermark_text="CES · Solo lectura"  # marca de agua (opcional)
+        # Publicamos (o reutilizamos) token y armamos URL de verificación
+        doc_token = _ensure_published_token(req, tipo_real)
+        verify_url = request.build_absolute_uri(
+            reverse("administracion:verificar_token", args=[doc_token.token])
         )
 
-        # 5) Responder
-        return FileResponse(
-            io.BytesIO(pdf_bytes),
-            content_type="application/pdf",
-            filename=f"{tipo_real}-{req.id}.pdf",
+        docx_bytes = _render_docx_template_for_request(
+            req,
+            tipo_real,
+            verify_url=verify_url,
         )
+    except Exception as e:
+        log.exception(
+            "Error usando plantilla DOCX en preview %s #%s: %s",
+            tipo_real,
+            req.id,
+            e,
+        )
+        docx_bytes = None
 
-    except Exception:
-        # Fallback: muestra HTML si WeasyPrint no está instalado
-        html = render_to_string(tpl, ctx, request=request)
-        return HttpResponse("WeasyPrint no está instalado. Vista HTML abajo:<hr>" + html)
+    if docx_bytes:
+        try:
+            class _U:
+                def __init__(self, b):
+                    self._b = b
+
+                def chunks(self, csize=64 * 1024):
+                    mv = memoryview(self._b)
+                    for i in range(0, len(mv), csize):
+                        yield mv[i : i + csize]
+
+            raw_pdf = _office_to_pdf_bytes(
+                _U(docx_bytes),
+                name_hint=f"{tipo_real}-preview-{req.id}.docx",
+            )
+
+            # Misma "super seguridad": raster + permisos + marca de agua
+            pdf_bytes = _pdf_secure(
+                raw_pdf,
+                user_pwd="",
+                watermark_text="CES · Vista previa",
+            )
+        except Exception as e:
+            log.exception(
+                "Error DOCX→PDF en preview %s #%s: %s",
+                tipo_real,
+                req.id,
+                e,
+            )
+            pdf_bytes = None
+
+    # --- 2) Fallback: HTML + WeasyPrint ---
+    if pdf_bytes is None:
+        if HTML is None:
+            return JsonResponse(
+                {"ok": False, "error": "WeasyPrint no está instalado."},
+                status=500,
+            )
+
+        try:
+            tpl, ctx = _render_ctx_and_template(
+                request,
+                req,
+                tipo_real,
+                use_published_if_exists=False,
+            )
+            html = render_to_string(tpl, ctx, request=request)
+            base_url = request.build_absolute_uri("/")
+            raw_pdf = HTML(string=html, base_url=base_url).write_pdf()
+
+            pdf_bytes = _pdf_secure(
+                raw_pdf,
+                user_pwd="",
+                watermark_text="CES · Vista previa",
+            )
+        except Exception as e:
+            log.exception(
+                "Fallo generando vista previa HTML para %s #%s: %s",
+                tipo_real,
+                req.id,
+                e,
+            )
+            return JsonResponse(
+                {"ok": False, "error": f"Error generando vista previa: {e}"},
+                status=500,
+            )
+
+    # Mostramos el PDF en el navegador (no como descarga forzada)
+    return HttpResponse(pdf_bytes, content_type="application/pdf")
+
 
 @login_required
 def egresado_update(request, req_id):
@@ -1485,23 +1970,36 @@ def egresado_update_inline(request, req_id: int):
         "saved": incoming,
         "note": "Egresado model no disponible; stub.",
     })
-@require_POST
+    
 def doc_send(request, req_id):
     """
-    Publica token de verificación para el documento (diploma/constancia),
-    genera el PDF y lo envía por correo al alumno con el link de verificación.
-    Además marca la solicitud como 'emailed' para activar el quinto círculo.
+    Genera el documento (preferiblemente desde DOCX con variables),
+    publica el token de verificación y envía el PDF vía correo al alumno.
+    Actualiza tracking (emailed / finalizado).
     """
     import logging
+    from django.core.mail import EmailMultiAlternatives
+    from django.utils import timezone
+    from django.http import JsonResponse
+    from django.shortcuts import get_object_or_404
+    from django.templatetags.static import static as static_url
+    from django.conf import settings
+    from email.mime.image import MIMEImage
+    from django.contrib.staticfiles import finders
+    from django.utils.html import escape
+    from django.template.loader import render_to_string
+    from django.urls import reverse
+
     log = logging.getLogger(__name__)
 
-    # Cargamos la solicitud (y el graduate si existe)
     req = get_object_or_404(
         Request.objects.select_related("program", "graduate"),
         pk=req_id,
     )
 
-    # --- Tipo solicitado (query/POST) y tipo real ---
+    # ----------------------------------
+    # Determinar tipo real (diploma/cproem/dc3)
+    # ----------------------------------
     tipo_query = _get_tipo_from_request(request, default="diploma")
     if tipo_query not in ("diploma", "constancia"):
         return JsonResponse({"ok": False, "error": "Tipo inválido."}, status=400)
@@ -1509,221 +2007,212 @@ def doc_send(request, req_id):
     tipo_real = "diploma" if tipo_query == "diploma" else constancia_kind_for_request(req)
     log.info("[doc_send] tipo_query=%s → tipo_real=%s (req=%s)", tipo_query, tipo_real, req.id)
 
-    # Mensaje extra opcional y modo desde el frontend
-    extra_msg = (request.POST.get("extra_message") or "").strip()
-    extra_mode = (request.POST.get("extra_mode") or "append").strip().lower()
-    if extra_mode not in ("append", "full"):
-        extra_mode = "append"
+    # ----------------------------------
+    # Validar email del alumno
+    # ----------------------------------
+    if not req.email or not req.email.strip():
+        return JsonResponse(
+            {"ok": False, "error": "La solicitud no tiene correo electrónico capturado."},
+            status=400,
+        )
 
-    # --- Publicar token / URL de verificación ---
+    # ----------------------------------
+    # Publicar token / verificar URL
+    # ----------------------------------
     doc = _ensure_published_token(req, tipo_real)
     verify_url = request.build_absolute_uri(
         reverse("administracion:verificar_token", args=[doc.token])
     )
 
-    # --- Generar PDF del diploma/constancia ---
+    # ----------------------------------
+    # Generar PDF desde DOCX (preferencia)
+    # ----------------------------------
     pdf_bytes = None
+
     try:
-        tpl, ctx = _render_ctx_and_template(
-            request, req, tipo_real, use_published_if_exists=True
-        )
-        html = render_to_string(tpl, ctx, request=request)
-
-        from weasyprint import HTML
-        pdf_bytes = HTML(string=html, base_url=request.build_absolute_uri("/")).write_pdf()
-
-        pdf_bytes = _pdf_secure(
-            pdf_bytes,
-            user_pwd="",
-            watermark_text="CES · Solo lectura",
-        )
+        docx_bytes = _render_docx_template_for_request(req, tipo_real, verify_url=verify_url)
     except Exception as e:
-        pdf_bytes = None
-        log.exception("Error generando PDF para Request %s: %s", req.id, e)
+        log.exception("Error usando plantilla DOCX para %s #%s: %s", tipo_real, req.id, e)
+        docx_bytes = None
 
-    # --- Enviar correo al alumno ---
-    emailed = False
-    if req.email:
+    if docx_bytes:
         try:
-            kind_label = "diploma" if tipo_real == "diploma" else "constancia"
-            nombre = f"{getattr(req, 'name', '')} {getattr(req, 'lastname', '')}".strip() or "alumno"
+            class _U:
+                def __init__(self, b): self._b = b
+                def chunks(self, csize=65536):
+                    mv = memoryview(self._b)
+                    for i in range(0, len(mv), csize):
+                        yield mv[i:i+csize]
 
-            subject = f"Tu {kind_label} – Centro de Estudios Superiores en Negocios y Humanidades"
-
-            # -------- Versión base (TEXTO PLANO) --------
-            base_body_text = (
-                f"Hola {nombre},\n\n"
-                f"Tu {kind_label} ha sido publicado.\n"
-                "Puedes verlo y verificarlo en el siguiente enlace:\n"
-                f"Verifica aquí: {verify_url}\n\n"
-                "Centro de Estudios Superiores en Negocios y Humanidades"
+            raw_pdf = _office_to_pdf_bytes(
+                _U(docx_bytes),
+                name_hint=f"{tipo_real}-{req.id}.docx",
             )
+        except Exception as e:
+            log.exception("Error convirtiendo DOCX→PDF para %s #%s: %s", tipo_real, req.id, e)
+            raw_pdf = None
 
-            # -------- Versión base (HTML) --------
-            base_body_html = f"""
-<html>
-  <body style="font-family: Arial, sans-serif; line-height:1.6;">
-    <div style="text-align:center; margin-bottom:20px;">
-      <img src="cid:ceslogo" alt="CES"
-           style="max-width:180px; height:auto;">
-    </div>
-    <p>Hola {escape(nombre)},</p>
-    <p>Tu {escape(kind_label)} ha sido publicado.</p>
-    <p>Puedes verlo y verificarlo en el siguiente enlace:</p>
-    <p><a href="{verify_url}">Verifica aquí</a></p>
-    <p>Centro de Estudios Superiores en Negocios y Humanidades</p>
-  </body>
-</html>
-""".strip()
+        if raw_pdf:
+            try:
+                pdf_bytes = _pdf_secure(raw_pdf, user_pwd="", watermark_text="CES · Solo lectura")
+            except Exception:
+                pdf_bytes = raw_pdf
 
-            # Helper para convertir texto extra a HTML (modo append)
-            def extra_to_html(text):
-                if not text:
-                    return ""
-                safe = escape(text).replace("\n", "<br>")
-                return f"<p><strong>Mensaje adicional:</strong><br>{safe}</p>"
+    # ----------------------------------
+    # Fallback: HTML + WeasyPrint (excepto DC3)
+    # ----------------------------------
+    if pdf_bytes is None and tipo_real != "dc3":
+        try:
+            tpl, ctx = _render_ctx_and_template(request, req, tipo_real, use_published_if_exists=True)
+            html = render_to_string(tpl, ctx, request=request)
 
-            # ---------- Construir cuerpo según modo ----------
-            if extra_mode == "full" and extra_msg:
-                # 🟣 MODO FULL: el textarea sustituye TODO el mensaje principal
-                # Respetamos exactamente el texto del usuario y:
-                #  - en HTML: la primera ocurrencia de "Verifica aquí" se vuelve <a href="...">
-                #  - en texto plano: añadimos al final la URL para no perderla
-                text_body = extra_msg + "\n\nEnlace de verificación:\n" + verify_url
+            from weasyprint import HTML
+            raw_pdf = HTML(string=html, base_url=request.build_absolute_uri("/")).write_pdf()
 
-                # HTML a partir del texto del usuario
-                rendered = escape(extra_msg).replace("\n", "<br>")
+            pdf_bytes = _pdf_secure(raw_pdf, user_pwd="", watermark_text="CES · Solo lectura")
+        except Exception as e:
+            log.exception("Error generando PDF HTML fallback para Request %s: %s", req.id, e)
+            pdf_bytes = None
 
-                if "Verifica aquí" in extra_msg:
-                    # Solo la primera ocurrencia se vuelve enlace
-                    rendered = rendered.replace(
-                        "Verifica aquí",
-                        f'<a href="{verify_url}">Verifica aquí</a>',
-                        1,
-                    )
-                    html_inner = rendered
-                else:
-                    # Si no puso la frase, añadimos el enlace al final
-                    html_inner = rendered + f'<br><br><a href="{verify_url}">Verifica aquí</a>'
+    # ----------------------------------
+    # Preparar correo
+    # ----------------------------------
+    extra_msg = (request.POST.get("extra_message") or "").strip()
+    extra_mode = (request.POST.get("extra_mode") or "append").strip().lower()
+    if extra_mode not in ("append", "full"):
+        extra_mode = "append"
 
-                html_body = f"""
-<html>
-  <body style="font-family: Arial, sans-serif; line-height:1.6;">
-    <div style="text-align:center; margin-bottom:20px;">
-      <img src="cid:ceslogo" alt="CES"
-           style="max-width:180px; height:auto;">
-    </div>
-    <div>{html_inner}</div>
-  </body>
-</html>
-""".strip()
+    nombre = f"{req.name or ''} {req.lastname or ''}".strip() or "alumno"
+    kind_label = "diploma" if tipo_real == "diploma" else "constancia"
 
-            else:
-                # 🟢 MODO APPEND (o sin mensaje extra): mensaje estándar + "Mensaje adicional"
-                text_body = base_body_text
-                html_body = base_body_html
+    subject = f"Tu {kind_label} – Centro de Estudios Superiores en Negocios y Humanidades"
 
-                if extra_msg:
-                    text_body += "\n\nMensaje adicional:\n" + extra_msg
-                    html_body = base_body_html.replace(
-                        "</body>",
-                        extra_to_html(extra_msg) + "\n  </body>"
-                    )
+    # Base TEXT
+    base_text = (
+        f"Hola {nombre},\n\n"
+        f"Tu {kind_label} ha sido publicado.\n"
+        f"Puedes verlo aquí:\n{verify_url}\n\n"
+        "Centro de Estudios Superiores en Negocios y Humanidades"
+    )
 
-            # Remitente configurado en settings
-            from_email = getattr(settings, "DEFAULT_FROM_EMAIL", None) or getattr(
-                settings, "EMAIL_HOST_USER", None
-            )
+    # Base HTML
+    base_html = f"""
+    <html><body style="font-family:Arial;">
+      <div style="text-align:center;margin-bottom:20px;">
+        <img src="cid:ceslogo" style="max-width:180px;">
+      </div>
+      <p>Hola {escape(nombre)},</p>
+      <p>Tu {kind_label} ha sido publicado.</p>
+      <p>Puedes verlo aquí:</p>
+      <p><a href="{verify_url}">Verifica aquí</a></p>
+      <p>Centro de Estudios Superiores en Negocios y Humanidades</p>
+    </body></html>
+    """
 
-            if not from_email:
-                log.warning(
-                    "No DEFAULT_FROM_EMAIL/EMAIL_HOST_USER configurado; no se enviará correo."
-                )
-            else:
-                # Crear el email multi-parte (texto + HTML)
-                email = EmailMultiAlternatives(
-                    subject=subject,
-                    body=text_body,
-                    from_email=from_email,
-                    to=[req.email],
-                )
-                email.attach_alternative(html_body, "text/html")
+    # Aplicar modo FULL o APPEND
+    if extra_mode == "full" and extra_msg:
+        text_body = extra_msg
+        html_body = f"""
+        <html><body style="font-family:Arial;">
+          <div style="text-align:center;margin-bottom:20px;">
+            <img src="cid:ceslogo" style="max-width:180px;">
+          </div>
+          {escape(extra_msg).replace("\n","<br>")}
+          <br><br><a href="{verify_url}">Verifica aquí</a>
+        </body></html>
+        """
+    else:
+        text_body = base_text
+        if extra_msg:
+            text_body += "\n\nMensaje adicional:\n" + extra_msg
+        html_body = base_html.replace(
+            "</body>",
+            f"<p><strong>Mensaje adicional:</strong></p><p>{escape(extra_msg).replace('\n','<br>')}</p></body>"
+        ) if extra_msg else base_html
 
-                # Adjuntar logo inline (cid:ceslogo) desde static/img/CES_Logo.png
-                try:
-                    logo_path = find_static("img/CES_Logo.png")
-                    if logo_path:
-                        with open(logo_path, "rb") as f:
-                            logo_data = f.read()
-                        image = MIMEImage(logo_data)
-                        image.add_header("Content-ID", "<ceslogo>")
-                        image.add_header("Content-Disposition", "inline", filename="CES_Logo.png")
-                        email.mixed_subtype = "related"
-                        email.attach(image)
-                except Exception as e:
-                    log.exception("No se pudo adjuntar el logo CES: %s", e)
+    # ----------------------------------
+    # Crear y enviar correo
+    # ----------------------------------
+    from_email = getattr(settings, "DEFAULT_FROM_EMAIL", None) or getattr(settings, "EMAIL_HOST_USER", None)
+    if not from_email:
+        return JsonResponse({"ok": False, "error": "Servidor sin remitente configurado."}, status=500)
 
-                # Adjuntar PDF si existe
-                if pdf_bytes:
-                    filename = f"{tipo_real}-{req.id}.pdf"
-                    email.attach(filename, pdf_bytes, "application/pdf")
+    email = EmailMultiAlternatives(subject, text_body, from_email, [req.email])
+    email.attach_alternative(html_body, "text/html")
 
-                email.send(fail_silently=False)
-                emailed = True
+    # ---- Adjuntar LOGO con finders ----
+    try:
+        logo_path = finders.find("img/CES_Logo.png")  # PATH real, no URL
+        if logo_path:
+            with open(logo_path, "rb") as f:
+                logo_data = f.read()
+            img = MIMEImage(logo_data)
+            img.add_header("Content-ID", "<ceslogo>")
+            img.add_header("Content-Disposition", "inline")
+            email.attach(img)
+        else:
+            log.warning("Logo img/CES_Logo.png no fue encontrado en staticfiles.")
+    except Exception as e:
+        log.exception("No se pudo adjuntar el logo CES: %s", e)
 
-        except Exception as exc:
-            log.exception("Error enviando correo para Request %s: %s", req.id, exc)
+    # Adjuntar PDF (si existe)
+    if pdf_bytes:
+        filename = f"{tipo_real}-{req.id}.pdf"
+        email.attach(filename, pdf_bytes, "application/pdf")
 
-    # --- Si se envió el correo, actualizar estado / tracking (quinto círculo) ---
+    # Enviar
+    try:
+        email.send(fail_silently=False)
+        emailed = True
+    except Exception as e:
+        log.exception("Error enviando correo: %s", e)
+        emailed = False
+
+    # ----------------------------------
+    # Actualizar tracking
+    # ----------------------------------
     if emailed:
-        try:
-            if getattr(req, "status", None) != "emailed":
-                req.status = "emailed"
-                req.save(update_fields=["status"])
+        req.status = "emailed"
+        req.save(update_fields=["status"])
 
-            if not RequestEvent.objects.filter(request=req, status="emailed").exists():
-                RequestEvent.objects.create(
-                    request=req,
-                    status="emailed",
-                    note="Documento enviado por correo desde administración.",
-                )
+        RequestEvent.objects.update_or_create(
+            request=req,
+            status="emailed",
+            defaults={"note": "Documento enviado por correo."},
+        )
 
-            grad = getattr(req, "graduate", None)
-            if grad and not getattr(grad, "sent_at", None):
-                grad.sent_at = timezone.now()
-                grad.save(update_fields=["sent_at"])
-        except Exception as exc:
-            log.exception(
-                "Error actualizando estado 'emailed' para Request %s: %s", req.id, exc
-            )
+        grad = getattr(req, "graduate", None)
+        if grad and not grad.sent_at:
+            grad.sent_at = timezone.now()
+            grad.save(update_fields=["sent_at"])
 
-    # === Solo para CPROEM: marcar como FINALIZADO (círculo 6) ===
-    is_cproem = (tipo_real == "cproem")
-    if is_cproem:
-        if req.status != "finalizado":
+        # Si es CPROEM → finalizado
+        if tipo_real == "cproem":
             req.status = "finalizado"
             req.save(update_fields=["status"])
 
-        if not RequestEvent.objects.filter(request=req, status="finalizado").exists():
-            RequestEvent.objects.create(
+            RequestEvent.objects.update_or_create(
                 request=req,
                 status="finalizado",
-                note="Constancia CPROEM confirmada; disponible para descarga.",
+                defaults={"note": "Constancia CPROEM lista para descarga."},
             )
 
-        grad = getattr(req, "graduate", None)
-        if grad and not getattr(grad, "download_date", None):
-            grad.download_date = timezone.localdate()
-            grad.save(update_fields=["download_date"])
+            if grad and not grad.download_date:
+                grad.download_date = timezone.localdate()
+                grad.save(update_fields=["download_date"])
+    else:
+        return JsonResponse(
+            {"ok": False, "error": "No se pudo enviar el correo. Revisa las credenciales SMTP."},
+            status=500,
+        )
 
+    # ----------------------------------
+    # Todo correcto
+    # ----------------------------------
     return JsonResponse(
-        {
-            "ok": True,
-            "verify_url": verify_url,
-            "tipo": tipo_real,
-            "finalizado": is_cproem,
-        }
+        {"ok": True, "verify_url": verify_url, "tipo": tipo_real}
     )
+
 
 @require_GET
 def doc_email_preview(request, req_id):
@@ -1815,7 +2304,46 @@ def doc_confirm(request, req_id):
 
 
 def doc_preview(request, req_id):
-    return egresados_preview_pdf(request, req_id)
+    """
+    Genera vista previa del documento en PDF.
+    Intenta primero DOCX → PDF.
+    """
+    req = get_object_or_404(
+        Request.objects.select_related("program", "graduate"),
+        pk=req_id,
+    )
+
+    tipo_real = _get_tipo_from_request(request, default="diploma")
+    verify_url = request.build_absolute_uri("/preview/")  # no importa, solo para DOCX
+
+    # DOCX primero
+    pdf_bytes = None
+    try:
+        docx_bytes = _render_docx_template_for_request(req, tipo_real, verify_url=verify_url)
+        if docx_bytes:
+            class _B:
+                def __init__(self, b): self.b = b
+                def chunks(self, s=65536):
+                    mv = memoryview(self.b)
+                    for i in range(0, len(mv), s):
+                        yield mv[i:i+s]
+
+            pdf_bytes = _office_to_pdf_bytes(_B(docx_bytes),
+                                             name_hint=f"preview-{req.id}.docx")
+            pdf_bytes = _pdf_secure(pdf_bytes, user_pwd="", watermark_text="CES · SOLO PREVIEW")
+    except:
+        pdf_bytes = None
+
+    # fallback HTML
+    if pdf_bytes is None:
+        tpl, ctx = _render_ctx_and_template(request, req, tipo_real)
+        html = render_to_string(tpl, ctx, request=request)
+        from weasyprint import HTML
+        raw = HTML(string=html, base_url=request.build_absolute_uri("/")).write_pdf()
+        pdf_bytes = _pdf_secure(raw, user_pwd="", watermark_text="CES · SOLO PREVIEW")
+
+    return HttpResponse(pdf_bytes, content_type="application/pdf")
+
 
 @require_GET
 def doc_download(request, req_id: int):
@@ -1928,8 +2456,11 @@ def doc_download(request, req_id: int):
             "signature_url": signature_url,
         }
 
-    # Generadores PDF/DOCX
-    def _make_pdf_bytes_for_cproem(graduate, signed: bool) -> bytes:
+    # Generadores PDF/DOCX (HTML fallback)
+    def _make_pdf_bytes_for_cproem_html(graduate, signed: bool) -> bytes:
+        """
+        Versión HTML (plantillas antiguas) – ahora solo como fallback si no hay DOCX.
+        """
         try:
             # Si signed -> plantilla digital (contiene la firma), si unsigned -> plantilla sin firma
             tpl_signed = "administracion/pdf_constancia_cproem_digital.html"
@@ -1942,7 +2473,10 @@ def doc_download(request, req_id: int):
         except Exception as e:
             raise RuntimeError(f"Error generando documento: {e}")
 
-    def _make_pdf_bytes_generic() -> bytes:
+    def _make_pdf_bytes_generic_html() -> bytes:
+        """
+        Fallback genérico HTML → PDF para tipos sin DOCX.
+        """
         try:
             tpl, ctx = _render_ctx_and_template(request, req, tipo_real, use_published_if_exists=True)
             html = render_to_string(tpl, ctx, request=request)
@@ -1951,72 +2485,84 @@ def doc_download(request, req_id: int):
             raise RuntimeError(f"Error generando documento: {e}")
 
     def _make_docx_bytes_generic(include_cproem_note=False, signed=None):
-    """
-    Genera un DOCX para diploma / constancia.
+        # 1) Intentar plantilla DOCX del programa (docx con variables)
+        try:
+            # Para el DOCX queremos también URL de verificación
+            doc_token = _ensure_published_token(req, tipo_real)
+            verify_url = request.build_absolute_uri(
+                reverse("administracion:verificar_token", args=[doc_token.token])
+            )
 
-    - Primero intenta usar una plantilla DocxTemplate (si hay).
-    - Si no hay plantilla, usa el DOCX genérico de texto simple.
-    """
-    # 1) Intentar plantilla DOCX
-    try:
-        # Para el DOCX no necesitamos token nuevo, pero si quieres,
-        # podemos generar también la URL de verificación aquí.
-        doc_token = _ensure_published_token(req, tipo_real)
-        verify_url = request.build_absolute_uri(
-            reverse("administracion:verificar_token", args=[doc_token.token])
+            rendered = _render_docx_template_for_request(
+                req,
+                tipo_real,
+                verify_url=verify_url,
+            )
+            if rendered:
+                return rendered
+        except Exception as e:
+            # Si falla la plantilla, logueamos y caemos al genérico
+            log.exception(
+                "Error usando plantilla DOCX para %s #%s: %s",
+                tipo_real,
+                req.id,
+                e,
+            )
+
+        # 2) Fallback: DOCX genérico como antes
+        try:
+            doc = Document()
+        except Exception as e:
+            raise RuntimeError(f"python-docx no está instalado: {e}")
+
+        title = (
+            f"{tipo_real.upper()} - {program_name}"
+            if tipo_real != "cproem"
+            else f"CONSTANCIA CPROEM - {program_name}"
         )
+        doc.add_heading(title, level=1)
+        doc.add_paragraph(f"Nombre: {full_name or '—'}")
+        doc.add_paragraph(f"Programa: {program_name}")
+        doc.add_paragraph(f"Inicio: {_fmt_date(start_date)}")
+        doc.add_paragraph(f"Fin: {_fmt_date(end_date)}")
 
-        rendered = _render_docx_template_for_request(req, tipo_real, verify_url=verify_url)
-        if rendered:
-            return rendered
-    except Exception as e:
-        # Si falla la plantilla, logueamos y caemos al genérico
-        log.exception("Error usando plantilla DOCX para %s #%s: %s", tipo_real, req.id, e)
+        curp = getattr(req, "curp", None)
+        rfc = getattr(req, "rfc", None)
+        job = getattr(req, "job_title", None)
+        giro = getattr(req, "industry", None)
+        biz = getattr(req, "business_name", None)
 
-    # 2) Fallback: DOCX genérico como antes
-    try:
-        from docx import Document
-    except Exception as e:
-        raise RuntimeError(f"python-docx no está instalado: {e}")
+        if curp:
+            doc.add_paragraph(f"CURP: {curp}")
+        if rfc:
+            doc.add_paragraph(f"RFC: {rfc}")
+        if job:
+            doc.add_paragraph(f"Puesto: {job}")
+        if giro:
+            doc.add_paragraph(f"Giro: {giro}")
+        if biz:
+            doc.add_paragraph(f"Razón social: {biz}")
 
-    doc = Document()
-    title = f"{tipo_real.upper()} - {program_name}" if tipo_real != "cproem" else f"CONSTANCIA CPROEM - {program_name}"
-    doc.add_heading(title, level=1)
-    doc.add_paragraph(f"Nombre: {full_name or '—'}")
-    doc.add_paragraph(f"Programa: {program_name}")
-    doc.add_paragraph(f"Inicio: {_fmt_date(start_date)}")
-    doc.add_paragraph(f"Fin: {_fmt_date(end_date)}")
+        if include_cproem_note:
+            doc.add_paragraph("")
+            if signed is False:
+                doc.add_paragraph("Versión sin firma (sin imagen de firma).")
+            else:
+                doc.add_paragraph("Versión con firma (contiene imagen de firma).")
 
-    curp = getattr(req, "curp", None)
-    rfc  = getattr(req, "rfc", None)
-    job  = getattr(req, "job_title", None)
-    giro = getattr(req, "industry", None)
-    biz  = getattr(req, "business_name", None)
-
-    if curp: doc.add_paragraph(f"CURP: {curp}")
-    if rfc:  doc.add_paragraph(f"RFC: {rfc}")
-    if job:  doc.add_paragraph(f"Puesto: {job}")
-    if giro: doc.add_paragraph(f"Giro: {giro}")
-    if biz:  doc.add_paragraph(f"Razón social: {biz}")
-
-    if include_cproem_note:
         doc.add_paragraph("")
-        if signed is False:
-            doc.add_paragraph("Versión sin firma (sin imagen de firma).")
-        else:
-            doc.add_paragraph("Versión con firma (contiene imagen de firma).")
+        doc.add_paragraph("Documento generado automáticamente por CES System.")
 
-    doc.add_paragraph("")
-    doc.add_paragraph("Documento generado automáticamente por CES System.")
-
-    b = io.BytesIO()
-    doc.save(b)
-    b.seek(0)
-    return b.getvalue()
-
+        b = io.BytesIO()
+        doc.save(b)
+        b.seek(0)
+        return b.getvalue()
 
     # --- 4) Ramas por formato solicitado ---
-    # CPROEM
+
+    # =========================
+    #    C P R O E M
+    # =========================
     if tipo_real == "cproem":
         # localizar graduate existente
         grad = getattr(req, "graduate", None)
@@ -2041,27 +2587,79 @@ def doc_download(request, req_id: int):
                 },
             )
 
-        # PDF
+        # --------- PDF (CPROEM) ---------
         if fmt == "pdf":
+            pdf_bytes = None
+
+            # 1) Intentar DOCX con variables -> PDF
             try:
-                signed = signed_flag if signed_flag is not None else True
-                pdf_bytes = _make_pdf_bytes_for_cproem(grad, signed=signed)
-                return FileResponse(
-                    io.BytesIO(pdf_bytes),
-                    content_type="application/pdf",
-                    filename=f"{tipo_real}-{req.id}.pdf",
+                doc_token = _ensure_published_token(req, tipo_real)
+                verify_url = request.build_absolute_uri(
+                    reverse("administracion:verificar_token", args=[doc_token.token])
+                )
+
+                docx_bytes = _render_docx_template_for_request(
+                    req,
+                    "cproem",
+                    verify_url=verify_url,
                 )
             except Exception as e:
                 log.exception(
-                    "Fallo generando documento para cproem #%s (fmt=pdf sig=%s)",
+                    "Error usando plantilla DOCX para CPROEM #%s: %s",
                     req.id,
-                    signed_flag,
+                    e,
                 )
-                return JsonResponse({"ok": False, "error": str(e)}, status=500)
+                docx_bytes = None
 
-        # DOCX
+            if docx_bytes:
+                try:
+                    class _U:
+                        def __init__(self, b): self._b = b
+                        def chunks(self, csize=64 * 1024):
+                            mv = memoryview(self._b)
+                            for i in range(0, len(mv), csize):
+                                yield mv[i:i + csize]
+
+                    raw_pdf = _office_to_pdf_bytes(
+                        _U(docx_bytes),
+                        name_hint=f"{tipo_real}-{req.id}.docx",
+                    )
+                    pdf_bytes = _pdf_secure(
+                        raw_pdf,
+                        user_pwd="",
+                        watermark_text="CES · Solo lectura",
+                    )
+                except Exception as e:
+                    log.exception(
+                        "Error DOCX→PDF CPROEM #%s: %s",
+                        req.id,
+                        e,
+                    )
+                    pdf_bytes = None
+
+            # 2) Fallback HTML (plantillas CPROEM antiguas con firma)
+            if pdf_bytes is None:
+                try:
+                    signed = signed_flag if signed_flag is not None else True
+                    pdf_bytes = _make_pdf_bytes_for_cproem_html(grad, signed=signed)
+                except Exception as e:
+                    log.exception(
+                        "Fallo generando documento CPROEM #%s (fmt=pdf sig=%s)",
+                        req.id,
+                        signed_flag,
+                    )
+                    return JsonResponse({"ok": False, "error": str(e)}, status=500)
+
+            return FileResponse(
+                io.BytesIO(pdf_bytes),
+                content_type="application/pdf",
+                filename=f"{tipo_real}-{req.id}.pdf",
+            )
+
+        # --------- DOCX (CPROEM) ---------
         if fmt == "docx":
             try:
+                # Usa plantilla DOCX del programa si existe (a través de _make_docx_bytes_generic)
                 docx_bytes = _make_docx_bytes_generic(
                     include_cproem_note=True,
                     signed=(signed_flag if signed_flag is not None else True),
@@ -2075,33 +2673,69 @@ def doc_download(request, req_id: int):
                 log.exception("Fallo generando DOCX CPROEM #%s", req.id)
                 return JsonResponse({"ok": False, "error": str(e)}, status=500)
 
-        # ZIP: ambos PDFs + DOCX
+        # --------- ZIP (CPROEM) ---------
         if fmt == "zip":
             mem = io.BytesIO()
             readme_lines = []
             try:
                 with zipfile.ZipFile(mem, "w", zipfile.ZIP_DEFLATED) as zf:
-                    # signed pdf
+                    # signed pdf (DOCX→PDF si hay, si no HTML)
                     try:
+                        # DOCX→PDF
+                        try:
+                            doc_token = _ensure_published_token(req, tipo_real)
+                            verify_url = request.build_absolute_uri(
+                                reverse("administracion:verificar_token", args=[doc_token.token])
+                            )
+                            docx_bytes = _render_docx_template_for_request(
+                                req, "cproem", verify_url=verify_url
+                            )
+                        except Exception:
+                            docx_bytes = None
+
+                        if docx_bytes:
+                            class _U2:
+                                def __init__(self, b): self._b = b
+                                def chunks(self, csize=64 * 1024):
+                                    mv = memoryview(self._b)
+                                    for i in range(0, len(mv), csize):
+                                        yield mv[i:i + csize]
+
+                            raw_signed = _office_to_pdf_bytes(
+                                _U2(docx_bytes),
+                                name_hint=f"{tipo_real}-{req.id}.docx",
+                            )
+                            signed_pdf = _pdf_secure(
+                                raw_signed,
+                                user_pwd="",
+                                watermark_text="CES · Solo lectura",
+                            )
+                        else:
+                            # fallback HTML firmado
+                            signed_pdf = _make_pdf_bytes_for_cproem_html(grad, signed=True)
+
                         zf.writestr(
                             f"{tipo_real}-{req.id}-signed.pdf",
-                            _make_pdf_bytes_for_cproem(grad, signed=True),
+                            signed_pdf,
                         )
                     except Exception as e:
                         msg = f"[PDF signed] fallo: {e}"
                         log.exception(msg)
                         readme_lines.append(msg)
-                    # unsigned pdf
+
+                    # unsigned pdf (para zip, seguimos con HTML sin firma)
                     try:
+                        unsigned_pdf = _make_pdf_bytes_for_cproem_html(grad, signed=False)
                         zf.writestr(
                             f"{tipo_real}-{req.id}-unsigned.pdf",
-                            _make_pdf_bytes_for_cproem(grad, signed=False),
+                            unsigned_pdf,
                         )
                     except Exception as e:
                         msg = f"[PDF unsigned] fallo: {e}"
                         log.exception(msg)
                         readme_lines.append(msg)
-                    # docx
+
+                    # docx (plantilla con variables si existe, si no genérico)
                     try:
                         zf.writestr(
                             f"{tipo_real}-{req.id}.docx",
@@ -2134,10 +2768,70 @@ def doc_download(request, req_id: int):
                     status=500,
                 )
 
-    # no-CPROEM (diploma, dc3, etc.) — comportamiento previo
+    # =========================
+    #  D I P L O M A / D C 3
+    # =========================
     if fmt == "pdf":
+        # 1) Intentar generar PDF a partir de una plantilla DOCX con variables (si existe)
+        docx_bytes = None
         try:
-            pdf_bytes = _make_pdf_bytes_generic()
+            doc_token = _ensure_published_token(req, tipo_real)
+            verify_url = request.build_absolute_uri(
+                reverse("administracion:verificar_token", args=[doc_token.token])
+            )
+
+            docx_bytes = _render_docx_template_for_request(
+                req,
+                tipo_real,
+                verify_url=verify_url,
+            )
+        except Exception as e:
+            log.exception(
+                "Error usando plantilla DOCX para PDF %s #%s: %s",
+                tipo_real,
+                req.id,
+                e,
+            )
+            docx_bytes = None
+
+        if docx_bytes:
+            # convertir DOCX -> PDF usando LibreOffice (headless), si está disponible
+            pdf_bytes = None
+            try:
+                class _U:
+                    def __init__(self, b): self._b = b
+                    def chunks(self, csize=64 * 1024):
+                        mv = memoryview(self._b)
+                        for i in range(0, len(mv), csize):
+                            yield mv[i:i + csize]
+
+                pdf_bytes = _office_to_pdf_bytes(
+                    _U(docx_bytes),
+                    name_hint=f"{tipo_real}-{req.id}.docx",
+                )
+            except Exception:
+                pdf_bytes = None
+
+            if pdf_bytes:
+                # endurecer PDF igual que en el flujo HTML (raster + watermark + permisos)
+                try:
+                    secured_pdf = _pdf_secure(
+                        pdf_bytes,
+                        user_pwd="",
+                        watermark_text="CES · Solo lectura",
+                    )
+                except Exception:
+                    secured_pdf = pdf_bytes
+
+                return FileResponse(
+                    io.BytesIO(secured_pdf),
+                    content_type="application/pdf",
+                    filename=f"{tipo_real}-{req.id}.pdf",
+                )
+
+        # 2) Fallback: comportamiento previo (HTML + imagen de fondo con WeasyPrint)
+        try:
+            pdf_bytes = _make_pdf_bytes_generic_html()
             return FileResponse(
                 io.BytesIO(pdf_bytes),
                 content_type="application/pdf",
@@ -2165,7 +2859,7 @@ def doc_download(request, req_id: int):
                 status=500,
             )
 
-    # zip genérico: PDF + DOCX
+    # zip genérico: PDF + DOCX (diploma/dc3)
     readme_lines = []
     mem = io.BytesIO()
     with zipfile.ZipFile(mem, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -2181,7 +2875,7 @@ def doc_download(request, req_id: int):
         try:
             zf.writestr(
                 f"{tipo_real}-{req.id}.pdf",
-                _make_pdf_bytes_generic(),
+                _make_pdf_bytes_generic_html(),
             )
         except Exception as e:
             msg = f"[PDF] No se pudo generar: {e}"
@@ -2831,13 +3525,28 @@ def egresado_update_inline(request, req_id: int):
 
 # ================== PLANTILLAS PREMIUM ==================
 
-@login_required
 def plantillas_admin(request):
     q = request.GET.get("q", "").strip()
+
+    # Plantillas de diseño (imágenes / fondos) — lo que ya tenías
     qs = DesignTemplate.objects.all().order_by("-updated_at")
     if q:
         qs = qs.filter(title__icontains=q)
-    return render(request, "administracion/plantillas_admin.html", {"items": qs, "q": q})
+
+    # NUEVO: plantillas DOCX con variables
+    docx_qs = DocxTemplate.objects.all().order_by("-created_at")
+    if q:
+        docx_qs = docx_qs.filter(name__icontains=q)
+
+    return render(
+        request,
+        "administracion/plantillas_admin.html",
+        {
+            "items": qs,
+            "docx_items": docx_qs,  # <-- nuevo contexto
+            "q": q,
+        },
+    )
 
 @login_required
 @require_http_methods(["GET", "POST"])
@@ -2991,164 +3700,22 @@ def asset_delete(request, pk: int):
 
 # ========== PROGRAMAS / DIPLOMADOS ==========
 
-
-@csrf_exempt
-@login_required
-@require_http_methods(["GET", "POST"])
-def program_edit(request, pk: int):
-    """
-    Edita SOLO el modelo Program (tabla nueva).
-    No toca ProgramSim ni la BD 'ces' para evitar errores.
-    """
-    p = get_object_or_404(Program, pk=pk)
-
-    # ---------- RAMA AJAX (llamada desde program_edit.js) ----------
-    if request.method == "POST" and request.headers.get("x-requested-with") == "XMLHttpRequest":
-        try:
-            data = json.loads(request.body.decode("utf-8") or "{}")
-        except json.JSONDecodeError:
-            return JsonResponse(
-                {"success": False, "message": "Datos inválidos (JSON)."},
-                status=400,
-            )
-
-        new_code = (data.get("programa") or "").strip()
-        new_name = (data.get("programa_full") or "").strip()
-        new_constancia = (data.get("constancia") or "").strip().lower()
-
-        # ---- Validaciones básicas ----
-        if not new_code or not new_name:
-            return JsonResponse(
-                {
-                    "success": False,
-                    "message": "Los campos «Programa» y «Nombre completo» son obligatorios.",
-                },
-                status=400,
-            )
-
-        if new_constancia not in ("dc3", "cproem"):
-            return JsonResponse(
-                {
-                    "success": False,
-                    "message": "Tipo de constancia inválido. Usa «dc3» o «cproem».",
-                },
-                status=400,
-            )
-
-        # Mapear dc3/cproem -> ConstanciaType
-        constancia_model = (
-            ConstanciaType.DC3 if new_constancia == "dc3" else ConstanciaType.CEPROEM
-        )
-
-        # Validar unicidad (evita IntegrityError)
-        if Program.objects.exclude(pk=p.pk).filter(code=new_code).exists():
-            return JsonResponse(
-                {
-                    "success": False,
-                    "message": f"Ya existe otro programa con el código «{new_code}».",
-                },
-                status=400,
-            )
-
-        if Program.objects.exclude(pk=p.pk).filter(name=new_name).exists():
-            return JsonResponse(
-                {
-                    "success": False,
-                    "message": f"Ya existe otro programa con el nombre «{new_name}».",
-                },
-                status=400,
-            )
-
-        # Guardar SOLO Program
-        try:
-            with transaction.atomic():
-                p.code = new_code
-                p.name = new_name
-                p.constancia_type = constancia_model
-                p.save()
-        except Exception as e:
-            # Error de negocio (ej. constraint) -> 400 con mensaje
-            return JsonResponse(
-                {
-                    "success": False,
-                    "message": f"No se pudo guardar el programa: {type(e).__name__}: {e}",
-                },
-                status=400,
-            )
-
-        # Respuesta OK para el front
-        return JsonResponse(
-            {
-                "success": True,
-                "message": f"El programa «{new_name}» se actualizó correctamente.",
-                "data": {
-                    "programa": new_code,
-                    "programa_full": new_name,
-                    "constancia": new_constancia,  # 'dc3' o 'cproem'
-                },
-            },
-            status=200,
-        )
-
-    # ---------- RAMA NORMAL (formulario clásico por POST / GET) ----------
-    if request.method == "POST":
-        # Formulario HTML clásico (si lo usas)
-        p.name = request.POST.get("name") or p.name
-        p.code = request.POST.get("code") or p.code
-
-        constancia_raw = (request.POST.get("constancia_type") or "").upper()
-        if constancia_raw in (ConstanciaType.DC3, ConstanciaType.CEPROEM):
-            p.constancia_type = constancia_raw
-
-        plantilla_d = request.POST.get("plantilla_diploma") or None
-        plantilla_c = request.POST.get("plantilla_constancia") or None
-
-        p.plantilla_diploma = (
-            DesignTemplate.objects.filter(id=plantilla_d).first() if plantilla_d else None
-        )
-        p.plantilla_constancia = (
-            DesignTemplate.objects.filter(id=plantilla_c).first() if plantilla_c else None
-        )
-
-        p.save()
-        return redirect("administracion:program_list")
-
-    # GET normal: mostrar formulario clásico (si navegas directo a la URL)
-    plantillas = DesignTemplate.objects.all().order_by("title")
-    return render(
-        request,
-        "administracion/program_form.html",
-        {
-            "mode": "edit",
-            "item": p,
-            "plantillas": plantillas,
-            "ConstanciaType": ConstanciaType,
-        },
-    )
-
-def _build_item_from_data(data=None):
-    data = data or {}
-
-    const_type = (data.get("constancia_type") or "cproem").lower()
-
-    return {
-        "code": (data.get("code") or "").strip(),
-        "name": (data.get("name") or "").strip(),
-        "constancia_type": const_type,  # 'cproem' o 'dc3'
-        "plantilla_diploma_id": data.get("plantilla_diploma") or None,
-        "plantilla_constancia_id": data.get("plantilla_constancia") or None,
-    }
-
 @login_required
 def program_create(request):
     plantillas = DesignTemplate.objects.all().order_by("title")
+
+    # 👇 NUEVO: plantillas DOCX activas, separadas por tipo
+    docx_tpls = DocxTemplate.objects.filter(is_active=True).order_by("name")
+    docx_diploma_templates = docx_tpls.filter(tipo="diploma")
+    docx_dc3_templates = docx_tpls.filter(tipo="dc3")
+    docx_cproem_templates = docx_tpls.filter(tipo="cproem")
 
     if request.method == "POST":
         code = (request.POST.get("code") or "").strip().upper()
         name = (request.POST.get("name") or "").strip()
         raw_const = request.POST.get("constancia_type") or ConstanciaType.CEPROEM
 
-        # Puede venir 0/1 o CEPROEM/DC3
+        # Puede venir 0/1 o CEPROEM/DC3 o cproem/dc3
         if str(raw_const) in ("0", "1"):
             constancia = ConstanciaType.DC3 if str(raw_const) == "1" else ConstanciaType.CEPROEM
         else:
@@ -3157,23 +3724,41 @@ def program_create(request):
         plantilla_diploma_id = request.POST.get("plantilla_diploma") or None
         plantilla_constancia_id = request.POST.get("plantilla_constancia") or None
 
+        # 👇 NUEVO: IDs de plantillas DOCX por tipo
+        docx_tpl_diploma_id = request.POST.get("docx_tpl_diploma") or None
+        docx_tpl_dc3_id = request.POST.get("docx_tpl_dc3") or None
+        docx_tpl_cproem_id = request.POST.get("docx_tpl_cproem") or None
+
         item = {
             "code": code,
             "name": name,
             "constancia_type": constancia,
             "plantilla_diploma_id": plantilla_diploma_id,
             "plantilla_constancia_id": plantilla_constancia_id,
+            # 👇 NUEVO: para que se mantengan seleccionados si hay error
+            "docx_tpl_diploma_id": docx_tpl_diploma_id,
+            "docx_tpl_dc3_id": docx_tpl_dc3_id,
+            "docx_tpl_cproem_id": docx_tpl_cproem_id,
         }
 
         if not code or not name:
             messages.error(request, "Código y nombre son obligatorios.")
-            return render(request, "administracion/program_form.html",
-                {"mode": "create", "item": item, "plantillas": plantillas}
+            return render(
+                request,
+                "administracion/program_form.html",
+                {
+                    "mode": "create",
+                    "item": item,
+                    "plantillas": plantillas,
+                    "ConstanciaType": ConstanciaType,
+                    "docx_diploma_templates": docx_diploma_templates,
+                    "docx_dc3_templates": docx_dc3_templates,
+                    "docx_cproem_templates": docx_cproem_templates,
+                },
             )
 
         try:
             with transaction.atomic():
-
                 # === 1) Crear Program en ces_db (tabla principal) ===
                 program = Program.objects.create(
                     code=code,
@@ -3181,34 +3766,68 @@ def program_create(request):
                     constancia_type=constancia,
                     plantilla_diploma_id=plantilla_diploma_id or None,
                     plantilla_constancia_id=plantilla_constancia_id or None,
+                    # 👇 NUEVO: guardar FKs DOCX
+                    docx_tpl_diploma_id=docx_tpl_diploma_id or None,
+                    docx_tpl_dc3_id=docx_tpl_dc3_id or None,
+                    docx_tpl_cproem_id=docx_tpl_cproem_id or None,
                 )
 
                 # === 2) Insertar en ces_simulacion.diplomado ===
                 constancia_sim = 1 if constancia == ConstanciaType.DC3 else 0
 
                 with connections["ces"].cursor() as cur:
-                    cur.execute("""
-                        INSERT INTO diplomado (programa, programa_full, constancia, update_at)
+                    cur.execute(
+                        """
+                        INSERT INTO diplomado (programa, programa_full, constancia, updated_at)
                         VALUES (%s, %s, %s, NOW())
-                    """, [code, name, constancia_sim])
+                        """,
+                        [code, name, constancia_sim],
+                    )       
 
             messages.success(request, "Programa creado correctamente.")
             return redirect("administracion:program_list")
 
         except Exception as exc:
             messages.error(request, f"No se pudo crear el programa: {exc}")
-            return render(request, "administracion/program_form.html",
-                {"mode": "create", "item": item, "plantillas": plantillas})
+            return render(
+                request,
+                "administracion/program_form.html",
+                {
+                    "mode": "create",
+                    "item": item,
+                    "plantillas": plantillas,
+                    "ConstanciaType": ConstanciaType,
+                    "docx_diploma_templates": docx_diploma_templates,
+                    "docx_dc3_templates": docx_dc3_templates,
+                    "docx_cproem_templates": docx_cproem_templates,
+                },
+            )
 
+    # GET inicial: item vacío
     empty_item = {
         "code": "",
         "name": "",
         "constancia_type": ConstanciaType.CEPROEM,
         "plantilla_diploma_id": None,
         "plantilla_constancia_id": None,
+        # 👇 NUEVO: sin DOCX por defecto
+        "docx_tpl_diploma_id": None,
+        "docx_tpl_dc3_id": None,
+        "docx_tpl_cproem_id": None,
     }
-    return render(request, "administracion/program_form.html",
-        {"mode": "create", "item": empty_item, "plantillas": plantillas})
+    return render(
+        request,
+        "administracion/program_form.html",
+        {
+            "mode": "create",
+            "item": empty_item,
+            "plantillas": plantillas,
+            "ConstanciaType": ConstanciaType,
+            "docx_diploma_templates": docx_diploma_templates,
+            "docx_dc3_templates": docx_dc3_templates,
+            "docx_cproem_templates": docx_cproem_templates,
+        },
+    )
 
 
 @csrf_exempt
@@ -3250,6 +3869,19 @@ def program_edit(request, pk: int):
             sim_id = int(sim_id_raw) if sim_id_raw not in (None, "",) else None
         except (TypeError, ValueError):
             sim_id = None
+
+        # IDs de plantillas (pueden venir vacíos)
+        def to_int_or_none(value):
+            try:
+                return int(value) if value not in (None, "",) else None
+            except (TypeError, ValueError):
+                return None
+
+        diploma_design_id = to_int_or_none(data.get("diploma_design_id"))
+        diploma_docx_id   = to_int_or_none(data.get("diploma_docx_id"))
+        const_design_id   = to_int_or_none(data.get("const_design_id"))
+        docx_dc3_id       = to_int_or_none(data.get("docx_dc3_id"))
+        docx_cproem_id    = to_int_or_none(data.get("docx_cproem_id"))
 
         # ---- Validaciones básicas ----
         if not new_code or not new_name:
@@ -3301,6 +3933,15 @@ def program_edit(request, pk: int):
                 p.code = new_code
                 p.name = new_name
                 p.constancia_type = constancia_model
+
+                # Plantillas (se asignan aunque vengan en blanco -> limpia el campo)
+                # Usamos los campos *_id para no tener que buscar los objetos uno por uno.
+                p.plantilla_diploma_id    = diploma_design_id
+                p.docx_tpl_diploma_id     = diploma_docx_id
+                p.plantilla_constancia_id = const_design_id
+                p.docx_tpl_dc3_id         = docx_dc3_id
+                p.docx_tpl_cproem_id      = docx_cproem_id
+
                 p.save()
 
             # 2) Sincronizar alumnos.Program (ProgramSim) – best effort
@@ -3413,11 +4054,33 @@ def program_edit(request, pk: int):
             else None
         )
 
+        # DOCX (si aún tienes esos campos en el form clásico)
+        docx_d = request.POST.get("docx_tpl_diploma") or None
+        docx_dc3 = request.POST.get("docx_tpl_dc3") or None
+        docx_cproem = request.POST.get("docx_tpl_cproem") or None
+
+        p.docx_tpl_diploma = (
+            DocxTemplate.objects.filter(id=docx_d).first() if docx_d else None
+        )
+        p.docx_tpl_dc3 = (
+            DocxTemplate.objects.filter(id=docx_dc3).first() if docx_dc3 else None
+        )
+        p.docx_tpl_cproem = (
+            DocxTemplate.objects.filter(id=docx_cproem).first() if docx_cproem else None
+        )
+
         p.save()
         return redirect("administracion:program_list")
 
     # ---------- GET normal: formulario de edición clásico ----------
     plantillas = DesignTemplate.objects.all().order_by("title")
+
+    # Listas DOCX (por si las sigues usando en el form clásico)
+    docx_tpls = DocxTemplate.objects.filter(is_active=True).order_by("name")
+    docx_diploma_templates = docx_tpls.filter(tipo="diploma")
+    docx_dc3_templates = docx_tpls.filter(tipo="dc3")
+    docx_cproem_templates = docx_tpls.filter(tipo="cproem")
+
     return render(
         request,
         "administracion/program_form.html",
@@ -3426,22 +4089,13 @@ def program_edit(request, pk: int):
             "item": p,
             "plantillas": plantillas,
             "ConstanciaType": ConstanciaType,
+            "docx_diploma_templates": docx_diploma_templates,
+            "docx_dc3_templates": docx_dc3_templates,
+            "docx_cproem_templates": docx_cproem_templates,
         },
     )
 
-@login_required
-@require_POST
-def program_delete(request, source, code):
-    """
-    Elimina un diplomado de la tabla Diplomado en la BD 'ces' (ces_simulacion).
-    El parámetro 'source' ya no se usa para nada (siempre vamos a simulación).
-    """
-    with transaction.atomic(using="ces"):
-        with connections["ces"].cursor() as cur:
-            cur.execute("DELETE FROM Diplomado WHERE idDiplomado = %s", [code])
 
-    messages.success(request, "El diplomado se eliminó correctamente.")
-    return redirect("administracion:program_list")
 @login_required
 @require_http_methods(["POST"])
 def plantilla_upload_thumb(request, tpl_id: int):
@@ -3684,6 +4338,143 @@ def plantilla_import(request):
     )
     return redirect("administracion:plantillas_admin")
 
+
+@login_required
+@require_POST
+def docx_template_import(request):
+    f = request.FILES.get("file")
+    if not f:
+        messages.error(request, "No se recibió ningún archivo.")
+        return redirect("administracion:plantillas_admin")
+
+    ext = Path(f.name).suffix.lower()
+    if ext not in {".doc", ".docx"}:
+        messages.error(request, "Solo se permiten archivos .doc o .docx para plantillas con variables.")
+        return redirect("administracion:plantillas_admin")
+
+    tipo = (request.POST.get("tipo") or "diploma").lower()
+    if tipo not in {"diploma", "dc3", "cproem"}:
+        tipo = "diploma"
+
+    titulo = Path(f.name).stem
+
+    docx_tpl = DocxTemplate.objects.create(
+        name=titulo,      # <--- campo correcto
+        tipo=tipo,
+        file=f,
+        is_active=True,
+    )
+
+    messages.success(
+        request,
+        f"Se importó la plantilla DOCX «{docx_tpl.name}» para {tipo.upper()}."
+    )
+    return redirect("administracion:plantillas_admin")
+
+@login_required
+@require_http_methods(["POST"])
+def docx_template_delete(request, pk: int):
+    """
+    Elimina una plantilla DOCX con variables.
+    """
+    tpl = get_object_or_404(DocxTemplate, pk=pk)
+    nombre = tpl.name or "(sin nombre)"
+    tpl.delete()
+    messages.success(
+        request,
+        f"Se eliminó la plantilla DOCX «{nombre}».",
+    )
+    return redirect("administracion:plantillas_admin")
+
+@login_required
+@require_GET
+def docx_template_preview(request, pk: int):
+    """
+    Devuelve una miniatura PNG de la primera página del DOCX.
+
+    - Primera vez: DOCX -> PDF (LibreOffice) -> PNG (PyMuPDF) y se guarda
+      como <nombre_docx>_preview.png en el mismo storage.
+    - Siguientes veces: solo lee ese PNG ya generado (rápido).
+    """
+    tpl = get_object_or_404(DocxTemplate, pk=pk)
+
+    if not tpl.file:
+        return HttpResponseNotFound(b"No file")
+
+    # -------- 1) Si ya existe la miniatura, la devolvemos directo --------
+    base, _ = os.path.splitext(tpl.file.name)  # docx_templates/DAIEN_QR
+    preview_relpath = f"{base}_preview.png"    # docx_templates/DAIEN_QR_preview.png
+
+    if default_storage.exists(preview_relpath):
+        with default_storage.open(preview_relpath, "rb") as fh:
+            data = fh.read()
+        return HttpResponse(data, content_type="image/png")
+
+    # -------- 2) Generar miniatura (una sola vez) --------
+    try:
+        import fitz  # PyMuPDF
+    except Exception:
+        log.exception("PyMuPDF (fitz) no está disponible para generar vista previa DOCX.")
+        return HttpResponseNotFound(b"preview-not-available")
+
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+
+            # 2.1 Copiar DOCX a archivo temporal
+            src_path = tmpdir_path / "src.docx"
+            tpl.file.open("rb")
+            try:
+                src_path.write_bytes(tpl.file.read())
+            finally:
+                tpl.file.close()
+
+            # 2.2 DOCX -> PDF con LibreOffice
+            soffice = (
+                getattr(settings, "SOFFICE_BIN", None)
+                or os.environ.get("SOFFICE_BIN")
+                or os.environ.get("LIBREOFFICE_PATH")
+                or "soffice"
+            )
+
+            subprocess.run(
+                [
+                    soffice,
+                    "--headless",
+                    "--nologo",
+                    "--convert-to",
+                    "pdf",
+                    "--outdir",
+                    str(tmpdir_path),
+                    str(src_path),
+                ],
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+
+            pdf_path = tmpdir_path / "src.pdf"
+            if not pdf_path.exists():
+                raise RuntimeError("No se generó el PDF temporal desde el DOCX.")
+
+            # 2.3 PDF -> PNG (primera página) con un zoom moderado
+            doc = fitz.open(pdf_path)
+            try:
+                page = doc.load_page(0)
+                # 1.0x para que sea ligero (puedes subir a 1.3 si quieres más calidad)
+                pix = page.get_pixmap(matrix=fitz.Matrix(1.0, 1.0))
+                png_bytes = pix.tobytes("png")
+            finally:
+                doc.close()
+
+        # 2.4 Guardar PNG en el storage para reutilizarlo
+        default_storage.save(preview_relpath, ContentFile(png_bytes))
+
+        return HttpResponse(png_bytes, content_type="image/png")
+
+    except Exception as e:
+        log.exception("Error generando vista previa para DocxTemplate #%s: %s", tpl.id, e)
+        return HttpResponseNotFound(b"preview-error")
 
 def _pdf_to_png_bytes(pdf_bytes: bytes):
     """
@@ -4260,11 +5051,19 @@ def program_list(request):
     # ============================
     # PLANTILLAS (DC3, CPROEM y DIPLOMA)
     # ============================
-    # Reutilizamos el mismo queryset para las 3 listas del modal
+    # Reutilizamos el mismo queryset para las 3 listas del modal (HTML/imagen)
     all_templates = DesignTemplate.objects.filter(kind="design").order_by("title")
     dc3_templates = all_templates
     cproem_templates = all_templates
-    diploma_templates = all_templates   # <-- para la lista de diploma
+    diploma_templates = all_templates   # <-- para el select de diploma
+
+    # Plantillas DOCX activas (para el modal de edición)
+    docx_tpls = DocxTemplate.objects.filter(is_active=True).order_by("name")
+    docx_diploma_templates = docx_tpls.filter(tipo="diploma")
+    docx_dc3_templates = docx_tpls.filter(tipo="dc3")
+    docx_cproem_templates = docx_tpls.filter(tipo="cproem")
+
+
 
     # Program (tabla nueva) para la lista de la derecha (si la usas)
     programs_qs = Program.objects.all()
@@ -4338,15 +5137,24 @@ def program_list(request):
                         constancia_type=constancia_model,
                     )
 
-        # ============================
+                # ============================
         # Plantillas guardadas en Program
         # ============================
         tpl_constancia_id = None
         tpl_diploma_id = None
+        docx_diploma_id = None
+        docx_dc3_id = None
+        docx_cproem_id = None
 
         if prog_obj:
             tpl_constancia_id = prog_obj.plantilla_constancia_id
-            tpl_diploma_id = prog_obj.plantilla_diploma_id  # <-- DIPLOMA
+            tpl_diploma_id = prog_obj.plantilla_diploma_id  # fondo diploma
+
+            # DOCX
+            docx_diploma_id = prog_obj.docx_tpl_diploma_id
+            docx_dc3_id = prog_obj.docx_tpl_dc3_id
+            docx_cproem_id = prog_obj.docx_tpl_cproem_id
+
 
         # Para DC3: frontal = plantilla_constancia (por ahora), reverso vacío
         if constancia_ui == "dc3":
@@ -4367,27 +5175,34 @@ def program_list(request):
                 "programa_full": programa_full,
                 "constancia": constancia_ui,
                 "program_admin_id": prog_obj.id if prog_obj else None,
-                # Ya los tenías para el modal:
                 "tpl_dc3_front_id": tpl_dc3_front_id,
                 "tpl_dc3_back_id": tpl_dc3_back_id,
                 "tpl_cproem_id": tpl_cproem_id,
-                # NUEVO: id de la plantilla de diploma
                 "tpl_diploma_id": tpl_diploma_id,
+                # NUEVOS: para el modal de edición
+                "tpl_constancia_id": tpl_constancia_id,
+                "docx_diploma_id": docx_diploma_id,
+                "docx_dc3_id": docx_dc3_id,
+                "docx_cproem_id": docx_cproem_id,
             }
         )
 
     return render(
         request,
         "administracion/program_list.html",
-        {
+                {
             "programs": programs,
             "sim_programs": sim_programs,
             "q": q,
             "dc3_templates": dc3_templates,
             "cproem_templates": cproem_templates,
-            "diploma_templates": diploma_templates,  # <-- para el select de diploma
+            "diploma_templates": diploma_templates,  # HTML/imagen
+            "docx_diploma_templates": docx_diploma_templates,
+            "docx_dc3_templates": docx_dc3_templates,
+            "docx_cproem_templates": docx_cproem_templates,
         },
     )
+
 
 
 def verificar_documento(request, token):

@@ -194,21 +194,31 @@
   );
 
   // ---------- Preview (abre nueva pestaña) ----------
-  const btnPrevDipl = document.getElementById('btnPrevDiploma');
+  const btnPrevDipl  = document.getElementById('btnPrevDiploma');
   const btnPrevConst = document.getElementById('btnPrevConst');
+
   if (btnPrevDipl) {
     btnPrevDipl.addEventListener('click', (e) => {
       if (!previewUrl) return;
       e.preventDefault();
-      const url = previewUrl + (previewUrl.includes('?') ? '&' : '?') + 'tipo=diploma';
+      const sep = previewUrl.includes('?') ? '&' : '?';
+      const url = previewUrl + sep + 'tipo=diploma&fmt=pdf';
       window.open(url, '_blank', 'noopener');
     });
   }
+
   if (btnPrevConst) {
     btnPrevConst.addEventListener('click', (e) => {
       if (!previewUrl) return;
       e.preventDefault();
-      const url = previewUrl + (previewUrl.includes('?') ? '&' : '?') + 'tipo=constancia';
+      const sep = previewUrl.includes('?') ? '&' : '?';
+      let url = previewUrl + sep + 'tipo=constancia&fmt=pdf';
+
+      // Si es CPROEM, la vista previa debe ser la digital (con firma)
+      if (constKind === 'cproem') {
+        url += '&sig=signed';
+      }
+
       window.open(url, '_blank', 'noopener');
     });
   }
