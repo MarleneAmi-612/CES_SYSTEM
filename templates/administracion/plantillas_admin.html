@@ -85,7 +85,10 @@
   <!-- ========================= CONTENIDO ========================= -->
   <main class="content content--wide">
     <h1 class="h1">Administración de plantillas</h1>
-    <p class="sub">Importa documentos o elimina las plantillas que ya no se usen.</p>
+    <p class="sub">Importa documentos o elimina las plantillas que ya no se usen. Se debe utilizar el siguiente tipo de variable dentro del documento para que 
+    el sistema pueda leerlas y adjuntar la informacion: [nombre],[apellido],[curp],[rfc],[puesto],[giro],[razon_social],[email],[programa],[horas],[fecha_inicio],[fecha_fin],[fecha_inicio_letra]
+    [fecha_fin_letra],[inicio_dia],[inicio_mes],[inicio_anio],[fin_dia],[fin_mes],[fin_anio],[verificacion_url] para mayor facilidad poner la variable del color y formato de letra antes de subirlo.
+    </p>
 
     <!-- Mensajes de estado -->
     {% if messages %}
