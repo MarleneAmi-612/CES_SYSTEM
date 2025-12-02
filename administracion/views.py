@@ -298,31 +298,15 @@ def _fecha_es_larga(fecha):
 
 def _docx_placeholders_for_request(req, tipo_real: str, verify_url: str | None = None):
     """
-    Construye un diccionario de placeholders para plantillas DOCX.
+    Placeholders disponibles para DOCX:
 
-    Puedes usar estos placeholders en el DOCX (entre corchetes):
+    Minúsculas:
+      [fecha_inicio_letra]
+      [fecha_fin_letra]
 
-      [nombre] [apellido]
-      [nombre_completo]
-      [curp]
-      [rfc]
-      [puesto]
-      [giro]
-      [razon_social]
-      [email]
-      [programa]
-      [horas]
-
-      [fecha_inicio]        -> 11/11/2025
-      [fecha_fin]           -> 15/11/2025
-      [fecha_inicio_letra]  -> 11 de noviembre de 2025
-      [fecha_fin_letra]     -> 15 de noviembre de 2025
-
-      [inicio_dia] / [inicio_mes] / [inicio_anio]
-      [fin_dia]    / [fin_mes]    / [fin_anio]
-
-      [folio]
-      [verificacion_url]
+    MAYÚSCULAS:
+      [fecha_inicio_letra_may]
+      [fecha_fin_letra_may]
     """
 
     # Nombre y programa
@@ -342,8 +326,7 @@ def _docx_placeholders_for_request(req, tipo_real: str, verify_url: str | None =
         inicio = getattr(req, "start_date", None)
         fin    = getattr(req, "end_date", None)
 
-    # Horas (intensidad)
-    # Prioridad: Graduate.hours -> Request.hours -> Program.hours -> None
+    # Horas
     horas = None
     if grad and hasattr(grad, "hours") and grad.hours is not None:
         horas = grad.hours
@@ -358,7 +341,7 @@ def _docx_placeholders_for_request(req, tipo_real: str, verify_url: str | None =
     else:
         folio = f"CON-{req.id:06d}"
 
-    # Fechas en partes (para DC3 por número)
+    # Fechas en partes
     def _parts(d):
         if not d:
             return ("", "", "")
@@ -370,7 +353,22 @@ def _docx_placeholders_for_request(req, tipo_real: str, verify_url: str | None =
     inicio_dia, inicio_mes, inicio_anio = _parts(inicio)
     fin_dia, fin_mes, fin_anio = _parts(fin)
 
-    # Base en minúsculas (las que tú vas a usar en el DOCX)
+    # Formatos de fecha
+    if inicio:
+        inicio_letra = _fecha_es_larga(inicio) or ""
+        inicio_letra_may = inicio_letra.upper()
+    else:
+        inicio_letra = ""
+        inicio_letra_may = ""
+
+    if fin:
+        fin_letra = _fecha_es_larga(fin) or ""
+        fin_letra_may = fin_letra.upper()
+    else:
+        fin_letra = ""
+        fin_letra_may = ""
+
+    # Diccionario principal (minúsculas)
     ctx = {
         "nombre": nombre,
         "apellido": apellidos,
@@ -387,9 +385,14 @@ def _docx_placeholders_for_request(req, tipo_real: str, verify_url: str | None =
         "horas": str(horas) if horas is not None else "",
 
         "fecha_inicio": inicio.strftime("%d/%m/%Y") if inicio else "",
-        "fecha_fin":    fin.strftime("%d/%m/%Y")   if fin   else "",
-        "fecha_inicio_letra": _fecha_es_larga(inicio),
-        "fecha_fin_letra":    _fecha_es_larga(fin),
+        "fecha_fin":    fin.strftime("%d/%m/%Y")     if fin else "",
+
+        "fecha_inicio_letra": inicio_letra,
+        "fecha_fin_letra":    fin_letra,
+
+        # ¡NUEVOS PLACEHOLDERS!
+        "fecha_inicio_letra_may": inicio_letra_may,
+        "fecha_fin_letra_may":    fin_letra_may,
 
         "inicio_dia": inicio_dia,
         "inicio_mes": inicio_mes,
@@ -402,7 +405,7 @@ def _docx_placeholders_for_request(req, tipo_real: str, verify_url: str | None =
         "verificacion_url": verify_url or "",
     }
 
-    # Alias en MAYÚSCULAS (por si algún DOCX viejo los usa)
+    # Alias en MAYÚSCULAS
     upper_aliases = {
         "NOMBRE": "nombre",
         "APELLIDOS": "apellido",
@@ -415,10 +418,18 @@ def _docx_placeholders_for_request(req, tipo_real: str, verify_url: str | None =
         "EMAIL": "email",
         "PROGRAMA": "programa",
         "HORAS": "horas",
+
         "FECHA_INICIO": "fecha_inicio",
         "FECHA_FIN": "fecha_fin",
+
+        # Alias para minúsculas
         "FECHA_INICIO_LETRA": "fecha_inicio_letra",
-        "FECHA_FIN_LETRA": "fecha_fin_letra",
+        "FECHA_FIN_LETRA":    "fecha_fin_letra",
+
+        # Alias MAYÚSCULAS nuevos
+        "FECHA_INICIO_LETRA_MAY": "fecha_inicio_letra_may",
+        "FECHA_FIN_LETRA_MAY":    "fecha_fin_letra_may",
+
         "FOLIO": "folio",
         "VERIFICACION_URL": "verificacion_url",
     }
